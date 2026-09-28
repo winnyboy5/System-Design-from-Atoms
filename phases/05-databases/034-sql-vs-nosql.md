@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry's database has become a junk drawer: orders, recipes, reviews, and chat messages, all tangled together. A new engineer declares, "Just switch to NoSQL, it scales!" Maya isn't convinced. Before choosing anything, she wants to understand what each *kind* of database is actually good at.
+
 ## 🎯 One-sentence idea
 
 **SQL (relational) databases store data in tables with fixed schemas, joins, and strong transactions. NoSQL databases trade some of that for flexible data shapes and easier horizontal scaling. Pick based on your data's relationships, consistency needs, and access patterns.**
@@ -157,6 +161,8 @@ Databases offering SQL and ACID transactions with automatic horizontal scaling (
 - Switch only if the access patterns fit a document model *and* the scale need is real. Migrations are costly and risky.
 - **Likely follow-up:** "When *would* you switch?" → a massive write volume with simple key-based access, or a genuinely schema-less, document-centric domain.
 </details>
+
+> 📖 *Next time: Then a crash charges a customer but never records the order.*
 
 ---
 

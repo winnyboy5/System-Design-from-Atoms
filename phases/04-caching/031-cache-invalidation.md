@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+A cook updates a dish to say "contains peanuts," but the cached page keeps showing the old version to hundreds of customers. This isn't just stale. It's *dangerous*. Maya has run into one of the famously hard problems in computing: keeping copies honest.
+
 ## 🎯 One-sentence idea
 
 **Invalidation is making sure cached copies don't lie after the real data changes. You can let copies expire (TTL), delete them when data changes (explicit invalidation), or version them so old copies are simply never asked for again.**
@@ -145,6 +149,8 @@ After deleting the key, the next miss reads the replica, which doesn't have the 
 - Alternative: the **transactional outbox** pattern from app code (lesson 062).
 - **Likely follow-up:** "What's the lag?" → typically ms to seconds, so it's eventual consistency. Critical reads go to the source.
 </details>
+
+> 📖 *Next time: At 8 pm sharp, the most popular cache entry expires, and ten thousand requests stampede.*
 
 ---
 

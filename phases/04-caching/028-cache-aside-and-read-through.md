@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Maya puts a cache in front of the database, and page loads drop from 50 milliseconds to 1. Magic! But now she has questions. Who puts data into the cache? What happens when something isn't there? And what if the cache itself crashes?
+
 ## 🎯 One-sentence idea
 
 **Cache-aside: the app checks the cache, and on a miss it reads the DB and puts the result in the cache itself. Read-through: the app only talks to the cache, and the cache loads from the DB on a miss. Same idea, different owner of the loading logic.**
@@ -157,6 +161,8 @@ Caching "not found" results for a short time, so repeated lookups for missing da
 - Fixes: **warm caches on startup** (preload the hot keys), **rolling deploys** so only a fraction of servers is cold at once, rely more on a **shared L2 cache** (Redis survives deploys), and ramp traffic slowly to new instances (slow start in the LB).
 - **Likely follow-up:** "How do you know which keys are hot?" → track access frequency, and load the top N from a snapshot.
 </details>
+
+> 📖 *Next time: Reading is solved. But what happens when a cook updates a menu?*
 
 ---
 

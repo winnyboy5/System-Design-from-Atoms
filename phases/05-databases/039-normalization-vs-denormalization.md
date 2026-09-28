@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+The recipe feed shows each recipe with the cook's name, photo, like count, and comment count, and building it takes six joins. Maya is tempted to copy some of that data straight onto each recipe row. Tempting! But what happens when a cook changes their photo?
+
 ## 🎯 One-sentence idea
 
 **Normalization stores each fact exactly once (easy, safe updates, but reads need joins). Denormalization copies facts where they're read (fast reads, but every copy must be updated). Normalize by default, and denormalize deliberately for hot read paths.**
@@ -155,6 +159,8 @@ Publish change events (outbox/CDC) that consumers use to update their copies (ev
 - Keep the `likes` table (who liked what) as the source of truth, and reconcile counters periodically.
 - **Likely follow-up:** "Does the count need to be exact in real time?" → usually no. Approximate counts are fine for display.
 </details>
+
+> 📖 *Next time: A profiling tool reveals that one innocent-looking page makes 101 database queries.*
 
 ---
 

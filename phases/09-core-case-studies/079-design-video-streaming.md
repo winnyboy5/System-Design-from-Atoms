@@ -8,6 +8,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry's cooking videos are a hit, but they buffer on phones, take hours to process, and the bandwidth bill is bigger than the salaries. Maya designs a proper video pipeline, all the way from the cook's upload to your screen.
+
 ## 🎯 One-sentence idea
 
 **A video platform is two systems: an upload pipeline that stores the original and transcodes it into many resolutions and small segments, and a playback system that streams those segments from CDN edges using adaptive bitrate, so the quality adjusts to each viewer's connection.**
@@ -178,6 +182,8 @@ Bandwidth (egress) for delivering video, which is why CDNs and efficient codecs 
 - Measure **rebuffer ratio** and **startup time** as SLIs, per region and ISP.
 - **Likely follow-up:** "How does the player choose bitrate?" → throughput-based, buffer-based (BOLA), or hybrid algorithms.
 </details>
+
+> 📖 *Next time: The last big feature is shared recipe folders that sync across every device.*
 
 ---
 

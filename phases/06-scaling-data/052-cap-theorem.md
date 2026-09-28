@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+At 2 pm, a construction crew cuts the fibre between Pantry's two data centres. Both halves keep running, but they can't talk to each other. A customer in the east orders the last portion of dumplings, and so does a customer in the west. Each side has to make a choice.
+
 ## 🎯 One-sentence idea
 
 **When a network partition splits a distributed system, each side must choose: refuse some requests to stay consistent (CP), or keep answering with possibly stale data (AP). Partitions are unavoidable, so the real choice is C vs A during a partition.**
@@ -136,6 +140,8 @@ CP: etcd, ZooKeeper, Spanner, HBase. AP: Cassandra (at low consistency levels), 
 - **AP:** DC2 returns the old x=5. When the link heals, the replicas reconcile (LWW, merge, or conflict resolution).
 - **Likely follow-up:** "What does the user experience in each case?" → CP: errors or timeouts on one side. AP: possibly stale or conflicting data that is fixed later.
 </details>
+
+> 📖 *Next time: Maya realizes "consistent" isn't one thing. It's a whole menu.*
 
 ---
 

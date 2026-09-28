@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+A customer's phone loses signal just as she taps "Pay." The app retries automatically, and she's charged *twice* for one dinner. Networks fail, retries happen, and duplicates are inevitable. Maya needs every important operation to be safe to repeat.
+
 ## 🎯 One-sentence idea
 
 **An operation is idempotent if doing it twice has the same effect as doing it once. Because retries and duplicate messages are unavoidable in distributed systems, making operations idempotent (usually with a unique idempotency key) is how you avoid double charges and double orders.**
@@ -161,6 +165,8 @@ Atomically claim the key first (a unique insert or lock). Only the winner procee
 - Accept that true exactly-once is impossible end to end, and aim for **effectively-once** via idempotency (lesson 060).
 - **Likely follow-up:** "How long do you keep processed IDs?" → longer than the maximum redelivery window (e.g., 7 days), with a TTL.
 </details>
+
+> 📖 *Next time: Chapter 7 begins. The dinner rush arrives all at once.*
 
 ---
 

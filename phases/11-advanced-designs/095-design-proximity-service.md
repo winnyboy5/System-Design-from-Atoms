@@ -8,6 +8,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry launches its own courier fleet. When a meal is ready, the nearest available courier must be found within seconds among a million moving dots, and must never be assigned twice. Maya designs the geo engine behind it.
+
 ## 🎯 One-sentence idea
 
 **Finding "what's near me" requires turning 2D coordinates into something indexable, like geohash cells, quadtrees, or hexagons (H3/S2). Then you search the user's cell plus its neighbours. Ride-sharing adds a stream of fast-changing driver locations kept in memory, and a matching step that must never double-assign a driver.**
@@ -185,6 +189,8 @@ Reserve the driver atomically (a conditional status update or a single owner per
 - Reduce the update frequency when a driver is idle or stationary, and increase it during trips.
 - **Likely follow-up:** "A city's shard is hot (New Year's Eve)?" → split the city into sub-regions (H3 cells) across more shards.
 </details>
+
+> 📖 *Next time: Pantry now moves real money for millions of cooks.*
 
 ---
 

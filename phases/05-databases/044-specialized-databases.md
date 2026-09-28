@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry's partner kitchens now have smart fridges reporting temperatures every second, couriers send their locations constantly, and Leo wants "dishes similar to this one." Maya discovers that there are specialist databases shaped for exactly these jobs.
+
 ## 🎯 One-sentence idea
 
 **Some data has such a distinctive shape (metrics over time, locations, vectors, immutable ledgers) that purpose-built databases handle it 10–100× better than a general-purpose one. Know they exist, and know when to reach for them.**
@@ -153,6 +157,8 @@ It stores embeddings and quickly finds the most similar vectors (approximate nea
 - Evaluate with click-through and relevance judgments, and cache embeddings for popular queries.
 - **Likely follow-up:** "Why not vectors only?" → exact matches (SKUs, brand names) and filters work better with keyword search, so hybrid gets both.
 </details>
+
+> 📖 *Next time: Maya's architecture diagram now has six databases. Were they all the right choice?*
 
 ---
 

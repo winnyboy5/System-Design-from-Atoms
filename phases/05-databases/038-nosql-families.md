@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry's in-app chat now stores two billion messages, recipes come in every shape imaginable, and Leo wants a "people you may know" feature. Maya realizes that "NoSQL" isn't one thing at all. It's four very different tools wearing one name.
+
 ## 🎯 One-sentence idea
 
 **"NoSQL" is four very different families: key-value (a giant dictionary), document (self-contained JSON records), wide-column (rows partitioned and sorted for massive writes), and graph (nodes and relationships). Each is great at one access pattern.**
@@ -163,6 +167,8 @@ So data that's read together lives in one document, giving a single fast read wi
 - Choose MongoDB if the team and workload are document-centric and cross-entity transactions are rare. Search goes to Elasticsearch either way.
 - **Likely follow-up:** "How would you support faceted search (filter by brand, size, price)?" → a search engine with facets/aggregations (lesson 043).
 </details>
+
+> 📖 *Next time: The recipe feed page needs six joins, and it's crawling.*
 
 ---
 

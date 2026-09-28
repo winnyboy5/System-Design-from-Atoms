@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Maya notices two mysteries. The orders table grew 40% this month, though the row count barely changed. And an analyst's three-hour report somehow didn't block a single checkout. Both mysteries have the same answer: the database quietly keeps several versions of every row.
+
 ## 🎯 One-sentence idea
 
 **MVCC keeps multiple versions of each row, stamped with transaction IDs, so readers see a consistent snapshot without locking. Readers never block writers and writers never block readers, and old versions get cleaned up later.**
@@ -143,6 +147,8 @@ Read committed takes a new snapshot for each statement. Repeatable read uses one
 - Or physical backups (base backup + WAL archiving) for faster restores and PITR (lesson 066).
 - **Likely follow-up:** "Any downside?" → a long snapshot holds back vacuum (bloat) while the dump runs, so prefer running it on a replica.
 </details>
+
+> 📖 *Next time: Leo asks why the "always consistent" European setup feels so slow.*
 
 ---
 

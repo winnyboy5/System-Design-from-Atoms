@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+After the incident, Leo hires a security auditor. The report is long: database passwords sitting in the code repository, unencrypted backups, an admin panel open to the whole internet… Maya learns that security isn't one big lock. It's layers.
+
 ## 🎯 One-sentence idea
 
 **Secure systems use layers of defense: encrypt data in transit and at rest, keep secrets out of code, give every component the least privilege it needs, validate all input, protect the edge from abuse and DDoS, and collect and keep only the personal data you need.**
@@ -156,6 +160,8 @@ Each user or component gets only the minimum permissions required to do its job.
 - Mitigate: fetch from an **isolated egress proxy** in a sandboxed network, **block private/link-local IP ranges** (checked *after* DNS resolution, and re-checked on redirects), allow only http/https, set size and time limits, and use IMDSv2 in AWS.
 - **Likely follow-up:** "What's DNS rebinding?" → a hostname resolves to a public IP at check time and a private IP at fetch time, so pin the resolved IP for the request.
 </details>
+
+> 📖 *Next time: With 60 services now, nobody knows which address is where anymore.*
 
 ---
 

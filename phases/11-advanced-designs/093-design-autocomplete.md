@@ -8,6 +8,10 @@
 
 ---
 
+## 📖 Story
+
+Customers type "pa…" and expect "pad thai" to appear before they've finished typing. Running a full search on every keystroke would melt the search cluster. Maya designs autocomplete that answers in milliseconds.
+
 ## 🎯 One-sentence idea
 
 **Autocomplete returns the top few popular completions for a typed prefix within ~100 ms. The trick is precomputing the top-K suggestions for every prefix offline (from query logs) and serving them from memory and caches, instead of searching at request time.**
@@ -176,6 +180,8 @@ Debouncing keystrokes, cancelling outdated requests, caching results, filtering 
 - Cache per-user results briefly. Fall back to global results if the personalization call is slow (a timeout of ~20 ms).
 - **Likely follow-up:** "Privacy?" → don't suggest other users' personal queries. Only aggregate queries above a frequency threshold appear globally.
 </details>
+
+> 📖 *Next time: Pantry wants to find every recipe on the web.*
 
 ---
 

@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+A major cloud region suffers an outage, and every Pantry server, database, and backup lives in that region. For six hours, Pantry simply doesn't exist. Leo asks, "How much data could we lose, and how long could we be down?" Maya needs two numbers and a plan.
+
 ## 🎯 One-sentence idea
 
 **Disaster recovery plans for losing a whole datacenter or region. RPO is how much data you can afford to lose, and RTO is how long you can afford to be down. Those two numbers decide whether you need simple backups, a standby region, or fully active-active multi-region.**
@@ -139,6 +143,8 @@ Synchronous replication would add the cross-region round trip (~60–150 ms) to 
 - Postmortem: safer migrations (backfills in batches, reversible steps, reviews), and tested PITR.
 - **Likely follow-up:** "Why not fail over to a replica?" → replicas received the same corruption.
 </details>
+
+> 📖 *Next time: The team keeps learning about problems from angry customers instead of from dashboards.*
 
 ---
 

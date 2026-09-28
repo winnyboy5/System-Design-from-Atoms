@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+A customer searches for "spicy vegan noodels" (typo included) and gets zero results, even though Pantry has forty matching dishes. The database's simple text matching can't handle typos, word forms, or ranking. Maya needs a real search engine.
+
 ## 🎯 One-sentence idea
 
 **Search engines flip the data around: instead of "document → words," they store "word → list of documents containing it" (an inverted index). That makes full-text search across millions of documents fast, with relevance ranking on top.**
@@ -158,6 +162,8 @@ It's updated asynchronously (events/CDC plus the engine's refresh interval), so 
 - A short lag is usually acceptable. A lag of minutes signals a pipeline problem.
 - **Likely follow-up:** "How do you handle deletes in CDC?" → a tombstone event → a delete-by-ID in the index.
 </details>
+
+> 📖 *Next time: Leo asks about fridge sensors, courier locations, and "dishes similar to this one."*
 
 ---
 

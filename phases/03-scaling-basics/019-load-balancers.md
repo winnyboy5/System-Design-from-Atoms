@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Maya now has three identical servers, but customers still know only one address. Something must stand at the front door, greet every request, and send it to a server that's awake. And when server two crashes during the lunch rush, nobody should even notice.
+
 ## 🎯 One-sentence idea
 
 **A load balancer sits in front of many servers, spreads incoming requests across them, and stops sending traffic to servers that fail health checks. It's what makes horizontal scaling and redundancy work.**
@@ -139,6 +143,8 @@ Letting in-flight requests on a server finish while sending it no new ones, befo
 - Fixes: **connection draining / deregistration delay**, a graceful shutdown handler (stop accepting, finish in-flight, then exit), **readiness probes** before adding to the pool, **rolling or blue-green** deploys (lesson 068), and making sure client retries on idempotent requests.
 - **Likely follow-up:** "What about WebSocket connections?" → drain over a longer window, tell clients to reconnect elsewhere with jitter.
 </details>
+
+> 📖 *Next time: The front door works, but some servers are drowning while others sit idle.*
 
 ---
 

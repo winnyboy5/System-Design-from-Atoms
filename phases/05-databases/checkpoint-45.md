@@ -6,6 +6,8 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
+> 📖 *Maya can justify every database on the diagram. Before Pantry goes national, let's check that you can too.*
+
 ---
 
 ## ⚡ Part 1: Recall (5 questions)

@@ -3,6 +3,12 @@
 > **Lessons 034–045 · 34% → 45% · 🅰️ Part A (core)**
 > By the end of this phase you'll **choose the right database for the job**, understand **transactions and indexes**, and model data around **how it's accessed**.
 
+## 📖 Chapter 5: A Home for Every Kind of Data
+
+Pantry's single database has become a junk drawer of orders, recipes, chats, videos, and reports. In this chapter, Maya learns what makes data safe (transactions), fast to find (indexes), and well-shaped (modelling), and she gives each kind of data its proper home: relational, NoSQL, warehouse, object storage, search engine, or specialist store.
+
+## 🗺️ Phase map
+
 ```mermaid
 flowchart LR
     L34["034<br/>SQL vs NoSQL"] --> L35["035<br/>ACID"]

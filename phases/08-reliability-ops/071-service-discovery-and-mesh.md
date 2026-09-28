@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry now runs 60 services across hundreds of containers that come and go all day. Hard-coded addresses break every week, and each team writes its own retry and encryption code, all slightly differently. Maya needs a live directory, and maybe a helper standing beside every service.
+
 ## 🎯 One-sentence idea
 
 **In a dynamic fleet where instances come and go, service discovery lets services find each other's current addresses through a registry. A service mesh adds a proxy next to every service that handles discovery, load balancing, retries, mTLS, and telemetry, so app code doesn't have to.**
@@ -159,6 +163,8 @@ Missed heartbeats or TTL expiry (or the orchestrator removes them when they fail
 - **Learning curve** for the team.
 - **Likely follow-up:** "How do newer meshes reduce the overhead?" → sidecar-less / ambient modes (per-node proxies, eBPF) and proxyless gRPC with xDS.
 </details>
+
+> 📖 *Next time: Two database shards generate the same order number, and chaos follows.*
 
 ---
 

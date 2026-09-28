@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+The team argues. "Likes can be a bit stale," says one. "Balances can't," says another. "Comments must appear in order," says a third. They're all right. Maya learns there are many levels of consistency, and each feature gets to order its own.
+
 ## 🎯 One-sentence idea
 
 **A consistency model is the promise a system makes about what reads can return after writes. It ranges from strong (everyone sees the latest value, like a single copy) to eventual (copies agree *eventually*), with useful middle grounds like causal and read-your-writes.**
@@ -142,6 +146,8 @@ Read-your-writes, monotonic reads, monotonic writes, writes-follow-reads (any tw
 - Apply strong consistency where it matters (money, inventory, uniqueness, permissions), and weaker models elsewhere.
 - **Likely follow-up:** "How do you explain eventual consistency to users?" → UX patterns: optimistic UI updates, "syncing…" indicators, and last-updated timestamps.
 </details>
+
+> 📖 *Next time: Maya wants fresh reads without asking every copy every time.*
 
 ---
 

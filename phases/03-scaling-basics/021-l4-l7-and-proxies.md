@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry now has an API, an image service, and a chat server, all living behind pantry.com. Maya needs the front door to *read* each request and route it by its path. But some traffic, like the database's, doesn't even speak HTTP. Two kinds of doormen, for two kinds of jobs.
+
 ## 🎯 One-sentence idea
 
 **An L4 load balancer routes by network address and port without reading the content (fast, dumb). An L7 load balancer reads the HTTP request and can route by URL, header, or cookie (smart, slower). A reverse proxy stands in front of servers, and a forward proxy stands in front of clients.**
@@ -152,6 +156,8 @@ L4 is cheap and fast at absorbing huge connection volumes (and some DDoS), and s
 - **Latency:** an extra hop that does real work. L4 can even use direct server return.
 - **Likely follow-up:** "What's direct server return?" → the L4 LB forwards the request, and the backend responds directly to the client, bypassing the LB on the way back (great for heavy responses like video).
 </details>
+
+> 📖 *Next time: Every service is re-implementing login checks. Maya wants one front desk for all of them.*
 
 ---
 

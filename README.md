@@ -12,10 +12,12 @@
 - **100 lessons, and each one is 1%.** Your progress is simply the number of lessons you've finished.
 - **Most important stuff comes first.** Lessons **1–80 (Part A)** are the core that every engineer and interviewer expects. Lessons **81–100 (Part B)** are the advanced 20%. If you stop at 80%, you still have practical mastery.
 - **There's a checkpoint every 5%.** Each one is a short self-test, an explain-it-aloud task, a mini design, and interview questions. You get a bigger 🎉 level-up every 10%, and a 🏁 **Practical Mastery gate at 80%**.
+- **It's told as a story.** A narrator follows Maya, a junior engineer, as she grows **Pantry** (a neighbourhood food marketplace) from one laptop into a global service. Every lesson begins when the story hits a problem that the lesson solves. 👉 [Meet the cast in STORY.md](STORY.md)
 - **Every lesson has the same shape**, so your brain always knows what's coming next:
 
 | Section | What it gives you |
 |---|---|
+| 📖 Story | The scene: why this problem shows up *now* |
 | 🎯 One-sentence idea | The whole lesson in one line |
 | 🧸 Analogy | An everyday picture |
 | 🖼️ Visual | A diagram |
@@ -27,6 +29,7 @@
 | 🧪 Feynman check | Explain it back, plus the common confusion |
 | ⚡ Quick recall | 3 questions with hidden answers |
 | 🎤 Interview practice | Interview-style questions with model answers |
+| 📖 Next time… | A one-line teaser for the next lesson |
 
 👉 **New here? Read [START-HERE.md](START-HERE.md) first (5 min).** Then track your progress in [PROGRESS.md](PROGRESS.md).
 

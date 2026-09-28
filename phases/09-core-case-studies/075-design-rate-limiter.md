@@ -8,6 +8,10 @@
 
 ---
 
+## 📖 Story
+
+Within a week, bots are creating a million short links a day and flooding the API. Pantry needs rate limiting, and not on one server, but consistently across fifty gateways at once. Maya designs a proper distributed rate limiter.
+
 ## 🎯 One-sentence idea
 
 **A distributed rate limiter enforces "at most N requests per time window per client" across many servers. It needs a fast shared counter (usually Redis), a good algorithm (token bucket or sliding window), and a plan for when the limiter itself is slow or down.**
@@ -176,6 +180,8 @@ Each gateway reserves a batch of tokens from Redis and serves requests from memo
 - Evaluate both atomically in one Lua script, and deny if either fails. Return the most restrictive `Retry-After`.
 - **Likely follow-up:** "Daily resets at midnight UTC cause spikes?" → use rolling 24 h sliding windows, or stagger resets per user.
 </details>
+
+> 📖 *Next time: Leo's next dream is a feed of recipes from the cooks you follow.*
 
 ---
 

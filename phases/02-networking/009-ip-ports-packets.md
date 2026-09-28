@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry's first out-of-town order arrives from a city 300 kilometres away. Maya realizes that message hopped across dozens of machines to reach her little server. How did it know where to go? And how did it find the right program once it arrived? Time to learn the internet's addressing system.
+
 ## 🎯 One-sentence idea
 
 **Every machine on a network has an IP address, every program on it listens on a port, and data travels in small chunks called packets that routers pass hop by hop toward the destination.**
@@ -139,6 +143,8 @@ Each packet is routed independently and may take a different path or be delayed 
 - The 65k limit bites on the **client side**: one client IP talking to one server IP:port can open at most about 64k connections (e.g., a proxy talking to a backend). Fix it with more source IPs or connection pooling.
 - **Likely follow-up:** "What limits a server with many connections?" → memory per connection, file descriptor limits, CPU for TLS, kernel tuning.
 </details>
+
+> 📖 *Next time: The messages arrive, but should they travel like a phone call or like a postcard?*
 
 ---
 

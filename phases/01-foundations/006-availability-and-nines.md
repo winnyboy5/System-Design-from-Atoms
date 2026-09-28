@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+At 7 pm on a Saturday, Pantry's only server crashes. For 40 minutes nobody can order dinner, and angry messages pile up. Leo asks, "Can we promise this never happens again?" Maya knows "never" is impossible. But "almost never" can be measured, planned for, and paid for.
+
 ## 🎯 One-sentence idea
 
 **Availability is the percentage of time a system works. Each extra "nine" (99% → 99.9% → 99.99%) means 10× less downtime, and costs a lot more to achieve.**
@@ -136,6 +140,8 @@ About **8.76 hours**.
 - Improve it by making dependencies **soft**: cache their responses, use fallbacks/defaults, make calls **async** via queues, and add **circuit breakers** so one failure doesn't cascade.
 - **Likely follow-up:** "Which dependencies can be soft?" → e.g., recommendations or reviews on a product page. Payments and inventory usually can't.
 </details>
+
+> 📖 *Next time: Leo wants to promise customers reliability. Maya wants to know exactly *what* to promise.*
 
 ---
 

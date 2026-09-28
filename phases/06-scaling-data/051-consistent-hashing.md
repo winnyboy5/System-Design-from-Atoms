@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry's cache cluster needs two more servers. Last time the team added one, 80% of the cached keys moved, and the database nearly drowned in misses. Maya discovers a beautifully simple idea: put everything on a circle.
+
 ## 🎯 One-sentence idea
 
 **Consistent hashing places both servers and keys on a circle (a "ring"). Each key belongs to the next server clockwise, so adding or removing a server only moves the keys next to it (about 1/N of them) instead of reshuffling everything.**
@@ -165,6 +169,8 @@ Each key is stored on the next N distinct physical servers clockwise from its po
 - Heterogeneous hardware → more vnodes for bigger nodes.
 - **Likely follow-up:** "Rack/AZ awareness?" → when choosing the N replicas, skip nodes in the same rack/AZ as the ones already chosen (lesson 092).
 </details>
+
+> 📖 *Next time: A construction crew cuts the cable between Pantry's two data centres.*
 
 ---
 

@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+A big office wants Pantry for staff lunches, and their lawyer sends a contract: "What uptime do you guarantee?" Leo is ready to write 100%. Maya gently takes the pen away. She's learning the difference between what you *measure*, what you *aim for*, and what you *promise*.
+
 ## 🎯 One-sentence idea
 
 **SLI is what you measure, SLO is the target you aim for, and SLA is the promise (with penalties) you make to customers. The gap between 100% and your SLO is an "error budget" you're allowed to spend.**
@@ -125,6 +129,8 @@ So you notice and fix problems (SLO breach) before you owe customers money (SLA 
 - Resume normal velocity when the budget recovers over the rolling window.
 - **Likely follow-up:** "What if the business insists on shipping?" → leadership accepts the risk explicitly, and the SLO may need renegotiation if it's unrealistic.
 </details>
+
+> 📖 *Next time: Before building anything bigger, Maya needs to pin down exactly what Pantry must do.*
 
 ---
 

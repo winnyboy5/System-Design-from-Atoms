@@ -8,6 +8,10 @@
 
 ---
 
+## 📖 Story
+
+3–5 sentences from the narrator: Maya hits exactly the problem this lesson solves at Pantry. Keep it under ~80 words, with no jargon the lesson hasn't defined yet.
+
 ## 🎯 One-sentence idea
 
 **The single idea of this lesson, in one plain sentence.**
@@ -72,6 +76,8 @@ Answer.
 - Trade-offs
 - **Likely follow-up:** …
 </details>
+
+> 📖 *Next time: a one-line teaser for the next lesson's problem.*
 
 ---
 

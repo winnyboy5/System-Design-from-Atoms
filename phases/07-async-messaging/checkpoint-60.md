@@ -6,6 +6,8 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
+> 📖 *The dinner rush no longer knocks Pantry over. Maya sleeps well tonight. Let's review before the next storm.*
+
 ---
 
 ## ⚡ Part 1: Recall (5 questions)

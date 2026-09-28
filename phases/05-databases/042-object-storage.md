@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Cooks upload recipe videos and photos, and Maya has been storing them inside the database. Backups now take nine hours, and the disk is almost full. She needs a home built for big files: cheap, endless, and nearly impossible to lose.
+
 ## 🎯 One-sentence idea
 
 **Object storage (S3, GCS, Azure Blob) stores files ("objects") by key in practically unlimited, very durable, cheap buckets. It's the right home for images, video, backups, and data lakes, and the wrong home for data you update in small pieces or query.**
@@ -147,6 +151,8 @@ In a database (metadata), with the object key referencing the file in object sto
 - Object storage gives durability, unlimited scale, cheap tiers, and direct CDN integration.
 - **Likely follow-up:** "What about latency for small, frequently read files?" → the CDN plus caching solves reads, and object storage first-byte latency (~tens of ms) is fine behind a CDN.
 </details>
+
+> 📖 *Next time: A customer searches for "spicy vegan noodels" and gets nothing back.*
 
 ---
 

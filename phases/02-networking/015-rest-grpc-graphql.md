@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry's new mobile app needs six requests just to draw the home screen, and it's painfully slow on a weak signal. Meanwhile, the backend is splitting into services that chatter constantly. Maya discovers three popular styles of API, and each one shines in a different place.
+
 ## 🎯 One-sentence idea
 
 **REST is simple and universal (great for public APIs), gRPC is fast and strongly typed (great between internal services), and GraphQL lets clients ask for exactly the data they need (great for varied front-ends).**
@@ -158,6 +162,8 @@ Resolving a list of N items and then fetching a related field for each one separ
 - **Authorization per field**, since the schema exposes a lot.
 - **Likely follow-up:** "How do you rate limit GraphQL?" → by query cost points, not by request count.
 </details>
+
+> 📖 *Next time: Customers want to watch their courier move live, without pressing refresh.*
 
 ---
 

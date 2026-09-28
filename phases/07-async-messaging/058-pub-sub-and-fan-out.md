@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Every new order matters to the kitchen, the courier team, analytics, loyalty, and the new fraud team. Maya's order service is turning into a switchboard operator, calling everyone one by one. She wants to announce once, and let anyone who cares listen in.
+
 ## 🎯 One-sentence idea
 
 **In publish/subscribe, a publisher sends an event to a topic, and every subscriber gets its own copy. One event fans out to many independent listeners, and the publisher doesn't know or care who they are.**
@@ -154,6 +158,8 @@ They represent facts that already happened, not commands, so producers stay unaw
 - Redis Pub/Sub is fine for **ephemeral** signals (typing indicators, cache invalidation hints, chat routing between gateways, with durable storage elsewhere).
 - **Likely follow-up:** "What does Redis Streams add?" → persistence, consumer groups, acks, and replay by ID.
 </details>
+
+> 📖 *Next time: The analytics team wants to replay last week's orders after fixing a bug.*
 
 ---
 

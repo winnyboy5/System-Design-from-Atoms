@@ -6,6 +6,8 @@
 
 **Rules:** answer each question **out loud or on paper before** opening the answer. No peeking. Peeking turns recall into rereading.
 
+> 📖 *Maya pins her napkin math to the fridge. Before our story moves on, let's make sure you'd have done the same math.*
+
 ---
 
 ## ⚡ Part 1: Recall (5 questions)

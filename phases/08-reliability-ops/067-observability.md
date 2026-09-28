@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+For the third time this month, Pantry learns about an outage from social media before a single alarm goes off. And when the site is slow, nobody can tell *which* of 30 services is to blame. Maya needs a way to see inside the system.
+
 ## 🎯 One-sentence idea
 
 **Observability is being able to understand what your system is doing from the outside. Metrics tell you *that* something is wrong, traces show *where*, and logs explain *why*. Alerts should fire on user-visible symptoms (SLOs), not on every twitch.**
@@ -163,6 +167,8 @@ Symptoms (errors, latency, SLO burn) reflect real user impact. Cause-based alert
 - Then add the missing SLI or dashboard so it's visible next time.
 - **Likely follow-up:** "How do you find the needle in 1B requests?" → high-cardinality event exploration (Honeycomb-style), filtering by user, app version, region, and endpoint.
 </details>
+
+> 📖 *Next time: The latest outage? It started with a Friday afternoon deploy.*
 
 ---
 

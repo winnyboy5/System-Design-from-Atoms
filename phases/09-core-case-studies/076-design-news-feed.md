@@ -8,6 +8,10 @@
 
 ---
 
+## 📖 Story
+
+Leo wants an Instagram-style feed: fresh recipes from the cooks you follow. Simple, until Maya learns that Pantry's most famous chef has twelve million followers. Every design choice now depends on *when* you build each person's feed.
+
 ## 🎯 One-sentence idea
 
 **A news feed shows each user the recent posts of everyone they follow. The central decision is *when* to assemble it: at write time (push the post into followers' precomputed feeds) or at read time (pull from followees when the feed is opened), with a hybrid for celebrities.**
@@ -191,6 +195,8 @@ They're filtered out during hydration (lazy deletion), instead of being removed 
 - Cache ranked pages briefly, and log impressions and engagement for training.
 - **Likely follow-up:** "How do you keep latency < 300 ms?" → limit candidates (~500), precompute features, use a lightweight first-stage ranker and a heavier second stage on the top-K.
 </details>
+
+> 📖 *Next time: Customers want to message cooks in real time.*
 
 ---
 

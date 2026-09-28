@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry's storage cluster now has 800 machines. A central list of "who's alive" can't keep up, and one slow network link keeps getting a perfectly healthy machine declared dead. Maya discovers how *rumours* can spread information reliably.
+
 ## 🎯 One-sentence idea
 
 **In a large cluster, nodes learn about each other by gossiping: each periodically shares what it knows with a few random peers, so information spreads to everyone in about log(N) rounds. They detect failures with heartbeats and suspicion, never certainty, because a slow node looks exactly like a dead one.**
@@ -150,6 +154,8 @@ Messages can be arbitrarily delayed, so a slow node is indistinguishable from a 
 - Add **hysteresis/cooldowns** on failover decisions. For DB primaries, require a consensus of observers.
 - **Likely follow-up:** "What's the trade-off?" → slower detection of real failures, which means a slightly longer outage when a node really dies.
 </details>
+
+> 📖 *Next time: A single checkout now spans five services. How can it still be all-or-nothing?*
 
 ---
 

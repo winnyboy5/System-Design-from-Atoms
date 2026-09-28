@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Two database shards both create order #558201. Receipts get mixed up, and one customer receives someone else's refund. With data spread across many machines, "just count upwards" no longer works. Maya needs IDs that are unique everywhere, without one central bottleneck.
+
 ## 🎯 One-sentence idea
 
 **When many machines create records at once, a single auto-increment counter becomes a bottleneck and a single point of failure. Use IDs that each machine can generate independently, like UUIDs (random) or Snowflake-style IDs (timestamp + machine ID + sequence), which are unique, compact, and sortable by time.**
@@ -172,6 +176,8 @@ It could reuse timestamps and generate duplicates, so it must detect this and wa
 - It's fine for small, single-DB systems, and it's simple.
 - **Likely follow-up:** "When is auto-increment fine?" → a single primary with moderate write rates, and internal IDs only.
 </details>
+
+> 📖 *Next time: Chapter 9 begins. Pantry's big features, designed properly from scratch.*
 
 ---
 

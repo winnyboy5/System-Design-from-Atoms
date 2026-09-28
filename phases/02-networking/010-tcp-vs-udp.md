@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Leo wants a live "your courier is here" map and a button to call the cook. Maya notices something odd: order data must arrive perfectly, but a dot on a live map can afford to skip a beat. There are two ways to send data across the internet, and they suit very different jobs.
+
 ## 🎯 One-sentence idea
 
 **TCP is a reliable, ordered connection that resends anything lost (slower but safe). UDP just fires packets with no guarantees (fast but lossy). Pick based on whether a late packet is worse than a missing one.**
@@ -146,6 +150,8 @@ Queries and answers are tiny and one-shot. A handshake would double the latency.
 - It uses UDP because it avoids **TCP head-of-line blocking** across multiplexed streams, allows **faster handshakes** (combined transport + TLS, 0-RTT resumption), and supports **connection migration** (a phone switching Wi-Fi → 4G keeps its connection).
 - **Likely follow-up:** "Any downsides?" → some networks and firewalls block or throttle UDP, and it's more CPU-heavy in user space. Browsers fall back to HTTP/2.
 </details>
+
+> 📖 *Next time: Customers type pantry.com, not a string of numbers. So who does the translating?*
 
 ---
 

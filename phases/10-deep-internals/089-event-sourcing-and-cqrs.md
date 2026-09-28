@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry launches wallets for cooks. The finance team asks, "Can we see exactly how every balance reached its value, on any day in history?" A single balance column can't answer that. Maya considers storing the *history itself* as the truth.
+
 ## 🎯 One-sentence idea
 
 **Event sourcing stores every change as an immutable event and derives the current state by replaying them, so you get a full history for free. CQRS separates the write model (commands) from read models (queries) that are built from those events and shaped for each screen.**
@@ -152,6 +156,8 @@ Crypto-shredding: encrypt personal data with a per-user key, and delete the key 
 - Options: return the new state directly from the command response (optimistic UI), wait for the projection to reach the write's position (a read-your-writes token), read from the write model for the user's own data, or reduce the projection lag (monitoring, scaling projectors).
 - **Likely follow-up:** "How do you monitor it?" → projection lag = the latest event position minus the projector checkpoint, with alerts on growth.
 </details>
+
+> 📖 *Next time: Leo wants to count unique visitors across a billion events, using almost no memory.*
 
 ---
 

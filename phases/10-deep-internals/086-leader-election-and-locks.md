@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+The nightly payout job runs on an elected leader. One night, the leader freezes for twenty seconds during a memory clean-up pause. A new leader takes over, and then the old one wakes up, and *both* pay the cooks. Maya learns why locks need expiry dates and ticket numbers.
+
 ## 🎯 One-sentence idea
 
 **Leader election and distributed locks make sure only one node does something at a time. Because a paused or partitioned node can wrongly believe it still holds the lock, safe systems use leases (locks that expire) plus fencing tokens (increasing numbers the storage checks) so stale holders can't do damage.**
@@ -153,6 +157,8 @@ The leader's ephemeral node / lease expires when it stops heartbeating, and watc
 - Practical answer: fine for **efficiency** locks. For **correctness**, use consensus-based locks **plus fencing** at the resource.
 - **Likely follow-up:** "How would you add fencing to a system writing to S3?" → it's hard, since S3 doesn't check tokens. Use conditional writes (ETag/version preconditions) or a coordinating DB that validates tokens.
 </details>
+
+> 📖 *Next time: With 800 servers, how does everyone even know who's still alive?*
 
 ---
 

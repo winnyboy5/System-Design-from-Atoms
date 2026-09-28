@@ -3,6 +3,12 @@
 > **Lessons 056–062 · 56% → 62% · 🅰️ Part A (core)**
 > By the end of this phase you'll **decouple systems** with queues, pub/sub, and event streams, absorb traffic spikes, and move data reliably between services.
 
+## 📖 Chapter 7: The Dinner Rush
+
+Every evening, orders pour in all at once, and every checkout waits on a chain of slow side-tasks. In this chapter, Maya learns to say "I'll do that later, reliably": queues, announcements that many teams can hear, replayable logs, honest delivery promises, polite refusal under overload, and events that can never be lost.
+
+## 🗺️ Phase map
+
 ```mermaid
 flowchart LR
     L56["056<br/>Sync vs<br/>async"] --> L57["057<br/>Message<br/>queues"]

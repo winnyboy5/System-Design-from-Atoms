@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+At 6:45 pm, the primary database's disk fails. There's no standby. Pantry is down for ninety minutes while Priya restores from a backup. The next morning, Leo asks the question that starts every reliability project: "What else do we only have *one* of?"
+
 ## 🎯 One-sentence idea
 
 **A single point of failure (SPOF) is any component whose failure takes down the whole system. Remove SPOFs with redundancy (spare copies), health detection, and automatic failover, and spread the copies across failure domains (machines, racks, availability zones).**
@@ -146,6 +150,8 @@ After losing a node or AZ, the survivors must handle the full peak load, or fail
 - Keep runbooks up to date, and do postmortems for the gaps.
 - **Likely follow-up:** "Isn't breaking production risky?" → start small (one instance, low traffic), have a kill switch, and do it during business hours with the team ready. It's safer than discovering the gaps during a real outage.
 </details>
+
+> 📖 *Next time: Then an entire cloud region goes dark.*
 
 ---
 

@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Only one portion of Grandma Rosa's famous lasagna is left. Two customers click "Buy" within the same millisecond, and *both* get a confirmation. Maya's checkout used transactions, so how did this happen? She's about to learn that "isolation" comes in levels.
+
 ## 🎯 One-sentence idea
 
 **Isolation levels decide how much concurrent transactions can see of each other. Stronger levels prevent more weird bugs (anomalies) but cost performance, and most databases default to a middle level, not the strongest.**
@@ -156,6 +160,8 @@ Two transactions read overlapping data, and each updates different rows based on
 - Fixes: a **DB constraint** (Postgres exclusion constraint on `(room, tstzrange)` with no overlaps), or lock a row that represents the room (`SELECT ... FOR UPDATE` on the room) before checking, or use **SERIALIZABLE** isolation with retries.
 - **Likely follow-up:** "What about a distributed system with no single DB?" → a reservation service with a single owner per room (partitioned), or a distributed lock with fencing (lesson 086).
 </details>
+
+> 📖 *Next time: A loyal customer's order history now takes eight seconds to load.*
 
 ---
 

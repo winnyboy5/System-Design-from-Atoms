@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+At 3 am, a single bot hits Pantry's search 5,000 times a second, and real customers can't even load a menu. Maya could block this one bot, but next week there'll be another. She needs a fair rule for everyone: *you may have this much, this fast, and no more.*
+
 ## 🎯 One-sentence idea
 
 **Rate limiting caps how many requests a client can make in a time window. It protects your system from abuse and overload and keeps things fair, and it uses simple algorithms like the token bucket.**
@@ -154,6 +158,8 @@ Clients can send up to 2× the limit in a short span around the window boundary.
 - Encourage MFA.
 - **Likely follow-up:** "Attackers use millions of IPs, one attempt each. Now what?" → per-account limits, device fingerprinting, and behavioural and risk scoring. Per-IP limits alone fail here.
 </details>
+
+> 📖 *Next time: Traffic now swings wildly between lunch and midnight, and Leo hates paying for idle servers.*
 
 ---
 

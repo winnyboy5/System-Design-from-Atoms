@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry's configuration service must never disagree with itself. Every server must see the same feature flags, in the same order, even while machines crash. Maya studies how a small group of computers can agree on a single truth, reliably.
+
 ## 🎯 One-sentence idea
 
 **Consensus lets a group of servers agree on a single, ordered log of decisions, even if some crash or messages are delayed. Raft does it by electing one leader per term, which replicates log entries and commits each once a majority has stored it.**
@@ -164,6 +168,8 @@ To make it unlikely that several followers become candidates at the same time an
 - Cross-range transactions then need a coordination protocol on top (e.g., parallel commits / 2PC-like protocols).
 - **Likely follow-up:** "What's the cost?" → the overhead of many heartbeats (so they coalesce them), and complex rebalancing and leader placement.
 </details>
+
+> 📖 *Next time: A frozen server wakes up still believing it's in charge.*
 
 ---
 

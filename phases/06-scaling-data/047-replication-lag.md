@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+A customer updates her delivery address, refreshes the page, and sees the old one. She updates it again. And again. Three dinners go to the wrong house. Her write went to the leader, but her reads went to a copy that was a second behind.
+
 ## 🎯 One-sentence idea
 
 **Followers apply changes slightly after the leader (replication lag), so a read from a follower can return old data. Guarantees like read-your-writes and monotonic reads hide that lag from users where it matters.**
@@ -150,6 +154,8 @@ Heavy write bursts or bulk jobs, long-running queries on the replica, network is
 - Schedule the job at low-traffic times, and investigate replica I/O limits.
 - **Likely follow-up:** "What if all replicas lag?" → temporarily send reads to the leader (if capacity allows), degrade non-critical features, and alert.
 </details>
+
+> 📖 *Next time: Pantry opens in Europe, and every European write crawls across the ocean.*
 
 ---
 

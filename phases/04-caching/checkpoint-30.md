@@ -6,6 +6,8 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
+> 📖 *The menu page is fast again, thanks to caching. Before the cache faces its first real crisis, pause and test yourself.*
+
 ---
 
 ## ⚡ Part 1: Recall (5 questions)

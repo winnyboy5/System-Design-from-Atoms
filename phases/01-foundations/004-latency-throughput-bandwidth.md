@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+It's the Friday dinner rush. Orders flood in, and even though each one takes only a moment, a line forms and everything slows down. Leo is baffled: "Each order takes 50 milliseconds. Why is everyone waiting two seconds?" Maya realizes that "fast" can mean three completely different things.
+
 ## 🎯 One-sentence idea
 
 **Latency is how long one thing takes, throughput is how many things finish per second, and bandwidth is the maximum the pipe can carry. Improving one doesn't automatically improve the others.**
@@ -148,6 +152,8 @@ Queueing delay grows sharply as utilization approaches 100%, and you need spare 
 - Fix: add capacity, shed load, reduce per-request work, or separate latency-sensitive traffic from bulk traffic.
 - **Likely follow-up:** "How would you protect latency-sensitive requests?" → separate pools (bulkheads, lesson 064), priority queues, rate limits.
 </details>
+
+> 📖 *Next time: Leo has big plans, and Maya needs numbers before anyone buys a single server.*
 
 ---
 

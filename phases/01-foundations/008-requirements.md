@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Leo's whiteboard is covered in dreams: chat with cooks, live courier maps, recipe videos, cooking classes. Maya itches to start drawing boxes and arrows. But you and she have learned something already: don't draw a system before you know what it's *for*. So she sits Leo down and asks questions first.
+
 ## 🎯 One-sentence idea
 
 **Functional requirements say *what* the system does (features). Non-functional requirements say *how well* it does it (scale, speed, uptime, consistency). You must pin both down before drawing a single box.**
@@ -134,6 +138,8 @@ To keep the design focused, to show prioritization, and to agree with the interv
 - Choose requirements that let you show interesting trade-offs (e.g., read-heavy with a hot-key problem).
 - **Likely follow-up:** "What if scale were 100× bigger?" → explain what would change (sharding, caching tiers, multi-region).
 </details>
+
+> 📖 *Next time: Chapter 2 begins. Pantry's first customers are about to arrive from far away, across the internet.*
 
 ---
 

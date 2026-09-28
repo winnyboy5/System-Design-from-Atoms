@@ -8,6 +8,10 @@
 
 ---
 
+## 📖 Story
+
+Years have passed. Pantry feeds millions of people, and Maya now leads the design reviews. A nervous junior engineer sits across from her, just as Maya once sat across from Leo. Maya smiles and says, "Let me tell you a story." And now, dear reader, the pen passes to *you*. It's time to write your own chapter.
+
 ## 🎯 One-sentence idea
 
 **True mastery, the Feynman way, means you can design a system you've never seen, justify every choice with requirements and numbers, and teach it so clearly that a beginner understands. The capstone is doing exactly that, end to end, and publishing it.**
@@ -149,6 +153,8 @@ Map each one to the relevant atom lesson (via COVERAGE.md), relearn it, and upda
 - At minute ~20, they inject a twist: "traffic is 100× more", "the region fails", or "now it must be strongly consistent."
 - Afterwards, both score it with the [80% gate rubric](../09-core-case-studies/checkpoint-80.md). Swap roles next time. **Interviewing others teaches you a lot too.**
 </details>
+
+> 📖 *Next time: The end of Maya's story, and the beginning of yours.*
 
 ---
 

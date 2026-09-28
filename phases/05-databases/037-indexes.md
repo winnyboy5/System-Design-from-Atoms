@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+A loyal customer with 3,000 past orders opens "My orders," and it takes eight seconds to load. Maya discovers the database is reading every one of Pantry's 50 million orders just to find hers. She remembers the index at the back of her old school textbook.
+
 ## 🎯 One-sentence idea
 
 **An index is a sorted lookup structure (usually a B-tree) that lets the database find matching rows without scanning the whole table. It makes reads dramatically faster, at the cost of extra storage and slower writes.**
@@ -158,6 +162,8 @@ Every insert, update, or delete must also update each index on the table.
 - **Growth:** partition by time (drop old partitions instead of deleting rows).
 - **Likely follow-up:** "Why do random UUIDs hurt?" → inserts land all over the B-tree, the working set doesn't fit in memory, and there's more I/O and fragmentation.
 </details>
+
+> 📖 *Next time: Chat messages are piling up by the billion, and the relational database is straining.*
 
 ---
 

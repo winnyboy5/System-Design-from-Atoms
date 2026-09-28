@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry now has 40 engineers working in one giant codebase. Deploys take a whole day, and a typo on the recipes page just broke checkout. Someone in a meeting says, "Let's do microservices, like Netflix!" Maya has learned enough by now to know that's a big decision with a big price tag.
+
 ## 🎯 One-sentence idea
 
 **A monolith is one deployable app (simple to build, test, and run). Microservices split the app into small independent services (teams and parts can scale and ship independently, but you pay a big distributed-systems tax). Split when team size and scaling needs demand it, not before.**
@@ -150,6 +154,8 @@ Gradually replacing a legacy system by routing one feature at a time to new serv
 - Fixes: redraw boundaries around domains, **one owner per data set**, replace sync chains with **events and local read models**, **version APIs** (backward-compatible changes), and consider **merging** services that always change together.
 - **Likely follow-up:** "How do you handle a transaction spanning orders and payments?" → saga with compensations and an outbox (lessons 062, 088).
 </details>
+
+> 📖 *Next time: Chapter 4 begins. The menu page, loaded a million times a day, is melting the database.*
 
 ---
 

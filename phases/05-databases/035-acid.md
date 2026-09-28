@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+The server crashes halfway through checkout. The customer's card was charged, but the order was never saved. Leo is furious, and the customer is more so. Maya learns that some groups of steps must happen *all together, or not at all*.
+
 ## 🎯 One-sentence idea
 
 **A transaction groups several operations into one unit that is Atomic (all or nothing), Consistent (the rules always hold), Isolated (concurrent transactions don't see each other's half-done work), and Durable (once committed, it survives crashes).**
@@ -145,6 +149,8 @@ Long transactions hold locks (blocking others), increase deadlock and contention
 - Model it as an **append-only ledger** (entries, not balance overwrites) with idempotency keys, and derive balances.
 - **Likely follow-up:** "Why an append-only ledger?" → auditability, easier reconciliation, and no lost updates from concurrent overwrites (lesson 096).
 </details>
+
+> 📖 *Next time: Two customers try to buy the very last portion of lasagna at the same instant.*
 
 ---
 

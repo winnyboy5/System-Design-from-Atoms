@@ -8,6 +8,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry needs to send millions of "your cooking class starts in one hour" reminders, run the weekly payouts, and retry failed jobs, all on time and never skipped. The old single scheduler server keeps crashing. Maya designs a distributed job scheduler.
+
 ## 🎯 One-sentence idea
 
 **A distributed job scheduler stores jobs with their next run time, efficiently finds the ones that are due, hands each to exactly one worker via a lease, retries failures with backoff, and assumes jobs may run more than once (so the jobs themselves must be idempotent).**
@@ -171,6 +175,8 @@ The rule for what to do with runs missed while the scheduler was down: run once 
 - The job logic is idempotent, keyed by `scheduled_time`.
 - **Likely follow-up:** "What if a run takes longer than the interval?" → the policy is to skip, queue, or allow concurrency, configured per job (like Kubernetes' `concurrencyPolicy`).
 </details>
+
+> 📖 *Next time: A celebrity chef's class goes on sale: fifty seats, and a million fans.*
 
 ---
 

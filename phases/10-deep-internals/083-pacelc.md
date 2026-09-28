@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry's European customers are unhappy. Every page has felt about 100 milliseconds slower since the team switched on "strong consistency everywhere." There's no outage and no cut cable, so why the cost? Maya realizes the CAP theorem only told her half of the story.
+
 ## 🎯 One-sentence idea
 
 **PACELC extends CAP: if there's a Partition, choose Availability or Consistency. Else (normal operation), choose Latency or Consistency. The second trade-off happens every single day, while partitions are rare.**
@@ -131,6 +135,8 @@ Replicas must coordinate (quorum or consensus round trips) before answering, and
 - Hybrid: EL for reads, with **home-region writes** (low latency for most users) and async replication elsewhere.
 - **Likely follow-up:** "What about a user who travels?" → route their writes to their home region (slightly slower abroad), or migrate their home region.
 </details>
+
+> 📖 *Next time: Two copies disagree about which update came first, and their clocks are lying.*
 
 ---
 

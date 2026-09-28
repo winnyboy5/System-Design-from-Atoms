@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+At 7 pm, 50,000 orders arrive in ten minutes. Each checkout waits for the confirmation email, the kitchen printer, the loyalty points, and the analytics, so the slowest one sets the pace for everyone. Maya wonders: does the customer really need to wait for all of that?
+
 ## 🎯 One-sentence idea
 
 **Synchronous calls make the caller wait for the answer (simple, immediate, but it couples both sides' speed and uptime). Asynchronous messaging lets the caller hand off work and move on (resilient and spike-absorbing, but eventually consistent and harder to trace).**
@@ -148,6 +152,8 @@ Every service in the chain must be up, so availabilities multiply, and one slow 
 - For low-latency request/response, where queue hops add overhead.
 - **Likely follow-up:** "Can you mix them?" → yes: a sync API that internally enqueues work and returns 202, or sync for the critical path with async for side effects.
 </details>
+
+> 📖 *Next time: Maya needs somewhere safe to put all that "later" work.*
 
 ---
 

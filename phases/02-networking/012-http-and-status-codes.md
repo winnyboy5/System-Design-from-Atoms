@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+A strange bug report arrives: the app shows "Order placed!" but nothing was ordered. Maya checks the server logs, which are full of numbers like 200, 404, and 500. It turns out the app ignores them completely. Every browser and server speaks a shared language, and those numbers are its tone of voice.
+
 ## 🎯 One-sentence idea
 
 **HTTP is the language of the web: a client sends a request (method + path + headers + body), and the server replies with a response (status code + headers + body). Each request stands alone. The protocol is stateless.**
@@ -151,6 +155,8 @@ It tells the client its cached copy (matching the ETag/Last-Modified) is still v
 - Compare with 502 (bad response or crash) and 503 (overload or no healthy backends).
 - **Likely follow-up:** "How do you stop slowness from cascading?" → timeouts shorter than the caller's, circuit breakers, load shedding (lessons 063–064).
 </details>
+
+> 📖 *Next time: Leo reads that strangers could snoop on customers' orders. Maya needs to lock the line.*
 
 ---
 

@@ -8,6 +8,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry now processes payments and payouts for millions of cooks in thirty countries. A single double-charge makes the news, and a single lost payout loses a cook's trust forever. Maya designs a payment system where every cent is accounted for.
+
 ## 🎯 One-sentence idea
 
 **A payment system moves money correctly, exactly once, even when networks fail. It does this with idempotency keys on every request, a double-entry ledger as the source of truth, a state machine for each payment, asynchronous integration with external processors, and daily reconciliation to catch anything that slipped through.**
@@ -183,6 +187,8 @@ Comparing internal records (the ledger) with external records (PSP settlements, 
 - Keep append-only writes (fast inserts), and derive balances via materialized aggregates with snapshots.
 - **Likely follow-up:** "Hot account contention?" → split the hot account into N sub-accounts and sum them, or post in batches every second.
 </details>
+
+> 📖 *Next time: Millions of reminders and payouts must run at exactly the right moment.*
 
 ---
 

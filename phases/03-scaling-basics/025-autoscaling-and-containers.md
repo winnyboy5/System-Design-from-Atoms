@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry's traffic chart looks like a mountain range: quiet at 4 am, ten times busier at 7 pm. Leo pays for peak capacity all day long. Then a surprise promotion catches the team completely off guard. Maya wants servers that appear when they're needed and vanish when they're not.
+
 ## 🎯 One-sentence idea
 
 **Autoscaling adds servers when load rises and removes them when it falls, so you pay for what you use. Containers (packaged apps) and orchestrators like Kubernetes make starting and stopping copies fast and reliable.**
@@ -157,6 +161,8 @@ Containers share the host OS kernel and start in seconds with little overhead. V
 - Mixed architectures are common.
 - **Likely follow-up:** "How do you fight cold starts?" → provisioned concurrency, smaller packages, lighter runtimes, keeping functions warm.
 </details>
+
+> 📖 *Next time: Pantry's codebase is now enormous, and three teams keep breaking each other's work.*
 
 ---
 

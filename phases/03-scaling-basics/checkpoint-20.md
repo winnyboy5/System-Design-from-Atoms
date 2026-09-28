@@ -6,6 +6,8 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
+> 📖 *Pantry survived its first traffic surge, but only just. Maya writes down what she learned. Now it's your turn.*
+
 ---
 
 ## ⚡ Part 1: Recall (5 questions)

@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry launches nationwide. Reads explode, and the single database is at its limit, and it's also a single point of failure. Maya decides to keep copies of the data on several machines. But who's allowed to write? And how do the copies stay in step?
+
 ## 🎯 One-sentence idea
 
 **Replication keeps copies of the same data on several machines. In leader–follower (primary–replica) replication, all writes go to one leader, which streams changes to followers that serve reads and stand by to take over if the leader dies.**
@@ -152,6 +156,8 @@ Two nodes both believe they're the leader and accept writes, which causes confli
 - Test failovers regularly (game days).
 - **Likely follow-up:** "What's the expected downtime?" → typically 10–60 s for detection + promotion + client reconnection.
 </details>
+
+> 📖 *Next time: Customers edit their profiles, and their changes seem to vanish.*
 
 ---
 

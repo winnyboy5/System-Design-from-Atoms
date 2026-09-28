@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry's cache now holds 300 GB, far too much for one machine. When that machine rebooted last week, the database nearly collapsed under the flood of misses. Maya needs a cache that spreads across many machines, survives failures, and can do more than store simple strings.
+
 ## 🎯 One-sentence idea
 
 **A distributed cache spreads cached data across many machines so it can grow beyond one server's RAM and survive failures. Redis (rich data structures, persistence, replication) and Memcached (simple, multi-threaded key-value) are the two classic choices.**
@@ -151,6 +155,8 @@ Any of: data structures (sorted sets, lists, hashes), persistence, built-in repl
 - Fixes: ban dangerous commands, split big keys, tune persistence (or offload it to replicas), shard hot keys, and monitor latency (`LATENCY DOCTOR`).
 - **Likely follow-up:** "How do you delete a 10M-member set safely?" → `UNLINK` (async delete) or delete incrementally with `SSCAN` + `SREM`.
 </details>
+
+> 📖 *Next time: Chapter 5 begins. Pantry's data has outgrown its very first database design.*
 
 ---
 

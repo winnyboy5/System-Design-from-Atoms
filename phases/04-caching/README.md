@@ -3,6 +3,12 @@
 > **Lessons 027–033 · 27% → 33% · 🅰️ Part A (core)**
 > By the end of this phase you'll make systems **10–100× faster** with caches, without serving stale nonsense or melting your database when the cache hiccups.
 
+## 📖 Chapter 4: The Menu Page That Melted
+
+The same popular pages are requested millions of times a day, and the database is drowning in repeated work. In this chapter, Maya discovers caching, the art of keeping copies close, and learns the hard way that copies can go stale, overflow, stampede, and need a cluster of their own.
+
+## 🗺️ Phase map
+
 ```mermaid
 flowchart LR
     L27["027<br/>Caching<br/>basics"] --> L28["028<br/>Cache-aside &<br/>read-through"]

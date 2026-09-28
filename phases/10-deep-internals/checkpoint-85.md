@@ -6,6 +6,8 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
+> 📖 *Maya can now explain what happens deep inside Pantry's databases and consensus clusters. Let's test your depth.*
+
 ---
 
 ## ⚡ Part 1: Recall (5 questions)

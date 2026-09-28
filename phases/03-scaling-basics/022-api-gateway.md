@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry now runs eight services, and each one checks logins, logs requests, and blocks abusers in its own slightly different, slightly buggy way. Then a partner discovers one service that forgot to check logins *at all*. Maya wants a single front desk that handles all of this for everyone.
+
 ## 🎯 One-sentence idea
 
 **An API gateway is the single front door for all your backend services. It handles the boring-but-critical cross-cutting work (auth, rate limits, routing, logging, request shaping) so each service doesn't have to.**
@@ -137,6 +141,8 @@ An LB distributes traffic among instances of one service. A gateway is an API-aw
 - Cache token validation (JWKS keys), keep plugins lightweight, and monitor its p99 closely.
 - **Likely follow-up:** "What if Redis (for rate limits) is down?" → fail open with local approximate limits, rather than blocking all traffic.
 </details>
+
+> 📖 *Next time: Customers overseas say the food photos load painfully slowly.*
 
 ---
 

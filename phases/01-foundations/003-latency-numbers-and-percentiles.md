@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+A customer in the next town complains that Pantry "feels slow." Maya checks the average response time: 80 milliseconds. Perfectly fine! So why the complaint? Leo shrugs: "Maybe they're just impatient." But Maya has a hunch that the average is hiding something. She's right, and you're about to find out what.
+
 ## 🎯 One-sentence idea
 
 **Know roughly how slow each operation is (memory ≪ disk ≪ network across the world), and measure speed with percentiles like p99 instead of averages, because averages hide your unhappiest users.**
@@ -141,6 +145,8 @@ The page is only as fast as its *slowest* call. With many calls, it becomes like
 - The trade-off: staleness and cache-invalidation complexity (lessons 027–031).
 - **Likely follow-up:** "What if the data changes every second?" → short TTL, or skip caching, or write-through.
 </details>
+
+> 📖 *Next time: Leo asks a question that sounds simple: how many orders can Pantry actually handle?*
 
 ---
 

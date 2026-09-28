@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+A worker crashes after sending an email but before marking it done, so the customer gets it twice. Another worker marks a message done *before* crashing, so that customer gets nothing. Maya learns the three promises a messaging system can make, and which one to trust.
+
 ## 🎯 One-sentence idea
 
 **Messaging systems can promise at-most-once (may lose messages, never duplicates), at-least-once (never loses, may duplicate), or "exactly-once" (which in practice means at-least-once delivery plus idempotent or transactional processing, so the effect happens once).**
@@ -154,6 +158,8 @@ At-least-once delivery + idempotent processing (dedupe by message ID, ideally in
 - But **trip start/end events** (billing) must be at-least-once + idempotent.
 - **Likely follow-up:** "How do you handle out-of-order pings?" → include timestamps or sequence numbers, and ignore older ones.
 </details>
+
+> 📖 *Next time: New Year's Eve arrives, and orders pour in faster than the kitchens can handle.*
 
 ---
 

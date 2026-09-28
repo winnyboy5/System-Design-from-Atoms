@@ -8,6 +8,10 @@
 
 ---
 
+## 📖 Story
+
+A celebrity chef announces a live cooking class: fifty seats, and a million fans waiting at 10:00:00. Last time, Pantry sold 73 tickets for 50 seats and then crashed for an hour. Maya gets one chance to redesign the system before the next sale.
+
 ## 🎯 One-sentence idea
 
 **When 1 million fans try to buy 50,000 seats in the same minute, the design must never sell a seat twice (strong consistency on seats), hold seats briefly while people pay (holds with a time limit), and protect the system from the stampede (a virtual waiting room, caching, and rate limiting).**
@@ -164,6 +168,8 @@ The saga compensates by releasing the held seats back to available (and cancelli
 - A **waiting room with randomized positions** at the opening, so being faster doesn't win.
 - **Likely follow-up:** "What about scalpers reselling?" → name-bound or dynamic (rotating) tickets, and official resale platforms with price caps.
 </details>
+
+> 📖 *Next time: Leo wants a live "Trending now" board that updates every few seconds.*
 
 ---
 

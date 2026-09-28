@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Maya moves the "later" work out of checkout. But where does it go? If the email service is down, the emails can't just vanish. She needs a to-do list between services that holds the work safely until someone is ready to do it.
+
 ## 🎯 One-sentence idea
 
 **A message queue is a durable to-do list between services. Producers add tasks, workers take them one at a time, and each task is handled by exactly one worker (the competing consumers pattern). It smooths out spikes and lets work happen reliably in the background.**
@@ -145,6 +149,8 @@ Queue depth growing and/or the age of the oldest message rising.
 - Or make handlers **order-insensitive**: include versions or timestamps, and ignore stale updates ("only apply if version > current").
 - **Likely follow-up:** "What's the cost of strict ordering?" → less parallelism: one slow message blocks the rest of its group.
 </details>
+
+> 📖 *Next time: Now five different teams all want to hear about every new order.*
 
 ---
 

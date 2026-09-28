@@ -6,6 +6,8 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
+> 📖 *Pantry's data now lives on many machines, in many copies. We're halfway through the story, so this is a big checkpoint.*
+
 ---
 
 ## ⚡ Part 1: Recall (5 questions)

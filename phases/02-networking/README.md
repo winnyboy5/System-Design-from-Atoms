@@ -3,6 +3,12 @@
 > **Lessons 009–016 · 9% → 16% · 🅰️ Part A (core)**
 > By the end of this phase you'll **follow a request across the internet**, know **which protocol to pick and why**, and **design clean APIs**.
 
+## 📖 Chapter 2: Strangers from Far Away
+
+Pantry's first customers from other towns (and soon, other countries) start arriving. Their requests cross oceans of cables and dozens of machines to reach Maya's server. In this chapter, Maya follows those messages hop by hop: how they're addressed, delivered, secured, and understood, and how Pantry can talk back in real time.
+
+## 🗺️ Phase map
+
 ```mermaid
 flowchart LR
     L9["009<br/>IP, ports<br/>& packets"] --> L10["010<br/>TCP vs UDP"]

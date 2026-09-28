@@ -8,6 +8,10 @@
 
 ---
 
+## 📖 Story
+
+Cooks want recipe folders that stay in sync between their laptop, phone, and kitchen tablet, including 2 GB video drafts. Editing one line shouldn't re-upload the whole thing. This is Maya's final design of the year. Nail it, and she's no longer "junior."
+
 ## 🎯 One-sentence idea
 
 **A file-sync service splits files into content-addressed chunks stored in object storage, keeps a metadata database of which chunks make up which file version, and syncs devices by uploading only changed chunks and notifying other devices to pull the changes, handling conflicts when two devices edit the same file offline.**
@@ -176,6 +180,8 @@ The commit includes the base version it was edited from. If the server's latest 
 - Chunk uploads are idempotent by hash, so retries are safe.
 - **Likely follow-up:** "What about orphaned chunks from abandoned uploads?" → GC chunks with refcount 0 older than a grace period.
 </details>
+
+> 📖 *Next time: Maya's big design review is next. And so is yours.*
 
 ---
 

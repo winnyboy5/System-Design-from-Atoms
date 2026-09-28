@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Cooking-video uploads are huge and slow, while menu clicks are tiny and quick. Simply taking turns has just sent three giant uploads to one poor server while the others relax. Maya realizes that *how* the doorman picks a server matters as much as having a doorman at all.
+
 ## 🎯 One-sentence idea
 
 **The algorithm decides which server gets the next request: take turns (round robin), pick the least busy (least connections), or always send the same key to the same server (hashing). Each fits a different kind of traffic.**
@@ -136,6 +140,8 @@ Weighted routing: weight 5 for v2 and 95 for v1 (a canary release).
 - Long term: replace or rightsize the hardware, and autoscale on consistent instance types.
 - **Likely follow-up:** "What if the slowness is caused by one noisy tenant?" → isolate it with bulkheads or a separate pool, and rate-limit that tenant.
 </details>
+
+> 📖 *Next time: Maya wants `/api` requests to go one way and `/images` requests another.*
 
 ---
 

@@ -8,6 +8,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry's shopping carts must *always* accept writes, even when a data centre fails, because a cart that can't be saved means lost sales. No off-the-shelf setup quite fits, so Leo asks Maya to design one from first principles. Everything from the last two chapters comes together here.
+
 ## 🎯 One-sentence idea
 
 **A Dynamo-style key-value store spreads keys across nodes with consistent hashing, replicates each key to N nodes, uses tunable quorums (R, W) for reads and writes, detects conflicts with version vectors, and heals itself with hinted handoff, read repair, and Merkle-tree anti-entropy. It's always writable, and eventually consistent.**
@@ -177,6 +181,8 @@ With vector clocks: if neither version's vector dominates the other, they're con
 - The cost: minority partitions become unavailable (CP), with leader-based latency and the need to rebalance leaders.
 - **Likely follow-up:** "Multi-key transactions?" → add a transaction layer (2PC across Raft groups with a timestamp oracle or HLC, like Percolator or TiDB).
 </details>
+
+> 📖 *Next time: Customers want search suggestions to appear as they type.*
 
 ---
 

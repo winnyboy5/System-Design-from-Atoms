@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pull up a chair. Our story begins in a small apartment kitchen, where Leo has just quit his job to launch **Pantry**, a website where neighbours sell home-cooked meals to each other. He hires **Maya**, a junior engineer who has built websites but never a *system*. On her first morning, Leo asks, "Will it handle the whole city?" Maya doesn't know. Neither do you, yet. That's exactly where we start.
+
 ## 🎯 One-sentence idea
 
 **System design is choosing and connecting building blocks (servers, databases, caches, queues) so software stays fast, correct, and available as it grows. Every choice is a trade-off.**
@@ -128,6 +132,8 @@ Any four of: scalability, latency/performance, availability, consistency, durabi
 - Mention the trade-off: each step adds complexity, so only do what the numbers require.
 - **Likely follow-up:** "What if the database is the bottleneck?" → indexes, caching, read replicas, then sharding (lessons 037, 046, 049).
 </details>
+
+> 📖 *Next time: Maya opens her browser and wonders what actually happens when a hungry customer clicks "Order".*
 
 ---
 

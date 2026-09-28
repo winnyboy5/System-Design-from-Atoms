@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Two edits to the same menu arrive at two data centres. The one with the later timestamp wins, except that it was actually written *first*: one server's clock was running 200 milliseconds fast. Maya learns that in distributed systems, even *time* can't be trusted.
+
 ## 🎯 One-sentence idea
 
 **Machine clocks drift and jump, so you can't reliably order events across machines by wall-clock time. Logical clocks (Lamport, vector) capture "happened-before" order, and systems like Spanner use bounded-uncertainty clocks (TrueTime) to get global ordering safely.**
@@ -142,6 +146,8 @@ Waiting out the clock uncertainty interval before making a commit visible, so ti
 - Use a **monotonic clock** (`System.nanoTime()`, `time.monotonic()`, `CLOCK_MONOTONIC`), which only moves forward.
 - **Likely follow-up:** "And for leases across machines?" → leases depend on bounded clock drift. Use conservative lease durations, and **fencing tokens** for safety (lesson 086).
 </details>
+
+> 📖 *Next time: So how can machines ever agree on anything at all?*
 
 ---
 

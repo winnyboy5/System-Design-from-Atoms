@@ -3,6 +3,12 @@
 > **Lessons 046–055 · 46% → 55% · 🅰️ Part A (core)**
 > By the end of this phase you'll **copy data (replication)**, **split data (sharding)**, and reason about **consistency, CAP, and quorums**, the heart of distributed data.
 
+## 📖 Chapter 6: Pantry Goes National
+
+Pantry explodes across the country, then across an ocean. One database machine can't hold the data or survive a failure. In this chapter, Maya copies data (replication), splits it (sharding), and wrestles with the deepest questions of distributed data: what happens when machines disagree, when the network breaks, and when a request arrives twice?
+
+## 🗺️ Phase map
+
 ```mermaid
 flowchart LR
     L46["046<br/>Leader–follower<br/>replication"] --> L47["047<br/>Replication lag &<br/>read-your-writes"]

@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+The recommendations service, a nice-to-have, got slow, and somehow checkout, the most important page, went down with it. Priya traces it: every server thread was stuck waiting on recommendations. Maya learns how to stop one broken part from sinking the whole ship.
+
 ## 🎯 One-sentence idea
 
 **A circuit breaker stops calling a dependency that keeps failing (it fails fast instead of waiting), and periodically tests whether it has recovered. Bulkheads isolate resources (thread pools, connections) per dependency, so one failing part can't sink the whole service.**
@@ -150,6 +154,8 @@ By giving each dependency its own limited pool of resources, so a slow dependenc
 - Test in chaos experiments, and alert on breaker state changes.
 - **Likely follow-up:** "Per instance or shared state?" → usually per client instance (simple, and no coordination). Aggregate the metrics centrally for visibility.
 </details>
+
+> 📖 *Next time: The only database server dies at dinnertime, and there's no spare.*
 
 ---
 

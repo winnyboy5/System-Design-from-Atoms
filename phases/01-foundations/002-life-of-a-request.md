@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Maya types Pantry's address and watches the page appear. It feels instant, but she's curious: where did that click *go*? She opens her browser's developer tools and finds a waterfall of steps she'd never noticed: a lookup, a handshake, a wait, a reply. Let's follow one click together, hop by hop.
+
 ## 🎯 One-sentence idea
 
 **When you click something, your device (the client) sends a request through DNS and the network to a server, which may ask a database, and then sends a response back. Every hop adds time and is a place things can break.**
@@ -139,6 +143,8 @@ Yes. An app server is a client of the database, cache, and other services it cal
 - Common culprits: many sequential requests, no CDN, slow DB queries (missing index, N+1), large uncompressed assets.
 - **Likely follow-up:** "The server part is 2.5 s. Now what?" → trace spans, check DB query plans, cache hot results.
 </details>
+
+> 📖 *Next time: Some of those hops take nanoseconds and others take a tenth of a second. Maya wants to know which is which.*
 
 ---
 

@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+A careful customer emails: "Your checkout page isn't secure. My browser says so!" Leo panics. Home addresses and payment details are travelling across coffee-shop Wi-Fi in plain sight. Maya must make the conversation private, *and* prove to every customer that it's really Pantry on the other end.
+
 ## 🎯 One-sentence idea
 
 **HTTPS is HTTP wrapped in TLS, which does three jobs: it encrypts the conversation (privacy), proves the server is who it claims to be (a certificate), and detects tampering (integrity).**
@@ -130,6 +134,8 @@ The LB decrypts incoming HTTPS and forwards requests to backends, so certificate
 - Reduce it with: **TLS 1.3**, **session resumption / 0-RTT**, **connection reuse (keep-alive, HTTP/2)**, **terminating TLS at a nearby CDN edge**, and **HTTP/3** (combined transport + crypto handshake).
 - **Likely follow-up:** "Any risk with 0-RTT?" → replay attacks, so only allow it for idempotent requests.
 </details>
+
+> 📖 *Next time: A partner company wants to connect its software to Pantry. Maya needs a proper API.*
 
 ---
 

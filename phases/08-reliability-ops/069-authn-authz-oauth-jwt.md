@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+A security researcher reports that changing `/orders/1234` to `/orders/1235` in the address bar shows *someone else's* order, home address and all. Pantry checked *who you are*, but never *what you're allowed to see*. Maya dives into identity, tokens, and permissions.
+
 ## 🎯 One-sentence idea
 
 **Authentication (AuthN) proves *who you are*, and authorization (AuthZ) decides *what you may do*. Sessions or tokens (often JWTs) carry that identity between requests, and OAuth 2.0 / OpenID Connect let users log in with another provider or grant apps limited access without sharing passwords.**
@@ -156,6 +160,8 @@ Authorization Code with PKCE.
 - It's a dedicated authorization service, with the `check`, `expand`, and `list objects` APIs.
 - **Likely follow-up:** "How do you list all docs a user can see?" → reverse indexes or materialized permission views. That's hard at scale.
 </details>
+
+> 📖 *Next time: The security audit that follows finds many more gaps.*
 
 ---
 

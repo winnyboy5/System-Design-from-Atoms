@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+At lunchtime, Leo runs a report of "revenue by city by month for three years" directly on the production database. Checkout slows to a crawl for every customer. Maya realizes that *running* the business and *analyzing* the business need different kinds of databases.
+
 ## 🎯 One-sentence idea
 
 **OLTP databases handle many small, fast transactions for the live app ("place this order"). OLAP systems (data warehouses) handle huge analytical scans ("revenue by region for 3 years"). Keep them separate, and move data between them with ETL/ELT pipelines.**
@@ -157,6 +161,8 @@ Facts: events with numeric measures (sales). Dimensions: descriptive context (pr
 - Lifecycle policies move old partitions to cheaper storage tiers.
 - **Likely follow-up:** "Why Parquet?" → columnar, compressed, splittable, and schema-aware, so engines scan only the needed columns and partitions.
 </details>
+
+> 📖 *Next time: Recipe videos are filling up the database disk.*
 
 ---
 

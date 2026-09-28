@@ -6,6 +6,8 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
+> 📖 *The double-charge bug is fixed for good. Before the dinner-rush chapter, let's review distributed data.*
+
 ---
 
 ## ⚡ Part 1: Recall (5 questions)

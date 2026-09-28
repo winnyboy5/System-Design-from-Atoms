@@ -6,6 +6,8 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
+> 📖 *Pantry's first faraway customers are happy. Take a breath with Maya, and check what you've learned so far.*
+
 ---
 
 ## ⚡ Part 1: Recall (5 questions)

@@ -3,6 +3,12 @@
 > **Lessons 001–008 · 1% → 8% · 🅰️ Part A (core)**
 > By the end of this phase you'll **think in trade-offs**, **estimate scale on a napkin**, and **speak the language** of latency and availability.
 
+## 📖 Chapter 1: One Laptop and a Big Dream
+
+Every great system starts small. Ours starts in Leo's kitchen, with a laptop running **Pantry**, a website where neighbours sell home-cooked meals, and with Maya, a junior engineer who has never designed a system before. In this chapter, Maya learns to see what really happens behind a click, to measure speed and uptime honestly, and to do napkin math that tells her whether Pantry needs one server or a thousand. You'll learn right alongside her.
+
+## 🗺️ Phase map
+
 ```mermaid
 flowchart LR
     L1["001<br/>What is<br/>system design"] --> L2["002<br/>Life of<br/>a request"]

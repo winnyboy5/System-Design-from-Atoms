@@ -8,6 +8,10 @@
 
 ---
 
+## 📖 Story
+
+The order service sends texts, marketing sends pushes, and chat sends emails. One customer gets fourteen notifications in an hour, while password-reset codes arrive late. Maya designs one notification system to rule them all.
+
 ## 🎯 One-sentence idea
 
 **A notification system accepts "notify user X about Y" events from many services, applies user preferences and rate limits, renders the message per channel (push, SMS, email, in-app), and reliably delivers it through third-party providers, without spamming, duplicating, or losing important messages.**
@@ -174,6 +178,8 @@ To respect provider rate limits and to avoid a thundering herd of users opening 
 - Make it idempotent per window, and let preferences control the digest frequency.
 - **Likely follow-up:** "Real-time vs digest?" → high-signal events (a direct message) go immediately, and low-signal ones (likes) get digested.
 </details>
+
+> 📖 *Next time: Cooking videos are Pantry's hottest feature, and they buffer constantly.*
 
 ---
 

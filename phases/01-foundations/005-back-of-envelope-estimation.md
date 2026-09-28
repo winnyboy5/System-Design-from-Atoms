@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Leo bursts in with news: a food festival wants to feature Pantry, which could mean millions of visitors. "Do we need a data centre?!" Maya grabs a napkin. She doesn't need exact answers, only the right *order of magnitude*. Watch how she works it out in two minutes. You'll do the same by the end of this lesson.
+
 ## 🎯 One-sentence idea
 
 **Rough math, done in 2 minutes with rounded numbers, tells you whether you need 1 server or 1,000, and 1 GB or 1 PB. That decides the shape of the design.**
@@ -133,6 +137,8 @@ Most storage systems keep 3 replicas for durability and availability.
 - Size the cache: hot set ≈ 20% of daily accessed data × object size. Check that it fits in RAM (tens to hundreds of GB is fine across a cluster).
 - **Likely follow-up:** "What hit rate do you need?" → if the DB can take 5k QPS and the load is 50k, you need ≥ 90% hits.
 </details>
+
+> 📖 *Next time: The numbers look manageable, until Leo asks, "And what if the server goes down?"*
 
 ---
 

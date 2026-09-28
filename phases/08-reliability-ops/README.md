@@ -3,6 +3,12 @@
 > **Lessons 063–072 · 63% → 72% · 🅰️ Part A (core)**
 > By the end of this phase you'll build systems that **survive failures**, **recover from disasters**, **can be observed and safely deployed**, **keep bad actors out**, and **generate unique IDs at scale**.
 
+## 📖 Chapter 8: The Night Everything Went Down
+
+Success brings new dangers: slow dependencies, dead disks, whole regions going dark, risky deploys, and security holes. Priya, Pantry's on-call engineer, joins the story. In this chapter, Maya and Priya make Pantry survive failure, see inside itself, ship safely, lock its doors, find its own services, and name things uniquely across hundreds of machines.
+
+## 🗺️ Phase map
+
 ```mermaid
 flowchart LR
     L63["063<br/>Timeouts &<br/>retries"] --> L64["064<br/>Circuit breakers<br/>& bulkheads"]

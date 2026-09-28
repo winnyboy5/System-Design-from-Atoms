@@ -8,6 +8,10 @@
 
 ---
 
+## 📖 Story
+
+Leo dreams up "Pantry Recipes," a search engine for every recipe on the internet. That means visiting billions of web pages politely, without getting stuck in loops or visiting the same page twice. Maya designs a web crawler.
+
 ## 🎯 One-sentence idea
 
 **A web crawler repeatedly takes a URL from a prioritized frontier, politely fetches the page, extracts new links, skips URLs and content it has already seen, and stores the pages. At scale, the hard parts are politeness per website, deduplication across billions of URLs, and prioritization.**
@@ -171,6 +175,8 @@ SimHash or MinHash fingerprints, which are similar for pages with mostly the sam
 - Mitigate: per-host page budgets, URL depth and length limits, parameter normalization and whitelisting, detecting repetitive path patterns, near-duplicate content detection (the same content under many URLs → stop), and honouring robots.txt and canonical tags.
 - **Likely follow-up:** "How do you keep it from starving other hosts?" → per-host quotas in the frontier, with round-robin across hosts.
 </details>
+
+> 📖 *Next time: The courier app needs to find the nearest driver in seconds.*
 
 ---
 

@@ -3,6 +3,12 @@
 > **Lessons 081–090 · 81% → 90% · 🅱️ Part B (advanced)**
 > You've passed the 🏁 80% gate. This phase opens the hood: **how databases store data**, **how distributed nodes agree**, **how time works (and doesn't)**, and the clever **probabilistic structures** that make web-scale possible. It's great for senior/staff interviews and infrastructure work.
 
+## 📖 Chapter 10: Inside the Engine Room
+
+Maya is now a senior engineer, and senior engineers are expected to know *why* things work. In this chapter, she opens up the machinery: how databases write to disk and keep versions, why clocks lie, how machines reach agreement, how locks go wrong, how rumours spread membership, how transactions span services, and how tiny probabilistic structures count billions.
+
+## 🗺️ Phase map
+
 ```mermaid
 flowchart LR
     L81["081<br/>B-tree, LSM<br/>& WAL"] --> L82["082<br/>MVCC"]

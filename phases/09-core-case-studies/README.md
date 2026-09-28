@@ -3,6 +3,12 @@
 > **Lessons 073–080 · 73% → 80% · 🅰️ Part A (core)**
 > This is where the atoms combine. Each case study is a **full mock interview walkthrough**: requirements → estimates → API → data → high-level design → deep dives → interviewer follow-ups. **Finishing this phase = 🏁 80% Practical Mastery.**
 
+## 📖 Chapter 9: Maya's Year of Big Features
+
+Leo has a list of ambitious features, and Maya must design each one properly and defend it in a design review. In this chapter, all the atoms you've learned combine into complete systems: short links, a rate limiter, a feed, chat, notifications, video streaming, and file sync. It ends with Maya's toughest review, and your 🏁 Practical Mastery gate.
+
+## 🗺️ Phase map
+
 ```mermaid
 flowchart LR
     L73["073<br/>The design<br/>framework"] --> L74["074<br/>URL<br/>shortener"]

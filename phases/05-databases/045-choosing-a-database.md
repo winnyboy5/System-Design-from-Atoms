@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+A new hire studies Pantry's architecture diagram and asks, "Why so many databases?" Maya realizes she should be able to justify every single one. Let's learn a repeatable way to choose, so that you never pick a database based on hype again.
+
 ## 🎯 One-sentence idea
 
 **Choose a database by answering five questions: what's the data shape, what are the access patterns, how consistent must it be, how big and fast will it get, and what can your team operate? Default to boring, proven choices, and add specialists only for specific needs.**
@@ -153,6 +157,8 @@ You get the best tool for each job, but pay in operational burden and in keeping
 - **Analytics:** click events → Kafka → warehouse (not the KV store).
 - **Likely follow-up:** "How do you generate unique short codes?" → lessons 072 and 074 (counter + base62, or a pre-generated key pool).
 </details>
+
+> 📖 *Next time: Chapter 6 begins. Pantry goes national, and one database machine is no longer enough.*
 
 ---
 

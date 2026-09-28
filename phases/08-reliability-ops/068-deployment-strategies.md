@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+The last three outages all started with a deploy. One broke checkout for every customer at once, and rolling it back took forty minutes. Maya wants changes to go out gradually, and to come back instantly.
+
 ## 🎯 One-sentence idea
 
 **Most outages are caused by changes, so ship them gradually and reversibly. Rolling updates replace servers bit by bit, blue-green switches all traffic between two environments at once, canaries expose a small percentage first, and feature flags separate "deploying code" from "turning features on".**
@@ -163,6 +167,8 @@ Expand (add new structures), migrate (dual-write, backfill, switch reads), contr
 - Each step is deployable and reversible on its own.
 - **Likely follow-up:** "What if other services read `users.name` directly?" → that's the shared-DB anti-pattern. Coordinate via APIs or events, and keep the old column until all consumers migrate.
 </details>
+
+> 📖 *Next time: A security researcher emails: "I can see other people's orders."*
 
 ---
 

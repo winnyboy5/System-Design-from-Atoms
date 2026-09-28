@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+With two servers running, customers complain that they're logged out every few clicks and their carts vanish. Maya digs in and finds that each server keeps its *own* memory of who's logged in. Whenever a request lands on the "other" server, the customer is a stranger.
+
 ## 🎯 One-sentence idea
 
 **A stateless server keeps no memory of past requests, so any server can handle any request. Push the state (sessions, files, carts) out to a shared store like Redis, a database, or S3.**
@@ -140,6 +144,8 @@ Databases, caches, message brokers, WebSocket gateways (any two).
 - **And** make billing **idempotent** (unique key per customer per billing period), so even a double run doesn't double-charge (lesson 055).
 - **Likely follow-up:** "What if the lock holder dies mid-job?" → the lease expires, another instance takes over, and idempotency protects against partial re-runs.
 </details>
+
+> 📖 *Next time: The servers no longer forget anyone. But who decides which server gets each request?*
 
 ---
 

@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Maya has been promoted to senior engineer. Her first mission: figure out why the new chat database handles writes ten times faster than the orders database. To answer, she has to open up the engine itself and see how data actually reaches the disk.
+
 ## 🎯 One-sentence idea
 
 **Storage engines choose between updating data in place in a sorted tree (B-tree: great for reads) or appending writes to memory and merging sorted files in the background (LSM tree: great for writes). Both use a write-ahead log so a crash never loses acknowledged data.**
@@ -144,6 +148,8 @@ To quickly skip SSTables that definitely don't contain the key, reducing disk re
 - Fixes: throttle compaction, move to leveled compaction for read-heavy workloads, faster disks (NVMe), tune memtable and L0 thresholds, and spread load.
 - **Likely follow-up:** "How would you detect it?" → correlate p99 latency with compaction metrics (pending compactions, bytes compacted/s, L0 file count).
 </details>
+
+> 📖 *Next time: The orders table keeps growing, even though hardly any new orders are arriving.*
 
 ---
 

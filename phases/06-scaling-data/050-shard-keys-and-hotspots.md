@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Maya splits the orders by date. On day one, every new order lands on the same machine while the others sit idle. Then a giant restaurant chain joins, and *its* machine melts. Choosing *how* to split turns out to matter more than splitting itself.
+
 ## 🎯 One-sentence idea
 
 **The shard key decides which shard each row lives on. A good key spreads load evenly AND keeps each common query on a single shard. A bad key creates hotspots or forces every query to visit every shard.**
@@ -164,6 +168,8 @@ Appending a random or hashed suffix to a hot key so its writes spread across sev
 - Longer term: rebalance tools that can move tenants live, and per-tenant quotas.
 - **Likely follow-up:** "How do you move a tenant without downtime?" → copy the data (snapshot + CDC catch-up), briefly pause writes (or dual-write), flip the directory entry, and verify.
 </details>
+
+> 📖 *Next time: Adding a new machine would reshuffle nearly every key, unless Maya is clever.*
 
 ---
 

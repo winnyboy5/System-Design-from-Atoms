@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry's European customers wait 150 milliseconds on every save, because the only leader lives in America. Maya wants a leader on each continent. But then two leaders might accept conflicting changes to the same shopping cart at the same moment.
+
 ## 🎯 One-sentence idea
 
 **When several nodes accept writes (multi-leader, or leaderless like Dynamo/Cassandra), writes stay fast and available even across regions, but two nodes can accept conflicting writes, so you need a conflict-resolution strategy.**
@@ -157,6 +161,8 @@ When a target replica is down, another node temporarily stores the write (with a
 - Choose per data type: payments → strong. Likes and preferences → multi-leader/LWW.
 - **Likely follow-up:** "What happens during a transatlantic partition?" → multi-leader keeps accepting writes on both sides and reconciles later. Strongly consistent systems reject writes on the minority side (CAP, lesson 052).
 </details>
+
+> 📖 *Next time: The orders table reaches 40 TB, and no single machine can hold it.*
 
 ---
 

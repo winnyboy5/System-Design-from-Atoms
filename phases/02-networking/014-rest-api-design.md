@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+A grocery chain wants to list its ingredients on Pantry automatically. Their developer asks, "Where's your API documentation?" Maya winces. Her endpoints are named things like `/getStuff` and `/doOrderNow`. Before strangers build on top of them, she needs a clean, predictable menu of operations.
+
 ## 🎯 One-sentence idea
 
 **A good REST API uses nouns for URLs (resources), HTTP methods for actions, and real status codes, and it plans ahead for pagination, versioning, idempotency, and errors so clients never break.**
@@ -167,6 +171,8 @@ Only make additive changes (new optional fields/endpoints). Introduce a new vers
 - Trade-off: a BFF couples the endpoint to one screen. GraphQL adds complexity (caching, query cost limits).
 - **Likely follow-up:** "How do you cache a GraphQL response?" → per-field/entity caching (DataLoader), persisted queries, CDN caching of persisted query IDs.
 </details>
+
+> 📖 *Next time: The mobile team says REST is too chatty. Are there other ways for software to talk?*
 
 ---
 

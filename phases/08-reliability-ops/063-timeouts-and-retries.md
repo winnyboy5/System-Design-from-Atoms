@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+At 9 pm, the payment provider gets slow. Pantry's servers wait patiently (forever), and retry instantly (over and over). Within minutes, the whole site freezes, and **Priya**, Pantry's new on-call engineer, is woken by her pager. The post-mortem the next day begins with two words: *timeouts* and *retries*.
+
 ## 🎯 One-sentence idea
 
 **Every network call needs a timeout (never wait forever), and retries should only happen for safe, transient failures, spaced out with exponentially growing, randomized delays (backoff + jitter), so retries help instead of stampeding a struggling service.**
@@ -162,6 +166,8 @@ Three layers each retrying 3 times multiply: 3 × 3 × 3 = 27 attempts at the bo
 - Payments aren't idempotent by default, so retry only with an **idempotency key**. On a timeout, check the status rather than blindly re-charging.
 - **Likely follow-up:** "What if p99.9 is 10 s?" → make the operation async (202 + a status check), or fix the dependency. Don't hold user requests for 10 s.
 </details>
+
+> 📖 *Next time: Why did a slow *recommendations* service take down *checkout*?*
 
 ---
 

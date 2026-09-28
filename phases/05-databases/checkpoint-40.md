@@ -6,6 +6,8 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
+> 📖 *Pantry's data has proper homes now. Maya looks back over everything she has learned. Join her.*
+
 ---
 
 ## ⚡ Part 1: Recall (5 questions)

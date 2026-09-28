@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Leo wants daily unique visitor counts, a fast "have we seen this link before?" check, and quick comparisons between replicas. Exact answers would need hundreds of gigabytes. Maya discovers clever structures that trade a tiny bit of accuracy for enormous savings.
+
 ## 🎯 One-sentence idea
 
 **At web scale, exact answers can cost too much memory. Probabilistic structures answer "have I seen this?" (Bloom filter), "how many unique?" (HyperLogLog), and "how often?" (count-min sketch) using tiny, fixed memory with small, bounded errors. Merkle trees (not probabilistic, but hash-based) find differences between huge datasets cheaply.**
@@ -155,6 +159,8 @@ By comparing hashes top-down and descending only into the subtrees whose hashes 
 - Keep an exact "seen" store (a KV DB) for important sites, or for verification.
 - **Likely follow-up:** "The filter fills up over time?" → use scalable Bloom filters (layers), or rebuild periodically with a larger m.
 </details>
+
+> 📖 *Next time: Chapter 11 begins. Pantry goes global, and the hardest problems arrive.*
 
 ---
 

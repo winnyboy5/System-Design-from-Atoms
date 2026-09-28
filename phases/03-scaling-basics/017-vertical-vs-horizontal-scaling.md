@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+The festival article goes live, and traffic jumps twenty-fold overnight. Pantry's single server hits 100% CPU, and pages take ten seconds to load. Leo asks, "Do we buy a bigger computer, or more computers?" Maya has one night to decide. Let's decide with her.
+
 ## 🎯 One-sentence idea
 
 **Vertical scaling means buying a bigger machine (simple, but there's a ceiling and it's a single point of failure). Horizontal scaling means adding more machines (almost no ceiling, and redundant, but the system must be designed for it).**
@@ -127,6 +131,8 @@ Splitting data across machines (sharding) is complex. It breaks joins and transa
 - Before that: vertical scaling, caching, archiving cold data, and separating read and write workloads.
 - **Likely follow-up:** "How would you pick a shard key?" → lesson 050.
 </details>
+
+> 📖 *Next time: Maya adds a second server, and customers start getting logged out at random.*
 
 ---
 

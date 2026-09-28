@@ -6,6 +6,8 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
+> 📖 *Pantry's engine room holds no more mysteries for Maya. One chapter left. Let's make sure you're ready for it.*
+
 ---
 
 ## ⚡ Part 1: Recall (5 questions)

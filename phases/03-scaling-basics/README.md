@@ -3,6 +3,12 @@
 > **Lessons 017–026 · 17% → 26% · 🅰️ Part A (core)**
 > By the end of this phase you'll grow a system **from 1 server to many**: load balancers, stateless services, CDNs, gateways, rate limits, autoscaling, and when to split into microservices.
 
+## 📖 Chapter 3: The Night the Article Went Live
+
+A festival article sends a wave of visitors to Pantry, far more than one server can survive. In this chapter, Maya grows Pantry from one machine into a fleet: a doorman at the front, forgetful (stateless) servers behind it, copies of photos near every customer, fair limits for greedy bots, servers that appear and vanish on demand, and one big question: should Pantry split into many services?
+
+## 🗺️ Phase map
+
 ```mermaid
 flowchart LR
     L17["017<br/>Vertical vs<br/>horizontal"] --> L18["018<br/>Stateless<br/>services"]

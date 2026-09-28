@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Leo announces a year of big features: short share links, a recipe feed, chat, notifications, cooking videos, and shared recipe folders. Maya will lead the designs, and each one will be reviewed by senior engineers, much like an interview. Before the first review, she learns a framework that works every time.
+
 ## 🎯 One-sentence idea
 
 **Every design, whether in an interview or at work, follows the same four steps: pin down requirements, estimate scale and define the API, sketch a simple high-level design, then deep-dive on the hardest parts while explaining the trade-offs out loud.**
@@ -144,6 +148,8 @@ At least one end-to-end write path and one read path through the components.
 - Name the new trade-offs introduced (consistency, complexity, cost).
 - **Tip:** treat interruptions as hints about what they want to explore, and go there.
 </details>
+
+> 📖 *Next time: The first feature: tiny links for sharing dishes on social media.*
 
 ---
 

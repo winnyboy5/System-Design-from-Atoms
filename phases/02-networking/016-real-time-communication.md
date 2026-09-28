@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+"Where's my food?" is Pantry's most common support question. Customers keep refreshing the tracking page, and the server groans under the load. Maya wants the *server* to speak up when something changes, but plain HTTP only lets the customer speak first.
+
 ## 🎯 One-sentence idea
 
 **Plain HTTP only lets the client speak first. To push updates from the server, you can poll repeatedly, long-poll (the server holds the request until there's news), stream with Server-Sent Events (one-way), or open a WebSocket (two-way, always on).**
@@ -157,6 +161,8 @@ The server holds each request until there's actually data (or a timeout), so the
 - WebSockets add stateful infrastructure for no real benefit here.
 - **Likely follow-up:** "What if 1M users watch it?" → put a CDN or cache in front of the polled endpoint, since everyone reads the same data.
 </details>
+
+> 📖 *Next time: Chapter 3 begins. The festival article goes live tomorrow, and one server won't be enough.*
 
 ---
 

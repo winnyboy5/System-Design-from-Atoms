@@ -8,6 +8,10 @@
 
 ---
 
+## 📖 Story
+
+Leo wants a live "Trending now" board on the home page: the top dishes of the last hour, for every city, updated every few seconds, from a million events per second. Counting everything exactly, everywhere, is impossible. Maya designs it anyway.
+
 ## 🎯 One-sentence idea
 
 **Finding the top K most frequent items (songs, hashtags, products) over a sliding time window at huge scale means you can't count everything exactly in one place. Partition the stream, keep approximate counts (a count-min sketch) plus a small heap of candidates per partition, merge the partial top-K lists, and serve the result from a cache.**
@@ -171,6 +175,8 @@ Trending measures the growth or velocity relative to a baseline, while top measu
 - For exact results on only the top items, do a second pass: exact counting for the candidate set from the heap (a much smaller key set).
 - **Likely follow-up:** "What's the error bound?" → estimate ≤ true + ε·N, with width = e/ε and depth = ln(1/δ).
 </details>
+
+> 📖 *Next time: The final chapter of this story belongs to you.*
 
 ---
 

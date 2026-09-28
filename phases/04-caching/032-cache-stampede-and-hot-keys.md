@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+A famous chef shares a Pantry dish with two million followers. At exactly 8:00:00, the cached page for that dish expires, and ten thousand requests hit the database at once. Meanwhile, a bot keeps asking for dishes that don't exist. Caches, it turns out, have failure modes of their own.
+
 ## 🎯 One-sentence idea
 
 **Caches fail in three classic ways under pressure: a popular key expires and thousands of requests hit the DB at once (stampede), one key gets so much traffic it overwhelms a single cache node (hot key), or requests for things that don't exist bypass the cache every time (penetration). Each has a well-known fix.**
@@ -175,6 +179,8 @@ One key maps to one shard. You need copies (split keys, replicas, local caches) 
 - **Protect the DB** with a circuit breaker and concurrency limits on the lookup path.
 - **Likely follow-up:** "How do you keep the Bloom filter updated as products are added?" → add on create. Deletions need a rebuild or a counting Bloom filter.
 </details>
+
+> 📖 *Next time: One cache server isn't enough anymore. Maya needs a whole cluster of them.*
 
 ---
 

@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+A cook changes a dish's price, and some customers see the old price for ten minutes. Meanwhile, the "likes" counter is hammering the database with thousands of writes a second. Maya realizes that *writes* need a cache strategy too, and that different data deserves different strategies.
+
 ## 🎯 One-sentence idea
 
 **When data is written, you can write to the cache and DB together (write-through: consistent), write to the cache now and the DB later (write-back: fast, but risky), or write only to the DB and skip the cache (write-around: avoids caching things nobody reads).**
@@ -146,6 +150,8 @@ Many increments are combined (coalesced) in the cache and flushed as one DB writ
 - Downsides: higher write latency, and caching data that may not be read. Usually add a TTL to evict unused entries.
 - **Likely follow-up:** "What if the DB write succeeds but the cache write fails?" → retry, or delete the key so the next read reloads. The DB is the source of truth.
 </details>
+
+> 📖 *Next time: The cache is full, and Maya must decide what to throw out.*
 
 ---
 

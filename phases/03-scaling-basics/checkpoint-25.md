@@ -6,6 +6,8 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
+> 📖 *Pantry now grows and shrinks on its own. A quarter of the story is behind us. Let's check your notes.*
+
 ---
 
 ## ⚡ Part 1: Recall (5 questions)

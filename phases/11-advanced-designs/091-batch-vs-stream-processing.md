@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry is global now, and data pours in every second: orders, clicks, courier pings. The finance team wants nightly reports, while the fraud team wants answers within 100 milliseconds. Maya learns that data can be processed in *piles* or in *streams*.
+
 ## 🎯 One-sentence idea
 
 **Batch processing crunches a large, bounded pile of data on a schedule (cheap, simple, but results are hours old). Stream processing handles unbounded data continuously, event by event or in small windows (fresh results in seconds, but it has to handle time, ordering, and state carefully).**
@@ -162,6 +166,8 @@ Lambda runs separate batch and streaming layers and merges them. Kappa uses only
 - Choose based on the cost vs freshness value.
 - **Likely follow-up:** "How do you ensure hourly numbers match the daily truth?" → a nightly reconciliation batch job that corrects late data (it becomes the source of truth).
 </details>
+
+> 📖 *Next time: Leo asks Maya to design Pantry's own key-value store.*
 
 ---
 

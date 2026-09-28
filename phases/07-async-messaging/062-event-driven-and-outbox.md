@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+An order is saved to the database, and then the server crashes before it can announce "OrderPlaced." The kitchen never hears about it, and a customer waits two hours for food that was never cooked. Maya needs the save and the announcement to be inseparable.
+
 ## 🎯 One-sentence idea
 
 **In an event-driven architecture, services announce facts ("OrderPlaced") and other services react on their own. The transactional outbox pattern makes sure a service's database change and its event are never out of sync, by saving the event in the same database transaction and publishing it afterwards.**
@@ -160,6 +164,8 @@ Choreography: services react to each other's events with no central controller. 
 - Many systems use both: orchestration inside a bounded context, and events between contexts.
 - **Likely follow-up:** "What's the risk of choreography at scale?" → an "event spaghetti" where no one understands the full flow, and cyclic event chains.
 </details>
+
+> 📖 *Next time: Chapter 8 begins. It's the night everything goes down.*
 
 ---
 

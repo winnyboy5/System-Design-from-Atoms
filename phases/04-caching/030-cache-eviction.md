@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+The cache server runs out of memory, and suddenly random items vanish, including the most popular menus. Maya needs a rule for what gets kicked out when space runs short, and for when old data should expire on its own.
+
 ## 🎯 One-sentence idea
 
 **Caches are small, so when they fill up something must be kicked out. LRU evicts the least recently used item, LFU evicts the least frequently used, and TTL expires items after a set time, whether or not the cache is full.**
@@ -159,6 +163,8 @@ To prevent many keys from expiring at the same moment and causing a burst of DB 
 - Fixes: add memory or shards, switch to LFU, isolate batch workloads in a separate cache, normalize keys, tune TTLs.
 - **Likely follow-up:** "How would you detect this early?" → alerts on hit ratio, evictions/s, and memory fragmentation.
 </details>
+
+> 📖 *Next time: A cook adds an allergy warning to a dish, but customers keep seeing the old page.*
 
 ---
 

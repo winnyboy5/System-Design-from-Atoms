@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+The analytics team found a bug that corrupted last week's revenue numbers. "Can we just replay last week's orders?" they ask. With an ordinary queue, those messages are gone forever. Maya discovers a different kind of messaging: a log you can reread.
+
 ## 🎯 One-sentence idea
 
 **Kafka-style systems store messages in an append-only, partitioned log that's kept for days, not deleted on read. Each consumer group tracks its own position (offset), so many consumers can read the same stream independently, in order per partition, and replay history whenever they want.**
@@ -152,6 +156,8 @@ How far behind a consumer group is: the latest offset minus the committed offset
 - Check downstream bottlenecks (a slow DB), and consumer rebalancing loops (session timeouts).
 - **Likely follow-up:** "Can you parallelize within a partition?" → yes, with per-key worker pools inside the consumer, committing offsets only when all earlier messages are done.
 </details>
+
+> 📖 *Next time: Some customers got two confirmation emails, and one got none at all.*
 
 ---
 

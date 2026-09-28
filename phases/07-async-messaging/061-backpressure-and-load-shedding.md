@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+New Year's Eve. Orders arrive three times faster than Pantry can process them. The queue grows, memory fills, response times hit two minutes, and customers who gave up long ago still clog the line. Maya learns that sometimes "not now" is the kindest answer.
+
 ## 🎯 One-sentence idea
 
 **When work arrives faster than a system can handle it, it must either push back ("slow down": backpressure) or deliberately drop some work ("not now": load shedding). Otherwise queues grow without limit, latency explodes, and everything falls over.**
@@ -155,6 +159,8 @@ Passing the remaining time budget along the call chain, so downstream services c
 - Propagate deadlines so no one waits longer than the user will.
 - **Likely follow-up:** "What do you return when the breaker is open?" → a cached or default response, or a fast error, depending on criticality.
 </details>
+
+> 📖 *Next time: An order was saved, but its announcement never reached the kitchen.*
 
 ---
 

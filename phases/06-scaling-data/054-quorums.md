@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Pantry now keeps three copies of every shopping cart. Waiting for all three on every write is slow, but reading just one copy might be stale. Maya finds the sweet spot with a little arithmetic that guarantees the reader and the writer always meet.
+
 ## 🎯 One-sentence idea
 
 **With N copies of the data, if every write waits for W copies to confirm and every read asks R copies, then R + W > N guarantees the reader overlaps with at least one copy that has the latest write. Tuning R and W trades speed against freshness and availability.**
@@ -150,6 +154,8 @@ Any two majorities share at least one node, so two conflicting decisions (e.g., 
 - So use **odd sizes**: 3 (tolerates 1) or 5 (tolerates 2).
 - **Likely follow-up:** "Why not 7 or 9?" → more nodes = slower writes (more acks) for rare benefit. 5 is the usual max for consensus groups.
 </details>
+
+> 📖 *Next time: A network hiccup, an automatic retry, and a customer is charged twice.*
 
 ---
 

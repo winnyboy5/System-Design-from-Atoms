@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Checkout now spans the order, inventory, payment, and courier services, and each one has its own database. A payment fails *after* the stock was reserved and a courier booked. There's no single transaction to roll back. Maya must choose between locking everything and undoing things step by step.
+
 ## 🎯 One-sentence idea
 
 **When one business operation spans several databases or services, you either lock everything and commit together (two-phase commit: atomic but blocking and fragile), or run a sequence of local transactions with an "undo" step for each (a saga: available and scalable, but only eventually consistent).**
@@ -161,6 +165,8 @@ Other transactions can see intermediate states. Mitigate with semantic locks/sta
 - Avoid it across independently owned microservices or third-party APIs.
 - **Likely follow-up:** "What's 3PC?" → it adds a pre-commit phase to reduce blocking, but it isn't safe under network partitions, so it's rarely used. Consensus-based commit is the modern answer.
 </details>
+
+> 📖 *Next time: The finance team wants the full history of every wallet, forever.*
 
 ---
 

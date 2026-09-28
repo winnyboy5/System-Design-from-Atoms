@@ -4,6 +4,8 @@
 >
 > `████████████████████` 🎓🎉🏆 **You finished the entire guide.** From "what is a server?" to consensus, sagas, and designing payment systems. That's a genuine achievement. Be proud.
 
+> 📖 *Maya's story is over. She closes her laptop, but you're about to open yours. One last checkpoint.*
+
 ---
 
 ## ⚡ Part 1: The final recall (10 questions, one per phase)

@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+The orders table is 40 TB and growing by 2 TB every month. There's no bigger machine left to buy. Maya must split the data across many machines, each holding a slice. It's one of the most powerful moves in system design, and one of the most painful.
+
 ## 🎯 One-sentence idea
 
 **Sharding splits one big dataset into pieces (shards), each stored on a different machine, so that storage and write load scale horizontally. The cost is that queries spanning shards, cross-shard transactions, and rebalancing all get harder.**
@@ -158,6 +162,8 @@ Cross-shard joins/queries, cross-shard transactions, global unique constraints/s
 - Usually **customer_id**. Serve date-based analytics from a warehouse.
 - **Likely follow-up:** "What about huge enterprise customers?" → a hot tenant, so give them a dedicated shard (directory-based) or a compound key.
 </details>
+
+> 📖 *Next time: Maya chooses how to split the data, and one slice catches fire.*
 
 ---
 

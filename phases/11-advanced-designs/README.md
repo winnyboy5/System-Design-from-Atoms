@@ -3,6 +3,12 @@
 > **Lessons 091–100 · 91% → 100% · 🅱️ Part B (advanced)**
 > The final stretch: large-scale data processing, then **specialist designs** that combine everything, including your own distributed KV store, search autocomplete, a web crawler, geo proximity, payments, a job scheduler, ticket booking under contention, and real-time top-K. It ends with a **capstone** where you design and teach a system of your choice.
 
+## 📖 Chapter 11: Pantry Goes Global
+
+Pantry now serves the whole world, and the hardest problems arrive: streams of data, an always-writable store, instant suggestions, a web-wide crawler, courier matching, real money, precise scheduling, ticket stampedes, and live trends. It ends with a twist: the storyteller hands the pen to *you*.
+
+## 🗺️ Phase map
+
 ```mermaid
 flowchart LR
     L91["091<br/>Batch vs<br/>stream"] --> L92["092<br/>Key-value<br/>store"]

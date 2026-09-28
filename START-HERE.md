@@ -14,6 +14,14 @@ flowchart LR
     M --> S["🏙️ Systems<br/>news feed, chat,<br/>payments…"]
 ```
 
+## 1½. It's a story 📖
+
+This guide is narrated like a book. You'll follow **Maya**, a junior engineer, as she grows **Pantry**, a food marketplace, from one laptop into a global system. Each lesson opens with a short **📖 Story** scene where something breaks, and closes with a **📖 Next time…** teaser.
+
+- **Before reading a lesson, pause after the story and guess:** *what would you do?* Guessing first (even wrongly) makes the answer stick.
+- **Don't want the story?** Skip the 📖 parts. Every lesson works without them.
+- Meet the cast and see the chapter map in **[STORY.md](STORY.md)**.
+
 ## 2. The Feynman loop (do this for every lesson)
 
 Richard Feynman learned things by trying to **teach them simply**. The places where his explanation broke down showed him what he didn't understand yet.

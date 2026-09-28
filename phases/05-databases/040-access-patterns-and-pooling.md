@@ -6,6 +6,10 @@
 
 ---
 
+## 📖 Story
+
+Maya profiles the "Cooks near you" page and finds 101 database queries: one for the list, and then one per cook. Worse, the new autoscaled servers are opening so many database connections that the database starts refusing them. Two classic mistakes, with two simple fixes.
+
 ## 🎯 One-sentence idea
 
 **Design your data around how it's actually read and written (access patterns), avoid making one query per item in a loop (the N+1 problem), and reuse database connections through a pool instead of opening new ones per request.**
@@ -159,6 +163,8 @@ Little's Law: concurrent connections ≈ queries per second × average query dur
 - Fix: **RDS Proxy / PgBouncer** to multiplex. Reuse connections across invocations (initialize outside the handler). Cap Lambda concurrency. Or use HTTP-based data APIs.
 - **Likely follow-up:** "What's transaction pooling mode?" → a server connection is assigned only for the duration of a transaction, so many clients share a few connections. But session-level state isn't preserved.
 </details>
+
+> 📖 *Next time: Leo runs a huge sales report, and everyone's checkout slows down.*
 
 ---
 

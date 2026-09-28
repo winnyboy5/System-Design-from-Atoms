@@ -8,6 +8,10 @@
 
 ---
 
+## 📖 Story
+
+"Can I get it without onions?" Customers want to chat with cooks, instantly. Messages must never be lost, must arrive in order, and must reach phones that have been offline for hours. Maya designs Pantry Chat.
+
 ## 🎯 One-sentence idea
 
 **A chat system keeps a persistent connection (WebSocket) from each online device to a gateway, stores every message durably (partitioned by conversation), routes messages to the gateways holding the recipients' connections, and falls back to push notifications for offline users, while guaranteeing per-conversation ordering and no lost or duplicated messages.**
@@ -180,6 +184,8 @@ It sends its last seen sequence number per conversation, and the server returns 
 - Multi-device: each device is a separate cryptographic endpoint (messages are encrypted per device).
 - **Likely follow-up:** "What server features break?" → server-side search, spam scanning of content, and cloud backups (unless those are encrypted with user keys).
 </details>
+
+> 📖 *Next time: Now every feature wants to send notifications, and customers are getting spammed.*
 
 ---
 

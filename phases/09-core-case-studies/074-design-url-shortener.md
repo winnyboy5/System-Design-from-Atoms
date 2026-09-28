@@ -8,6 +8,10 @@
 
 ---
 
+## 📖 Story
+
+Cooks want to share their dishes on social media, but Pantry's links are 140 characters of gibberish. Leo wants short links like `pan.try/x7Kp2`. It sounds like a weekend project, until Maya estimates *billions* of clicks a month.
+
 ## 🎯 One-sentence idea
 
 **A URL shortener maps a short code to a long URL. It's a read-heavy key-value lookup, so the interesting parts are generating short, unique codes, and serving billions of redirects fast with caching.**
@@ -187,6 +191,8 @@ Each server gets a large block of IDs and assigns them locally. The coordinator 
 - **Rate limit** redirect lookups per IP, and detect scanning patterns (lots of 404s).
 - **Likely follow-up:** "Does that break uniqueness?" → no, a bijective permutation maps unique inputs to unique outputs.
 </details>
+
+> 📖 *Next time: The short links go viral, and so do the bots abusing them.*
 
 ---
 
