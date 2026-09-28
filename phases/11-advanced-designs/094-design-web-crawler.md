@@ -2,7 +2,7 @@
 
 > ⏱ 13 min · 📈 94% · 🅱️ Part B (advanced) · Phase 11: Data Processing & Advanced Designs
 >
-> `███████████████████░` 94% of the whole guide
+> `██████████████████░░` 94% of the whole guide
 >
 > 🧬 **Atoms used:** queues & priorities [057] · Bloom filters [090] · DNS [011] · consistent hashing [051] · rate limiting (politeness) [024] · object storage [042] · dedup / hashing [080] · distributed workers [025]
 

@@ -1,5 +1,7 @@
 # NNN · Lesson Title
 
+<!-- Copy this file into phases/NN-phase-name/ — the relative links below assume that location. -->
+
 > ⏱ X min · 📈 NN% · 🅰️ Part A (core) · Phase NN — Phase Name
 >
 > `██████░░░░░░░░░░░░░░` NN% of the whole guide
