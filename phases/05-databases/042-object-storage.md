@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Cooks upload recipe videos and photos, and Maya has been storing them inside the database. Backups now take nine hours, and the disk is almost full. She needs a home built for big files: cheap, endless, and nearly impossible to lose.
+Cooks uploaded recipe videos and photos, and Maya had been storing them inside the database. Backups now took nine hours, and the disk was almost full. I told her I'd done exactly the same thing on my first project. She needed a home built for big files: cheap, endless, and nearly impossible to lose.
 
 ## 🎯 One-sentence idea
 
@@ -152,7 +152,7 @@ In a database (metadata), with the object key referencing the file in object sto
 - **Likely follow-up:** "What about latency for small, frequently read files?" → the CDN plus caching solves reads, and object storage first-byte latency (~tens of ms) is fine behind a CDN.
 </details>
 
-> 📖 *Next time: A customer searches for "spicy vegan noodels" and gets nothing back.*
+> 📖 *Next, a customer searches for "spicy vegan noodels" and gets nothing back.*
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pantry now runs eight services, and each one checks logins, logs requests, and blocks abusers in its own slightly different, slightly buggy way. Then a partner discovers one service that forgot to check logins *at all*. Maya wants a single front desk that handles all of this for everyone.
+Pantry now ran eight services, and each one checked logins, logged requests, and blocked abusers in its own slightly different, slightly buggy way. Then a partner found one service that forgot to check logins *at all*. I winced when Maya told me, because I've seen that happen in real companies. She needed one front desk to handle it for everyone.
 
 ## 🎯 One-sentence idea
 
@@ -142,7 +142,7 @@ An LB distributes traffic among instances of one service. A gateway is an API-aw
 - **Likely follow-up:** "What if Redis (for rate limits) is down?" → fail open with local approximate limits, rather than blocking all traffic.
 </details>
 
-> 📖 *Next time: Customers overseas say the food photos load painfully slowly.*
+> 📖 *Next, customers overseas say the food photos load painfully slowly.*
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pantry's partner kitchens now have smart fridges reporting temperatures every second, couriers send their locations constantly, and Leo wants "dishes similar to this one." Maya discovers that there are specialist databases shaped for exactly these jobs.
+Pantry's partner kitchens now had smart fridges reporting temperatures every second, couriers sent their locations constantly, and Leo wanted "dishes similar to this one." Maya asked me if one database could do it all. I told her there are specialist databases shaped for exactly these jobs, and I'll introduce you to them here.
 
 ## 🎯 One-sentence idea
 
@@ -158,7 +158,7 @@ It stores embeddings and quickly finds the most similar vectors (approximate nea
 - **Likely follow-up:** "Why not vectors only?" → exact matches (SKUs, brand names) and filters work better with keyword search, so hybrid gets both.
 </details>
 
-> 📖 *Next time: Maya's architecture diagram now has six databases. Were they all the right choice?*
+> 📖 *Next, Maya's architecture diagram has six databases. Were they all the right choice?*
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-The recipe feed shows each recipe with the cook's name, photo, like count, and comment count, and building it takes six joins. Maya is tempted to copy some of that data straight onto each recipe row. Tempting! But what happens when a cook changes their photo?
+The recipe feed showed each recipe with the cook's name, photo, like count, and comment count, and building it took six joins. Maya was tempted to copy some of that data straight onto each recipe row. I've been tempted too! But ask yourself the question I asked her: what happens when a cook changes their photo?
 
 ## 🎯 One-sentence idea
 
@@ -160,7 +160,7 @@ Publish change events (outbox/CDC) that consumers use to update their copies (ev
 - **Likely follow-up:** "Does the count need to be exact in real time?" → usually no. Approximate counts are fine for display.
 </details>
 
-> 📖 *Next time: A profiling tool reveals that one innocent-looking page makes 101 database queries.*
+> 📖 *Next, a profiling tool reveals that one innocent-looking page makes 101 database queries.*
 
 ---
 

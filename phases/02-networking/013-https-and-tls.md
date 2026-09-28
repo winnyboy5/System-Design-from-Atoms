@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-A careful customer emails: "Your checkout page isn't secure. My browser says so!" Leo panics. Home addresses and payment details are travelling across coffee-shop Wi-Fi in plain sight. Maya must make the conversation private, *and* prove to every customer that it's really Pantry on the other end.
+A careful customer emailed: "Your checkout page isn't secure. My browser says so!" Leo panicked. Home addresses and payment details were crossing coffee-shop Wi-Fi in plain sight. I'll be honest: this one makes my stomach drop every time. Maya had to make the conversation private, *and* prove it was really Pantry on the other end.
 
 ## 🎯 One-sentence idea
 
@@ -135,7 +135,7 @@ The LB decrypts incoming HTTPS and forwards requests to backends, so certificate
 - **Likely follow-up:** "Any risk with 0-RTT?" → replay attacks, so only allow it for idempotent requests.
 </details>
 
-> 📖 *Next time: A partner company wants to connect its software to Pantry. Maya needs a proper API.*
+> 📖 *Next, a partner company wants to connect to Pantry, and Maya needs a proper API.*
 
 ---
 

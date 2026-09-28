@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-After the incident, Leo hires a security auditor. The report is long: database passwords sitting in the code repository, unencrypted backups, an admin panel open to the whole internet… Maya learns that security isn't one big lock. It's layers.
+After the incident, Leo hired a security auditor. The report was long: database passwords in the code repository, unencrypted backups, an admin panel open to the whole internet… Maya read it with her head in her hands. I told her what I'll tell you: security isn't one big lock. It's layers.
 
 ## 🎯 One-sentence idea
 
@@ -161,7 +161,7 @@ Each user or component gets only the minimum permissions required to do its job.
 - **Likely follow-up:** "What's DNS rebinding?" → a hostname resolves to a public IP at check time and a private IP at fetch time, so pin the resolved IP for the request.
 </details>
 
-> 📖 *Next time: With 60 services now, nobody knows which address is where anymore.*
+> 📖 *Next, with 60 services, nobody knows which address is where anymore.*
 
 ---
 

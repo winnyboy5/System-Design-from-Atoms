@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Leo wants daily unique visitor counts, a fast "have we seen this link before?" check, and quick comparisons between replicas. Exact answers would need hundreds of gigabytes. Maya discovers clever structures that trade a tiny bit of accuracy for enormous savings.
+Leo wanted daily unique visitor counts, a fast "have we seen this link before?" check, and quick comparisons between replicas. Exact answers would need hundreds of gigabytes. I showed Maya a few structures that still feel like magic tricks to me. They trade a tiny bit of accuracy for enormous savings.
 
 ## 🎯 One-sentence idea
 
@@ -160,7 +160,7 @@ By comparing hashes top-down and descending only into the subtrees whose hashes 
 - **Likely follow-up:** "The filter fills up over time?" → use scalable Bloom filters (layers), or rebuild periodically with a larger m.
 </details>
 
-> 📖 *Next time: Chapter 11 begins. Pantry goes global, and the hardest problems arrive.*
+> 📖 *Chapter 11 is next. Pantry goes global, and the hardest problems arrive.*
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Maya profiles the "Cooks near you" page and finds 101 database queries: one for the list, and then one per cook. Worse, the new autoscaled servers are opening so many database connections that the database starts refusing them. Two classic mistakes, with two simple fixes.
+Maya profiled the "Cooks near you" page and found 101 database queries: one for the list, then one per cook. Worse, the new autoscaled servers were opening so many connections that the database started refusing them. I've made both of these mistakes in production. Let me show you the two simple fixes.
 
 ## 🎯 One-sentence idea
 
@@ -164,7 +164,7 @@ Little's Law: concurrent connections ≈ queries per second × average query dur
 - **Likely follow-up:** "What's transaction pooling mode?" → a server connection is assigned only for the duration of a transaction, so many clients share a few connections. But session-level state isn't preserved.
 </details>
 
-> 📖 *Next time: Leo runs a huge sales report, and everyone's checkout slows down.*
+> 📖 *Next, Leo runs a huge sales report, and everyone's checkout slows down.*
 
 ---
 

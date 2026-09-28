@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-A strange bug report arrives: the app shows "Order placed!" but nothing was ordered. Maya checks the server logs, which are full of numbers like 200, 404, and 500. It turns out the app ignores them completely. Every browser and server speaks a shared language, and those numbers are its tone of voice.
+A strange bug report arrived: the app said "Order placed!", but nothing was ordered. Maya checked the logs, which were full of numbers like 200, 404, and 500. The app ignored every one of them. I've debugged that exact bug. Every browser and server speaks a shared language, and those numbers are its tone of voice. Let me teach you to hear it.
 
 ## 🎯 One-sentence idea
 
@@ -156,7 +156,7 @@ It tells the client its cached copy (matching the ETag/Last-Modified) is still v
 - **Likely follow-up:** "How do you stop slowness from cascading?" → timeouts shorter than the caller's, circuit breakers, load shedding (lessons 063–064).
 </details>
 
-> 📖 *Next time: Leo reads that strangers could snoop on customers' orders. Maya needs to lock the line.*
+> 📖 *Next, Leo reads that strangers could snoop on customers' orders, and Maya has to lock the line.*
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-The analytics team found a bug that corrupted last week's revenue numbers. "Can we just replay last week's orders?" they ask. With an ordinary queue, those messages are gone forever. Maya discovers a different kind of messaging: a log you can reread.
+The analytics team found a bug that had corrupted last week's revenue numbers. "Can we just replay last week's orders?" they asked. With an ordinary queue, those messages are gone forever. Then Maya discovered the tool I reach for most often in my own work: a log you can reread.
 
 ## 🎯 One-sentence idea
 
@@ -157,7 +157,7 @@ How far behind a consumer group is: the latest offset minus the committed offset
 - **Likely follow-up:** "Can you parallelize within a partition?" → yes, with per-key worker pools inside the consumer, committing offsets only when all earlier messages are done.
 </details>
 
-> 📖 *Next time: Some customers got two confirmation emails, and one got none at all.*
+> 📖 *Next, some customers get two confirmation emails, and one gets none at all.*
 
 ---
 

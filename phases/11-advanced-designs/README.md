@@ -5,7 +5,7 @@
 
 ## 📖 Chapter 11: Pantry Goes Global
 
-Pantry now serves the whole world, and the hardest problems arrive: streams of data, an always-writable store, instant suggestions, a web-wide crawler, courier matching, real money, precise scheduling, ticket stampedes, and live trends. It ends with a twist: the storyteller hands the pen to *you*.
+Pantry now served the whole world, and the hardest problems arrived: streams of data, an always-writable store, instant suggestions, a web-wide crawler, courier matching, real money, precise scheduling, ticket stampedes, and live trends. And at the very end, I have one last thing to hand you: the pen.
 
 ## 🗺️ Phase map
 

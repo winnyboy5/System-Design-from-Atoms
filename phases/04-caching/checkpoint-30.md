@@ -6,7 +6,7 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
-> 📖 *The menu page is fast again, thanks to caching. Before the cache faces its first real crisis, pause and test yourself.*
+> 📖 *The menu page is fast again, thanks to caching. Before I throw the cache its first real crisis, pause and test yourself.*
 
 ---
 

@@ -10,7 +10,7 @@
 
 ## 📖 Story
 
-Pantry launches its own courier fleet. When a meal is ready, the nearest available courier must be found within seconds among a million moving dots, and must never be assigned twice. Maya designs the geo engine behind it.
+Pantry launched its own courier fleet. When a meal was ready, the nearest available courier had to be found within seconds among a million moving dots, and never assigned twice. I showed Maya how to turn a map into a grid of labelled squares. It's a trick I'll show you now.
 
 ## 🎯 One-sentence idea
 
@@ -190,7 +190,7 @@ Reserve the driver atomically (a conditional status update or a single owner per
 - **Likely follow-up:** "A city's shard is hot (New Year's Eve)?" → split the city into sub-regions (H3 cells) across more shards.
 </details>
 
-> 📖 *Next time: Pantry now moves real money for millions of cooks.*
+> 📖 *Next, Pantry starts moving real money for millions of cooks.*
 
 ---
 

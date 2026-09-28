@@ -10,7 +10,7 @@
 
 ## 📖 Story
 
-Within a week, bots are creating a million short links a day and flooding the API. Pantry needs rate limiting, and not on one server, but consistently across fifty gateways at once. Maya designs a proper distributed rate limiter.
+Within a week, bots were creating a million short links a day and flooding the API. Pantry needed rate limiting, and not on one server, but consistently across fifty gateways at once. I've built this exact system twice. Let me walk you through how Maya designed hers, and the traps I helped her avoid.
 
 ## 🎯 One-sentence idea
 
@@ -181,7 +181,7 @@ Each gateway reserves a batch of tokens from Redis and serves requests from memo
 - **Likely follow-up:** "Daily resets at midnight UTC cause spikes?" → use rolling 24 h sliding windows, or stagger resets per user.
 </details>
 
-> 📖 *Next time: Leo's next dream is a feed of recipes from the cooks you follow.*
+> 📖 *Next, Leo dreams of a feed of recipes from the cooks you follow.*
 
 ---
 

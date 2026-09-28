@@ -6,7 +6,7 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
-> 📖 *The auditor signs off: Pantry is observable, safely deployed, and locked down. Your checkpoint awaits.*
+> 📖 *The auditor signed off: Pantry is observable, safely deployed, and locked down. I've prepared your checkpoint.*
 
 ---
 

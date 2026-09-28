@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Maya has been promoted to senior engineer. Her first mission: figure out why the new chat database handles writes ten times faster than the orders database. To answer, she has to open up the engine itself and see how data actually reaches the disk.
+I watched Maya get promoted to senior engineer. Her first mission: figure out why the new chat database handled writes ten times faster than the orders database. To answer, she had to open up the engine itself and see how data actually reaches the disk. I'll open it up for you too.
 
 ## 🎯 One-sentence idea
 
@@ -149,7 +149,7 @@ To quickly skip SSTables that definitely don't contain the key, reducing disk re
 - **Likely follow-up:** "How would you detect it?" → correlate p99 latency with compaction metrics (pending compactions, bytes compacted/s, L0 file count).
 </details>
 
-> 📖 *Next time: The orders table keeps growing, even though hardly any new orders are arriving.*
+> 📖 *Next, the orders table keeps growing, even though hardly any new orders are arriving.*
 
 ---
 

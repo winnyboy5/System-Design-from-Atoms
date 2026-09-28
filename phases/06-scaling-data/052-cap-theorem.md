@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-At 2 pm, a construction crew cuts the fibre between Pantry's two data centres. Both halves keep running, but they can't talk to each other. A customer in the east orders the last portion of dumplings, and so does a customer in the west. Each side has to make a choice.
+At 2 pm, a construction crew cut the fibre between Pantry's two data centres. Both halves kept running, but they couldn't talk to each other. A customer in the east ordered the last portion of dumplings, and so did a customer in the west. Before I explain, I want you to decide: what should each side do?
 
 ## 🎯 One-sentence idea
 
@@ -141,7 +141,7 @@ CP: etcd, ZooKeeper, Spanner, HBase. AP: Cassandra (at low consistency levels), 
 - **Likely follow-up:** "What does the user experience in each case?" → CP: errors or timeouts on one side. AP: possibly stale or conflicting data that is fixed later.
 </details>
 
-> 📖 *Next time: Maya realizes "consistent" isn't one thing. It's a whole menu.*
+> 📖 *Next, Maya discovers that "consistent" isn't one thing. It's a whole menu.*
 
 ---
 

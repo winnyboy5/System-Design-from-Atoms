@@ -6,7 +6,7 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
-> 📖 *The double-charge bug is fixed for good. Before the dinner-rush chapter, let's review distributed data.*
+> 📖 *The double-charge bug is fixed for good. Before I tell you about the dinner rush, let's review distributed data.*
 
 ---
 

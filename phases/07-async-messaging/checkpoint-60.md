@@ -6,7 +6,7 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
-> 📖 *The dinner rush no longer knocks Pantry over. Maya sleeps well tonight. Let's review before the next storm.*
+> 📖 *The dinner rush no longer knocks Pantry over, and Maya slept well that night. Let's review before the next storm.*
 
 ---
 

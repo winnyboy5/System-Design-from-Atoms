@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pull up a chair. Our story begins in a small apartment kitchen, where Leo has just quit his job to launch **Pantry**, a website where neighbours sell home-cooked meals to each other. He hires **Maya**, a junior engineer who has built websites but never a *system*. On her first morning, Leo asks, "Will it handle the whole city?" Maya doesn't know. Neither do you, yet. That's exactly where we start.
+Pull up a chair. I want to tell you about Maya. When I met her, she'd just been hired by Leo, who had quit his job to launch **Pantry**, a website where neighbours sell home-cooked meals to each other. On her first morning, Leo asked, "Will it handle the whole city?" Maya didn't know. I didn't either, at her age. And right now, neither do you. That's exactly where we'll start.
 
 ## 🎯 One-sentence idea
 
@@ -133,7 +133,7 @@ Any four of: scalability, latency/performance, availability, consistency, durabi
 - **Likely follow-up:** "What if the database is the bottleneck?" → indexes, caching, read replicas, then sharding (lessons 037, 046, 049).
 </details>
 
-> 📖 *Next time: Maya opens her browser and wonders what actually happens when a hungry customer clicks "Order".*
+> 📖 *Next, I'll follow Maya as she wonders what really happens when a hungry customer clicks "Order".*
 
 ---
 

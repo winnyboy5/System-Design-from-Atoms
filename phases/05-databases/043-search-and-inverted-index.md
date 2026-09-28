@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-A customer searches for "spicy vegan noodels" (typo included) and gets zero results, even though Pantry has forty matching dishes. The database's simple text matching can't handle typos, word forms, or ranking. Maya needs a real search engine.
+A customer searched for "spicy vegan noodels" (typo included) and got zero results, even though Pantry had forty matching dishes. The database's simple text matching couldn't handle typos, word forms, or ranking. I'll show you how real search engines work. It's one of my favourite "aha" moments to teach.
 
 ## 🎯 One-sentence idea
 
@@ -163,7 +163,7 @@ It's updated asynchronously (events/CDC plus the engine's refresh interval), so 
 - **Likely follow-up:** "How do you handle deletes in CDC?" → a tombstone event → a delete-by-ID in the index.
 </details>
 
-> 📖 *Next time: Leo asks about fridge sensors, courier locations, and "dishes similar to this one."*
+> 📖 *Next, Leo asks about fridge sensors, courier locations, and "dishes similar to this one."*
 
 ---
 

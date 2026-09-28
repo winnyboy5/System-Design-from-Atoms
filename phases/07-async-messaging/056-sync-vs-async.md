@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-At 7 pm, 50,000 orders arrive in ten minutes. Each checkout waits for the confirmation email, the kitchen printer, the loyalty points, and the analytics, so the slowest one sets the pace for everyone. Maya wonders: does the customer really need to wait for all of that?
+At 7 pm, 50,000 orders arrived in ten minutes. Each checkout waited for the confirmation email, the kitchen printer, the loyalty points, and the analytics, so the slowest one set the pace for everyone. I asked Maya the question I'll ask you now: does the customer really need to wait for all of that?
 
 ## 🎯 One-sentence idea
 
@@ -153,7 +153,7 @@ Every service in the chain must be up, so availabilities multiply, and one slow 
 - **Likely follow-up:** "Can you mix them?" → yes: a sync API that internally enqueues work and returns 202, or sync for the critical path with async for side effects.
 </details>
 
-> 📖 *Next time: Maya needs somewhere safe to put all that "later" work.*
+> 📖 *Next, Maya needs somewhere safe to put all that "later" work.*
 
 ---
 

@@ -10,7 +10,7 @@
 
 ## 📖 Story
 
-The order service sends texts, marketing sends pushes, and chat sends emails. One customer gets fourteen notifications in an hour, while password-reset codes arrive late. Maya designs one notification system to rule them all.
+The order service sent texts, marketing sent pushes, and chat sent emails. One customer got fourteen notifications in an hour, while password-reset codes arrived late. I told Maya I'd seen this mess at every company I've worked at. She designed one notification system to rule them all, and I'll show you how.
 
 ## 🎯 One-sentence idea
 
@@ -179,7 +179,7 @@ To respect provider rate limits and to avoid a thundering herd of users opening 
 - **Likely follow-up:** "Real-time vs digest?" → high-signal events (a direct message) go immediately, and low-signal ones (likes) get digested.
 </details>
 
-> 📖 *Next time: Cooking videos are Pantry's hottest feature, and they buffer constantly.*
+> 📖 *Next, cooking videos are Pantry's hottest feature, and they buffer constantly.*
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Two database shards both create order #558201. Receipts get mixed up, and one customer receives someone else's refund. With data spread across many machines, "just count upwards" no longer works. Maya needs IDs that are unique everywhere, without one central bottleneck.
+Two database shards both created order #558201. Receipts got mixed up, and one customer received someone else's refund. With data spread across many machines, "just count upwards" no longer works. I showed Maya a trick from Twitter's engineers that I still admire: IDs that are unique everywhere, with no central bottleneck.
 
 ## 🎯 One-sentence idea
 
@@ -177,7 +177,7 @@ It could reuse timestamps and generate duplicates, so it must detect this and wa
 - **Likely follow-up:** "When is auto-increment fine?" → a single primary with moderate write rates, and internal IDs only.
 </details>
 
-> 📖 *Next time: Chapter 9 begins. Pantry's big features, designed properly from scratch.*
+> 📖 *Chapter 9 is next. Pantry's big features, designed properly from scratch.*
 
 ---
 

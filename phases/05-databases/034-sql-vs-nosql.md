@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pantry's database has become a junk drawer: orders, recipes, reviews, and chat messages, all tangled together. A new engineer declares, "Just switch to NoSQL, it scales!" Maya isn't convinced. Before choosing anything, she wants to understand what each *kind* of database is actually good at.
+By now Pantry's database had become a junk drawer: orders, recipes, reviews, and chat messages, all tangled together. A new engineer declared, "Just switch to NoSQL, it scales!" Maya called me, unconvinced. I told her what I'll tell you: before choosing anything, understand what each *kind* of database is actually good at.
 
 ## 🎯 One-sentence idea
 
@@ -162,7 +162,7 @@ Databases offering SQL and ACID transactions with automatic horizontal scaling (
 - **Likely follow-up:** "When *would* you switch?" → a massive write volume with simple key-based access, or a genuinely schema-less, document-centric domain.
 </details>
 
-> 📖 *Next time: Then a crash charges a customer but never records the order.*
+> 📖 *Next, a crash charges a customer but never records the order.*
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Leo bursts in with news: a food festival wants to feature Pantry, which could mean millions of visitors. "Do we need a data centre?!" Maya grabs a napkin. She doesn't need exact answers, only the right *order of magnitude*. Watch how she works it out in two minutes. You'll do the same by the end of this lesson.
+Leo burst in with news: a food festival wanted to feature Pantry, which could mean millions of visitors. "Do we need a data centre?!" Maya grabbed a napkin. This is the moment I most want you to master: she didn't need exact answers, only the right *order of magnitude*. Watch how she did it in two minutes. You'll do the same by the end of this lesson.
 
 ## 🎯 One-sentence idea
 
@@ -138,7 +138,7 @@ Most storage systems keep 3 replicas for durability and availability.
 - **Likely follow-up:** "What hit rate do you need?" → if the DB can take 5k QPS and the load is 50k, you need ≥ 90% hits.
 </details>
 
-> 📖 *Next time: The numbers look manageable, until Leo asks, "And what if the server goes down?"*
+> 📖 *The numbers looked manageable, until Leo asked, "And what if the server goes down?"*
 
 ---
 

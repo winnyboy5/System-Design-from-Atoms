@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pantry now has 40 engineers working in one giant codebase. Deploys take a whole day, and a typo on the recipes page just broke checkout. Someone in a meeting says, "Let's do microservices, like Netflix!" Maya has learned enough by now to know that's a big decision with a big price tag.
+Pantry now had 40 engineers in one giant codebase. Deploys took a whole day, and a typo on the recipes page broke checkout. In a meeting someone said, "Let's do microservices, like Netflix!" Maya looked at me. I've seen that decision save teams, and I've seen it sink them. Let me give you what you need to make the call yourself.
 
 ## 🎯 One-sentence idea
 
@@ -155,7 +155,7 @@ Gradually replacing a legacy system by routing one feature at a time to new serv
 - **Likely follow-up:** "How do you handle a transaction spanning orders and payments?" → saga with compensations and an outbox (lessons 062, 088).
 </details>
 
-> 📖 *Next time: Chapter 4 begins. The menu page, loaded a million times a day, is melting the database.*
+> 📖 *Chapter 4 is next. The menu page, loaded a million times a day, is melting the database.*
 
 ---
 

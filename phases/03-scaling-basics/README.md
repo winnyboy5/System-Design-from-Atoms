@@ -5,7 +5,7 @@
 
 ## 📖 Chapter 3: The Night the Article Went Live
 
-A festival article sends a wave of visitors to Pantry, far more than one server can survive. In this chapter, Maya grows Pantry from one machine into a fleet: a doorman at the front, forgetful (stateless) servers behind it, copies of photos near every customer, fair limits for greedy bots, servers that appear and vanish on demand, and one big question: should Pantry split into many services?
+I still remember Maya's message that night: "Everything is on fire." A festival article sent a wave of visitors to Pantry, far more than one server could survive. In this chapter, I'll show you how she grew Pantry from one machine into a fleet: a doorman at the front, forgetful (stateless) servers behind it, photos near every customer, fair limits for greedy bots, servers that appear on demand, and one big question: should Pantry split into many services?
 
 ## 🗺️ Phase map
 

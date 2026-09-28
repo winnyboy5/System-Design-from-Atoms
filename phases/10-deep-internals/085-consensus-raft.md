@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pantry's configuration service must never disagree with itself. Every server must see the same feature flags, in the same order, even while machines crash. Maya studies how a small group of computers can agree on a single truth, reliably.
+Pantry's configuration service must never disagree with itself. Every server must see the same feature flags, in the same order, even while machines crash. Maya asked me how that's even possible. I'll show you the same thing I showed her: how a small group of computers can agree on a single truth, reliably.
 
 ## 🎯 One-sentence idea
 
@@ -169,7 +169,7 @@ To make it unlikely that several followers become candidates at the same time an
 - **Likely follow-up:** "What's the cost?" → the overhead of many heartbeats (so they coalesce them), and complex rebalancing and leader placement.
 </details>
 
-> 📖 *Next time: A frozen server wakes up still believing it's in charge.*
+> 📖 *Next, a frozen server wakes up still believing it's in charge.*
 
 ---
 

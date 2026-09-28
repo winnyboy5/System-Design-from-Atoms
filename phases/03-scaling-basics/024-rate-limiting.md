@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-At 3 am, a single bot hits Pantry's search 5,000 times a second, and real customers can't even load a menu. Maya could block this one bot, but next week there'll be another. She needs a fair rule for everyone: *you may have this much, this fast, and no more.*
+At 3 am, one bot hit Pantry's search 5,000 times a second, and real customers couldn't even load a menu. Maya could block that bot, but I told her there'd be another next week. What she needed was a fair rule for everyone: *you may have this much, this fast, and no more.* Let me show you the jar of coins that makes it work.
 
 ## 🎯 One-sentence idea
 
@@ -159,7 +159,7 @@ Clients can send up to 2× the limit in a short span around the window boundary.
 - **Likely follow-up:** "Attackers use millions of IPs, one attempt each. Now what?" → per-account limits, device fingerprinting, and behavioural and risk scoring. Per-IP limits alone fail here.
 </details>
 
-> 📖 *Next time: Traffic now swings wildly between lunch and midnight, and Leo hates paying for idle servers.*
+> 📖 *Next, traffic swings wildly between lunch and midnight, and Leo hates paying for idle servers.*
 
 ---
 

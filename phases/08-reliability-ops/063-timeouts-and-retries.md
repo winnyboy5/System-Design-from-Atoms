@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-At 9 pm, the payment provider gets slow. Pantry's servers wait patiently (forever), and retry instantly (over and over). Within minutes, the whole site freezes, and **Priya**, Pantry's new on-call engineer, is woken by her pager. The post-mortem the next day begins with two words: *timeouts* and *retries*.
+At 9 pm, the payment provider got slow. Pantry's servers waited patiently (forever), and retried instantly (over and over). Within minutes, the whole site froze, and **Priya**, Pantry's new on-call engineer, was woken by her pager. I've been Priya on nights like that. The post-mortem began with two words I want you to remember: *timeouts* and *retries*.
 
 ## 🎯 One-sentence idea
 
@@ -167,7 +167,7 @@ Three layers each retrying 3 times multiply: 3 × 3 × 3 = 27 attempts at the bo
 - **Likely follow-up:** "What if p99.9 is 10 s?" → make the operation async (202 + a status check), or fix the dependency. Don't hold user requests for 10 s.
 </details>
 
-> 📖 *Next time: Why did a slow *recommendations* service take down *checkout*?*
+> 📖 *Next, I'll show you why a slow *recommendations* service took down *checkout*.*
 
 ---
 

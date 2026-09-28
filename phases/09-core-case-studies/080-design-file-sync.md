@@ -10,7 +10,7 @@
 
 ## 📖 Story
 
-Cooks want recipe folders that stay in sync between their laptop, phone, and kitchen tablet, including 2 GB video drafts. Editing one line shouldn't re-upload the whole thing. This is Maya's final design of the year. Nail it, and she's no longer "junior."
+Cooks wanted recipe folders that stayed in sync between their laptop, phone, and kitchen tablet, including 2 GB video drafts. Editing one line shouldn't re-upload the whole thing. This was Maya's final design of the year. I told her: nail it, and she'd no longer be "junior." Let's nail it together.
 
 ## 🎯 One-sentence idea
 
@@ -181,7 +181,7 @@ The commit includes the base version it was edited from. If the server's latest 
 - **Likely follow-up:** "What about orphaned chunks from abandoned uploads?" → GC chunks with refcount 0 older than a grace period.
 </details>
 
-> 📖 *Next time: Maya's big design review is next. And so is yours.*
+> 📖 *Next is Maya's big design review. And, if you're ready, yours.*
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pantry's cache cluster needs two more servers. Last time the team added one, 80% of the cached keys moved, and the database nearly drowned in misses. Maya discovers a beautifully simple idea: put everything on a circle.
+Pantry's cache cluster needed two more servers. Last time the team added one, 80% of the cached keys moved, and the database nearly drowned in misses. Then Maya learned the idea I think of as one of the most elegant in all of computing, and I'll share it with you: put everything on a circle.
 
 ## 🎯 One-sentence idea
 
@@ -170,7 +170,7 @@ Each key is stored on the next N distinct physical servers clockwise from its po
 - **Likely follow-up:** "Rack/AZ awareness?" → when choosing the N replicas, skip nodes in the same rack/AZ as the ones already chosen (lesson 092).
 </details>
 
-> 📖 *Next time: A construction crew cuts the cable between Pantry's two data centres.*
+> 📖 *Next, a construction crew cuts the cable between Pantry's two data centres.*
 
 ---
 

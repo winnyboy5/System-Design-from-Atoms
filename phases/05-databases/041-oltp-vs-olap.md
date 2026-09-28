@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-At lunchtime, Leo runs a report of "revenue by city by month for three years" directly on the production database. Checkout slows to a crawl for every customer. Maya realizes that *running* the business and *analyzing* the business need different kinds of databases.
+At lunchtime, Leo ran a report of "revenue by city by month for three years" directly on the production database. Checkout slowed to a crawl for every customer. When Maya told me, I winced. I've seen this happen at much bigger companies. *Running* the business and *analyzing* the business need different kinds of databases.
 
 ## 🎯 One-sentence idea
 
@@ -162,7 +162,7 @@ Facts: events with numeric measures (sales). Dimensions: descriptive context (pr
 - **Likely follow-up:** "Why Parquet?" → columnar, compressed, splittable, and schema-aware, so engines scan only the needed columns and partitions.
 </details>
 
-> 📖 *Next time: Recipe videos are filling up the database disk.*
+> 📖 *Next, recipe videos start filling up the database disk.*
 
 ---
 

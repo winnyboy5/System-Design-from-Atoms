@@ -6,7 +6,7 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
-> 📖 *Pantry's global features are shipping. Maya's journey is nearly over, and so is yours.*
+> 📖 *Pantry's global features are shipping. Maya's journey is nearly over, and so is yours with me.*
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-A customer's phone loses signal just as she taps "Pay." The app retries automatically, and she's charged *twice* for one dinner. Networks fail, retries happen, and duplicates are inevitable. Maya needs every important operation to be safe to repeat.
+A customer's phone lost signal just as she tapped "Pay." The app retried automatically, and she was charged *twice* for one dinner. I want this lesson to stick with you more than almost any other. Networks fail, retries happen, and duplicates are inevitable. So every important operation must be safe to repeat.
 
 ## 🎯 One-sentence idea
 
@@ -166,7 +166,7 @@ Atomically claim the key first (a unique insert or lock). Only the winner procee
 - **Likely follow-up:** "How long do you keep processed IDs?" → longer than the maximum redelivery window (e.g., 7 days), with a TTL.
 </details>
 
-> 📖 *Next time: Chapter 7 begins. The dinner rush arrives all at once.*
+> 📖 *Chapter 7 is next. The dinner rush arrives all at once.*
 
 ---
 

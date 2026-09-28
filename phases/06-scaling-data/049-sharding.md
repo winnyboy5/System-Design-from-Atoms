@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-The orders table is 40 TB and growing by 2 TB every month. There's no bigger machine left to buy. Maya must split the data across many machines, each holding a slice. It's one of the most powerful moves in system design, and one of the most painful.
+The orders table was 40 TB and growing by 2 TB every month. There was no bigger machine left to buy. Maya had to split the data across many machines, each holding a slice. I'll be honest with you: it's one of the most powerful moves in system design, and one of the most painful.
 
 ## 🎯 One-sentence idea
 
@@ -163,7 +163,7 @@ Cross-shard joins/queries, cross-shard transactions, global unique constraints/s
 - **Likely follow-up:** "What about huge enterprise customers?" → a hot tenant, so give them a dedicated shard (directory-based) or a compound key.
 </details>
 
-> 📖 *Next time: Maya chooses how to split the data, and one slice catches fire.*
+> 📖 *Next, Maya chooses how to split the data, and one slice catches fire.*
 
 ---
 

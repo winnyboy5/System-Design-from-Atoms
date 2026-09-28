@@ -10,7 +10,7 @@
 
 ## 📖 Story
 
-Pantry needs to send millions of "your cooking class starts in one hour" reminders, run the weekly payouts, and retry failed jobs, all on time and never skipped. The old single scheduler server keeps crashing. Maya designs a distributed job scheduler.
+Pantry needed to send millions of "your cooking class starts in one hour" reminders, run the weekly payouts, and retry failed jobs, all on time and never skipped. The old single scheduler server kept crashing. I walked Maya through a distributed job scheduler, and now I'll walk you through it.
 
 ## 🎯 One-sentence idea
 
@@ -176,7 +176,7 @@ The rule for what to do with runs missed while the scheduler was down: run once 
 - **Likely follow-up:** "What if a run takes longer than the interval?" → the policy is to skip, queue, or allow concurrency, configured per job (like Kubernetes' `concurrencyPolicy`).
 </details>
 
-> 📖 *Next time: A celebrity chef's class goes on sale: fifty seats, and a million fans.*
+> 📖 *Next, a celebrity chef's class goes on sale: fifty seats, and a million fans.*
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pantry is global now, and data pours in every second: orders, clicks, courier pings. The finance team wants nightly reports, while the fraud team wants answers within 100 milliseconds. Maya learns that data can be processed in *piles* or in *streams*.
+Pantry was global now, and data poured in every second: orders, clicks, courier pings. The finance team wanted nightly reports, while the fraud team wanted answers within 100 milliseconds. I explained to Maya the idea I'll explain to you: data can be processed in *piles* or in *streams*.
 
 ## 🎯 One-sentence idea
 
@@ -167,7 +167,7 @@ Lambda runs separate batch and streaming layers and merges them. Kappa uses only
 - **Likely follow-up:** "How do you ensure hourly numbers match the daily truth?" → a nightly reconciliation batch job that corrects late data (it becomes the source of truth).
 </details>
 
-> 📖 *Next time: Leo asks Maya to design Pantry's own key-value store.*
+> 📖 *Next, Leo asks Maya to design Pantry's own key-value store.*
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Every new order matters to the kitchen, the courier team, analytics, loyalty, and the new fraud team. Maya's order service is turning into a switchboard operator, calling everyone one by one. She wants to announce once, and let anyone who cares listen in.
+Every new order mattered to the kitchen, the courier team, analytics, loyalty, and the new fraud team. Maya's order service was turning into a switchboard operator, calling everyone one by one. I suggested a better way, and I'll share it with you: announce once, and let anyone who cares listen in.
 
 ## 🎯 One-sentence idea
 
@@ -159,7 +159,7 @@ They represent facts that already happened, not commands, so producers stay unaw
 - **Likely follow-up:** "What does Redis Streams add?" → persistence, consumer groups, acks, and replay by ID.
 </details>
 
-> 📖 *Next time: The analytics team wants to replay last week's orders after fixing a bug.*
+> 📖 *Next, the analytics team wants to replay last week's orders after fixing a bug.*
 
 ---
 

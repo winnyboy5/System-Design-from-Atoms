@@ -10,7 +10,7 @@
 
 ## 📖 Story
 
-3–5 sentences from the narrator: Maya hits exactly the problem this lesson solves at Pantry. Keep it under ~80 words, with no jargon the lesson hasn't defined yet.
+3–5 sentences in the first person, the author telling the reader Maya's story ("I remember when Maya…"): Maya hits exactly the problem this lesson solves at Pantry. Keep it under ~80 words, with no jargon the lesson hasn't defined yet.
 
 ## 🎯 One-sentence idea
 
@@ -77,7 +77,7 @@ Answer.
 - **Likely follow-up:** …
 </details>
 
-> 📖 *Next time: a one-line teaser for the next lesson's problem.*
+> 📖 *Next, a one-line teaser in the author's voice for the next lesson's problem.*
 
 ---
 

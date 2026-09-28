@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-At 7 pm on a Saturday, Pantry's only server crashes. For 40 minutes nobody can order dinner, and angry messages pile up. Leo asks, "Can we promise this never happens again?" Maya knows "never" is impossible. But "almost never" can be measured, planned for, and paid for.
+At 7 pm one Saturday, Pantry's only server crashed. For 40 minutes nobody could order dinner, and angry messages piled up. Leo asked, "Can we promise this never happens again?" I've had that exact conversation with founders. The honest answer is that "never" is impossible, but "almost never" can be measured, planned for, and paid for. Let me show you how.
 
 ## 🎯 One-sentence idea
 
@@ -141,7 +141,7 @@ About **8.76 hours**.
 - **Likely follow-up:** "Which dependencies can be soft?" → e.g., recommendations or reviews on a product page. Payments and inventory usually can't.
 </details>
 
-> 📖 *Next time: Leo wants to promise customers reliability. Maya wants to know exactly *what* to promise.*
+> 📖 *Next, Leo wants to promise customers reliability, and Maya has to work out exactly *what* to promise.*
 
 ---
 

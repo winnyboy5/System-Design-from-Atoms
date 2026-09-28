@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-The last three outages all started with a deploy. One broke checkout for every customer at once, and rolling it back took forty minutes. Maya wants changes to go out gradually, and to come back instantly.
+The last three outages all started with a deploy. One broke checkout for every customer at once, and rolling it back took forty minutes. I confessed to Maya that most outages I've ever caused were changes I made myself. I'll teach you what I taught her: ship gradually, and be able to undo instantly.
 
 ## 🎯 One-sentence idea
 
@@ -168,7 +168,7 @@ Expand (add new structures), migrate (dual-write, backfill, switch reads), contr
 - **Likely follow-up:** "What if other services read `users.name` directly?" → that's the shared-DB anti-pattern. Coordinate via APIs or events, and keep the old column until all consumers migrate.
 </details>
 
-> 📖 *Next time: A security researcher emails: "I can see other people's orders."*
+> 📖 *Next, a security researcher emails: "I can see other people's orders."*
 
 ---
 

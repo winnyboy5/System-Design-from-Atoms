@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pantry now runs 60 services across hundreds of containers that come and go all day. Hard-coded addresses break every week, and each team writes its own retry and encryption code, all slightly differently. Maya needs a live directory, and maybe a helper standing beside every service.
+Pantry now ran 60 services across hundreds of containers that came and went all day. Hard-coded addresses broke every week, and each team wrote its own retry and encryption code, each slightly differently. I told Maya she needed a live directory, and maybe a helper standing beside every service. I'll show you both.
 
 ## 🎯 One-sentence idea
 
@@ -164,7 +164,7 @@ Missed heartbeats or TTL expiry (or the orchestrator removes them when they fail
 - **Likely follow-up:** "How do newer meshes reduce the overhead?" → sidecar-less / ambient modes (per-node proxies, eBPF) and proxyless gRPC with xDS.
 </details>
 
-> 📖 *Next time: Two database shards generate the same order number, and chaos follows.*
+> 📖 *Next, two database shards generate the same order number, and chaos follows.*
 
 ---
 

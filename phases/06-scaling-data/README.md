@@ -5,7 +5,7 @@
 
 ## 📖 Chapter 6: Pantry Goes National
 
-Pantry explodes across the country, then across an ocean. One database machine can't hold the data or survive a failure. In this chapter, Maya copies data (replication), splits it (sharding), and wrestles with the deepest questions of distributed data: what happens when machines disagree, when the network breaks, and when a request arrives twice?
+Pantry exploded across the country, then across an ocean. One database machine couldn't hold the data or survive a failure. This is my favourite chapter to teach, and also the hardest. I'll show you how Maya copied data (replication), split it (sharding), and wrestled with what happens when machines disagree, when the network breaks, and when a request arrives twice.
 
 ## 🗺️ Phase map
 

@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-A grocery chain wants to list its ingredients on Pantry automatically. Their developer asks, "Where's your API documentation?" Maya winces. Her endpoints are named things like `/getStuff` and `/doOrderNow`. Before strangers build on top of them, she needs a clean, predictable menu of operations.
+A grocery chain wanted to list its ingredients on Pantry automatically. Their developer asked, "Where's your API documentation?" Maya winced. Her endpoints were named things like `/getStuff` and `/doOrderNow`. I've shipped names like that too, and I've paid for it later. Before strangers build on top of it, let me show you how to design a clean, predictable menu of operations.
 
 ## 🎯 One-sentence idea
 
@@ -172,7 +172,7 @@ Only make additive changes (new optional fields/endpoints). Introduce a new vers
 - **Likely follow-up:** "How do you cache a GraphQL response?" → per-field/entity caching (DataLoader), persisted queries, CDN caching of persisted query IDs.
 </details>
 
-> 📖 *Next time: The mobile team says REST is too chatty. Are there other ways for software to talk?*
+> 📖 *Next, the mobile team says REST is too chatty, so I'll show you the other ways software can talk.*
 
 ---
 

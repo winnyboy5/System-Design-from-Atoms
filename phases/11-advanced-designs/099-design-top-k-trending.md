@@ -10,7 +10,7 @@
 
 ## 📖 Story
 
-Leo wants a live "Trending now" board on the home page: the top dishes of the last hour, for every city, updated every few seconds, from a million events per second. Counting everything exactly, everywhere, is impossible. Maya designs it anyway.
+Leo wanted a live "Trending now" board on the home page: the top dishes of the last hour, for every city, updated every few seconds, from a million events per second. Counting everything exactly, everywhere, is impossible. I told Maya that, and she designed it anyway. Here's how.
 
 ## 🎯 One-sentence idea
 
@@ -176,7 +176,7 @@ Trending measures the growth or velocity relative to a baseline, while top measu
 - **Likely follow-up:** "What's the error bound?" → estimate ≤ true + ε·N, with width = e/ε and depth = ln(1/δ).
 </details>
 
-> 📖 *Next time: The final chapter of this story belongs to you.*
+> 📖 *Next is the final chapter of this story, and it belongs to you.*
 
 ---
 

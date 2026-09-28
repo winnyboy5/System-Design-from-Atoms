@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Leo's whiteboard is covered in dreams: chat with cooks, live courier maps, recipe videos, cooking classes. Maya itches to start drawing boxes and arrows. But you and she have learned something already: don't draw a system before you know what it's *for*. So she sits Leo down and asks questions first.
+Leo's whiteboard was covered in dreams: chat with cooks, live courier maps, recipe videos, cooking classes. Maya itched to start drawing boxes and arrows. I understand that itch. But you and she have already learned one thing from me: don't draw a system before you know what it's *for*. So she sat Leo down and asked questions first.
 
 ## 🎯 One-sentence idea
 
@@ -139,7 +139,7 @@ To keep the design focused, to show prioritization, and to agree with the interv
 - **Likely follow-up:** "What if scale were 100× bigger?" → explain what would change (sharding, caching tiers, multi-region).
 </details>
 
-> 📖 *Next time: Chapter 2 begins. Pantry's first customers are about to arrive from far away, across the internet.*
+> 📖 *Chapter 2 is next. Pantry's first customers are about to arrive from far away, and I'll follow them across the internet.*
 
 ---
 

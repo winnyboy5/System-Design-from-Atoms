@@ -6,7 +6,7 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
-> 📖 *Pantry's engine room holds no more mysteries for Maya. One chapter left. Let's make sure you're ready for it.*
+> 📖 *Pantry's engine room holds no more mysteries for Maya. There's one chapter left, and I want you ready for it.*
 
 ---
 

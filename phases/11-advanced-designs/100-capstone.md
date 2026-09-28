@@ -10,7 +10,7 @@
 
 ## 📖 Story
 
-Years have passed. Pantry feeds millions of people, and Maya now leads the design reviews. A nervous junior engineer sits across from her, just as Maya once sat across from Leo. Maya smiles and says, "Let me tell you a story." And now, dear reader, the pen passes to *you*. It's time to write your own chapter.
+Years have passed. Pantry feeds millions of people, and Maya now leads the design reviews. Last month, I watched a nervous junior engineer sit across from her, just as Maya once sat across from me. She smiled and said, "Let me tell you a story." And now, dear reader, I'm handing the pen to *you*. It's time to write your own chapter.
 
 ## 🎯 One-sentence idea
 
@@ -154,7 +154,7 @@ Map each one to the relevant atom lesson (via COVERAGE.md), relearn it, and upda
 - Afterwards, both score it with the [80% gate rubric](../09-core-case-studies/checkpoint-80.md). Swap roles next time. **Interviewing others teaches you a lot too.**
 </details>
 
-> 📖 *Next time: The end of Maya's story, and the beginning of yours.*
+> 📖 *That's the end of Maya's story, and the beginning of yours.*
 
 ---
 

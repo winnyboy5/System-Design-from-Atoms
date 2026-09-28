@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pantry launches nationwide. Reads explode, and the single database is at its limit, and it's also a single point of failure. Maya decides to keep copies of the data on several machines. But who's allowed to write? And how do the copies stay in step?
+Pantry launched nationwide. Reads exploded, and the single database was at its limit, and it was also a single point of failure. Maya decided to keep copies of the data on several machines. I asked her the two questions I'll ask you: who is allowed to write? And how do the copies stay in step?
 
 ## 🎯 One-sentence idea
 
@@ -157,7 +157,7 @@ Two nodes both believe they're the leader and accept writes, which causes confli
 - **Likely follow-up:** "What's the expected downtime?" → typically 10–60 s for detection + promotion + client reconnection.
 </details>
 
-> 📖 *Next time: Customers edit their profiles, and their changes seem to vanish.*
+> 📖 *Next, customers edit their profiles, and their changes seem to vanish.*
 
 ---
 

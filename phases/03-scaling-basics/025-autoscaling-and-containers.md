@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pantry's traffic chart looks like a mountain range: quiet at 4 am, ten times busier at 7 pm. Leo pays for peak capacity all day long. Then a surprise promotion catches the team completely off guard. Maya wants servers that appear when they're needed and vanish when they're not.
+Pantry's traffic chart looked like a mountain range: quiet at 4 am, ten times busier at 7 pm. Leo was paying for peak capacity all day long. Then a surprise promotion caught everyone off guard. Maya wanted servers that appear when they're needed and vanish when they're not. I'll show you how, and the traps I've fallen into doing it.
 
 ## 🎯 One-sentence idea
 
@@ -162,7 +162,7 @@ Containers share the host OS kernel and start in seconds with little overhead. V
 - **Likely follow-up:** "How do you fight cold starts?" → provisioned concurrency, smaller packages, lighter runtimes, keeping functions warm.
 </details>
 
-> 📖 *Next time: Pantry's codebase is now enormous, and three teams keep breaking each other's work.*
+> 📖 *Next, Pantry's codebase is enormous, and three teams keep breaking each other's work.*
 
 ---
 

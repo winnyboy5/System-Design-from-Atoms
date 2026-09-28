@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pantry's in-app chat now stores two billion messages, recipes come in every shape imaginable, and Leo wants a "people you may know" feature. Maya realizes that "NoSQL" isn't one thing at all. It's four very different tools wearing one name.
+Pantry's chat now stored two billion messages, recipes came in every shape imaginable, and Leo wanted "people you may know." Maya asked me which NoSQL database to use. I had to explain that "NoSQL" isn't one thing at all. It's four very different tools wearing one name. Let me introduce you to each of them.
 
 ## 🎯 One-sentence idea
 
@@ -168,7 +168,7 @@ So data that's read together lives in one document, giving a single fast read wi
 - **Likely follow-up:** "How would you support faceted search (filter by brand, size, price)?" → a search engine with facets/aggregations (lesson 043).
 </details>
 
-> 📖 *Next time: The recipe feed page needs six joins, and it's crawling.*
+> 📖 *Next, the recipe feed page needs six joins, and it's crawling.*
 
 ---
 

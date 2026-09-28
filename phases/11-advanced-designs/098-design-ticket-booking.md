@@ -10,7 +10,7 @@
 
 ## 📖 Story
 
-A celebrity chef announces a live cooking class: fifty seats, and a million fans waiting at 10:00:00. Last time, Pantry sold 73 tickets for 50 seats and then crashed for an hour. Maya gets one chance to redesign the system before the next sale.
+A celebrity chef announced a live cooking class: fifty seats, and a million fans waiting at 10:00:00. Last time, Pantry sold 73 tickets for 50 seats and then crashed for an hour. I told Maya she'd get one chance to redesign it before the next sale. Let's make that chance count.
 
 ## 🎯 One-sentence idea
 
@@ -169,7 +169,7 @@ The saga compensates by releasing the held seats back to available (and cancelli
 - **Likely follow-up:** "What about scalpers reselling?" → name-bound or dynamic (rotating) tickets, and official resale platforms with price caps.
 </details>
 
-> 📖 *Next time: Leo wants a live "Trending now" board that updates every few seconds.*
+> 📖 *Next, Leo wants a live "Trending now" board that updates every few seconds.*
 
 ---
 

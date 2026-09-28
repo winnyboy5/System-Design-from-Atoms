@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-It's the Friday dinner rush. Orders flood in, and even though each one takes only a moment, a line forms and everything slows down. Leo is baffled: "Each order takes 50 milliseconds. Why is everyone waiting two seconds?" Maya realizes that "fast" can mean three completely different things.
+It was the Friday dinner rush. Orders flooded in, and even though each one took only a moment, a line formed and everything slowed down. Leo was baffled: "Each order takes 50 milliseconds. Why is everyone waiting two seconds?" I smiled when Maya told me, because I'd asked the same question years ago. "Fast" can mean three completely different things.
 
 ## 🎯 One-sentence idea
 
@@ -153,7 +153,7 @@ Queueing delay grows sharply as utilization approaches 100%, and you need spare 
 - **Likely follow-up:** "How would you protect latency-sensitive requests?" → separate pools (bulkheads, lesson 064), priority queues, rate limits.
 </details>
 
-> 📖 *Next time: Leo has big plans, and Maya needs numbers before anyone buys a single server.*
+> 📖 *Leo has big plans, and I'll show you how Maya got numbers before anyone bought a single server.*
 
 ---
 

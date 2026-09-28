@@ -6,7 +6,7 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
-> 📖 *The short links and the rate limiter are live and holding. Maya's reviewers are impressed. Let's see how you'd do.*
+> 📖 *The short links and the rate limiter are live and holding, and Maya's reviewers were impressed. Let me see how you'd do.*
 
 ---
 

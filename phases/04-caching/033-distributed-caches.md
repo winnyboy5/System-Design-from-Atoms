@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pantry's cache now holds 300 GB, far too much for one machine. When that machine rebooted last week, the database nearly collapsed under the flood of misses. Maya needs a cache that spreads across many machines, survives failures, and can do more than store simple strings.
+Pantry's cache now held 300 GB, far too much for one machine. When that machine rebooted last week, the database nearly collapsed under the flood of misses. Maya needed a cache that spreads across many machines, survives failures, and can do more than store simple strings. I'll show you the two tools I'd reach for.
 
 ## 🎯 One-sentence idea
 
@@ -156,7 +156,7 @@ Any of: data structures (sorted sets, lists, hashes), persistence, built-in repl
 - **Likely follow-up:** "How do you delete a 10M-member set safely?" → `UNLINK` (async delete) or delete incrementally with `SSCAN` + `SREM`.
 </details>
 
-> 📖 *Next time: Chapter 5 begins. Pantry's data has outgrown its very first database design.*
+> 📖 *Chapter 5 is next. Pantry's data has outgrown its very first database design.*
 
 ---
 

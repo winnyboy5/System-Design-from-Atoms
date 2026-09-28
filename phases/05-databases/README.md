@@ -5,7 +5,7 @@
 
 ## 📖 Chapter 5: A Home for Every Kind of Data
 
-Pantry's single database has become a junk drawer of orders, recipes, chats, videos, and reports. In this chapter, Maya learns what makes data safe (transactions), fast to find (indexes), and well-shaped (modelling), and she gives each kind of data its proper home: relational, NoSQL, warehouse, object storage, search engine, or specialist store.
+By now Pantry's database was a junk drawer of orders, recipes, chats, videos, and reports. In this chapter, I'll teach you what I taught Maya: what makes data safe (transactions), fast to find (indexes), and well-shaped (modelling), and how to give each kind of data its proper home: relational, NoSQL, warehouse, object storage, search engine, or specialist store.
 
 ## 🗺️ Phase map
 

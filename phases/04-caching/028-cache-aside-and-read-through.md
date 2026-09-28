@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Maya puts a cache in front of the database, and page loads drop from 50 milliseconds to 1. Magic! But now she has questions. Who puts data into the cache? What happens when something isn't there? And what if the cache itself crashes?
+Maya put a cache in front of the database, and page loads dropped from 50 milliseconds to 1. She messaged me: "It's like magic!" I told her the magic comes with questions. Who puts data into the cache? What happens when something isn't there? And what if the cache itself crashes? Let's answer them together.
 
 ## 🎯 One-sentence idea
 
@@ -162,7 +162,7 @@ Caching "not found" results for a short time, so repeated lookups for missing da
 - **Likely follow-up:** "How do you know which keys are hot?" → track access frequency, and load the top N from a snapshot.
 </details>
 
-> 📖 *Next time: Reading is solved. But what happens when a cook updates a menu?*
+> 📖 *Reading is solved. Next, I'll show you what happens when a cook updates a menu.*
 
 ---
 

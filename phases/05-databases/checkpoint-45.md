@@ -6,7 +6,7 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
-> 📖 *Maya can justify every database on the diagram. Before Pantry goes national, let's check that you can too.*
+> 📖 *Maya can justify every database on the diagram. Before Pantry goes national, I want to make sure you can too.*
 
 ---
 

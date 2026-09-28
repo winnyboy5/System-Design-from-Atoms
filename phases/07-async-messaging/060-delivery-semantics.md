@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-A worker crashes after sending an email but before marking it done, so the customer gets it twice. Another worker marks a message done *before* crashing, so that customer gets nothing. Maya learns the three promises a messaging system can make, and which one to trust.
+A worker crashed after sending an email but before marking it done, so the customer got it twice. Another worker marked a message done *before* crashing, so that customer got nothing. I'll show you the three promises a messaging system can make, and which one I'd trust with your customers.
 
 ## 🎯 One-sentence idea
 
@@ -159,7 +159,7 @@ At-least-once delivery + idempotent processing (dedupe by message ID, ideally in
 - **Likely follow-up:** "How do you handle out-of-order pings?" → include timestamps or sequence numbers, and ignore older ones.
 </details>
 
-> 📖 *Next time: New Year's Eve arrives, and orders pour in faster than the kitchens can handle.*
+> 📖 *Next, New Year's Eve arrives, and orders pour in faster than the kitchens can handle.*
 
 ---
 

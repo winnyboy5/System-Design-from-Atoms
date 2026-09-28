@@ -6,7 +6,7 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
-> 📖 *Pantry now survives single failures, and Priya's pager is quiet for once. Time to check what you've learned.*
+> 📖 *Pantry now survives single failures, and Priya's pager is quiet for once. Time for me to check what you've learned.*
 
 ---
 

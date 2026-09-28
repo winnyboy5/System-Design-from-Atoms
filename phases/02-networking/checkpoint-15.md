@@ -6,7 +6,7 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
-> 📖 *Pantry now speaks the web's language fluently. Before customers start demanding live updates, let's review.*
+> 📖 *Pantry now speaks the web's language fluently. Before customers start demanding live updates, let's review together.*
 
 ---
 

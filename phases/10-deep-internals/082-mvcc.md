@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Maya notices two mysteries. The orders table grew 40% this month, though the row count barely changed. And an analyst's three-hour report somehow didn't block a single checkout. Both mysteries have the same answer: the database quietly keeps several versions of every row.
+Maya brought me two mysteries. The orders table grew 40% in a month, though the row count barely changed. And an analyst's three-hour report somehow didn't block a single checkout. I grinned, because both mysteries have the same answer: the database quietly keeps several versions of every row.
 
 ## 🎯 One-sentence idea
 
@@ -148,7 +148,7 @@ Read committed takes a new snapshot for each statement. Repeatable read uses one
 - **Likely follow-up:** "Any downside?" → a long snapshot holds back vacuum (bloat) while the dump runs, so prefer running it on a replica.
 </details>
 
-> 📖 *Next time: Leo asks why the "always consistent" European setup feels so slow.*
+> 📖 *Next, Leo asks why the "always consistent" European setup feels so slow.*
 
 ---
 

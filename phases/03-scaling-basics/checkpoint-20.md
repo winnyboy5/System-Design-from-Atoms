@@ -6,7 +6,7 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
-> 📖 *Pantry survived its first traffic surge, but only just. Maya writes down what she learned. Now it's your turn.*
+> 📖 *Pantry survived its first traffic surge, but only just. Maya wrote down what she learned. Now I'd like you to do the same.*
 
 ---
 

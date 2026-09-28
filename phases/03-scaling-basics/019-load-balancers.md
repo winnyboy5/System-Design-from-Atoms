@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Maya now has three identical servers, but customers still know only one address. Something must stand at the front door, greet every request, and send it to a server that's awake. And when server two crashes during the lunch rush, nobody should even notice.
+Maya now had three identical servers, but customers still knew only one address. Something had to stand at the front door, greet every request, and send it to a server that was awake. And when server two crashed during the lunch rush, I wanted nobody to notice. Let me introduce you to the doorman.
 
 ## 🎯 One-sentence idea
 
@@ -144,7 +144,7 @@ Letting in-flight requests on a server finish while sending it no new ones, befo
 - **Likely follow-up:** "What about WebSocket connections?" → drain over a longer window, tell clients to reconnect elsewhere with jitter.
 </details>
 
-> 📖 *Next time: The front door works, but some servers are drowning while others sit idle.*
+> 📖 *The front door works, but next I'll show you why some servers drowned while others sat idle.*
 
 ---
 

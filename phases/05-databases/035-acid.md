@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-The server crashes halfway through checkout. The customer's card was charged, but the order was never saved. Leo is furious, and the customer is more so. Maya learns that some groups of steps must happen *all together, or not at all*.
+The server crashed halfway through checkout. The customer's card was charged, but the order was never saved. Leo was furious, and the customer was more so. I've been on the receiving end of that phone call, and I never want you to be. Some groups of steps must happen *all together, or not at all*.
 
 ## 🎯 One-sentence idea
 
@@ -150,7 +150,7 @@ Long transactions hold locks (blocking others), increase deadlock and contention
 - **Likely follow-up:** "Why an append-only ledger?" → auditability, easier reconciliation, and no lost updates from concurrent overwrites (lesson 096).
 </details>
 
-> 📖 *Next time: Two customers try to buy the very last portion of lasagna at the same instant.*
+> 📖 *Next, two customers try to buy the very last portion of lasagna at the same instant.*
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-An order is saved to the database, and then the server crashes before it can announce "OrderPlaced." The kitchen never hears about it, and a customer waits two hours for food that was never cooked. Maya needs the save and the announcement to be inseparable.
+An order was saved to the database, and then the server crashed before it could announce "OrderPlaced." The kitchen never heard about it, and a customer waited two hours for food that was never cooked. I've debugged this bug at 2 am. Maya needed the save and the announcement to be inseparable.
 
 ## 🎯 One-sentence idea
 
@@ -165,7 +165,7 @@ Choreography: services react to each other's events with no central controller. 
 - **Likely follow-up:** "What's the risk of choreography at scale?" → an "event spaghetti" where no one understands the full flow, and cyclic event chains.
 </details>
 
-> 📖 *Next time: Chapter 8 begins. It's the night everything goes down.*
+> 📖 *Chapter 8 is next. It's the night everything goes down.*
 
 ---
 

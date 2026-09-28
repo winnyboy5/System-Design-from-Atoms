@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-The festival article goes live, and traffic jumps twenty-fold overnight. Pantry's single server hits 100% CPU, and pages take ten seconds to load. Leo asks, "Do we buy a bigger computer, or more computers?" Maya has one night to decide. Let's decide with her.
+The festival article went live, and traffic jumped twenty-fold overnight. Pantry's single server hit 100% CPU, and pages took ten seconds to load. Leo asked, "Do we buy a bigger computer, or more computers?" Maya had one night to decide. I've lived through nights like that. Let's decide together, the way I'd want you to.
 
 ## 🎯 One-sentence idea
 
@@ -132,7 +132,7 @@ Splitting data across machines (sharding) is complex. It breaks joins and transa
 - **Likely follow-up:** "How would you pick a shard key?" → lesson 050.
 </details>
 
-> 📖 *Next time: Maya adds a second server, and customers start getting logged out at random.*
+> 📖 *Next, Maya adds a second server, and customers start getting logged out at random.*
 
 ---
 

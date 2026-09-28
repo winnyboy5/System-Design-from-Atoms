@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pantry's first out-of-town order arrives from a city 300 kilometres away. Maya realizes that message hopped across dozens of machines to reach her little server. How did it know where to go? And how did it find the right program once it arrived? Time to learn the internet's addressing system.
+Pantry's first out-of-town order came from a city 300 kilometres away. Maya realized that message had hopped across dozens of machines to reach her little server. How did it know where to go? And how did it find the right program when it arrived? I still find this part of the internet quietly beautiful. Let me show you its addressing system.
 
 ## 🎯 One-sentence idea
 
@@ -144,7 +144,7 @@ Each packet is routed independently and may take a different path or be delayed 
 - **Likely follow-up:** "What limits a server with many connections?" → memory per connection, file descriptor limits, CPU for TLS, kernel tuning.
 </details>
 
-> 📖 *Next time: The messages arrive, but should they travel like a phone call or like a postcard?*
+> 📖 *The messages arrive, but should they travel like a phone call or like a postcard? I'll explain next.*
 
 ---
 

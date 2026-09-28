@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-A loyal customer with 3,000 past orders opens "My orders," and it takes eight seconds to load. Maya discovers the database is reading every one of Pantry's 50 million orders just to find hers. She remembers the index at the back of her old school textbook.
+A loyal customer with 3,000 past orders opened "My orders," and it took eight seconds to load. Maya discovered that the database was reading every one of Pantry's 50 million orders just to find hers. I asked her to picture the index at the back of her old school textbook. Now I'll ask you to do the same.
 
 ## 🎯 One-sentence idea
 
@@ -163,7 +163,7 @@ Every insert, update, or delete must also update each index on the table.
 - **Likely follow-up:** "Why do random UUIDs hurt?" → inserts land all over the B-tree, the working set doesn't fit in memory, and there's more I/O and fragmentation.
 </details>
 
-> 📖 *Next time: Chat messages are piling up by the billion, and the relational database is straining.*
+> 📖 *Next, chat messages pile up by the billion, and the relational database starts to strain.*
 
 ---
 

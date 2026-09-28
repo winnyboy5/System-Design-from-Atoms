@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-A cook changes a dish's price, and some customers see the old price for ten minutes. Meanwhile, the "likes" counter is hammering the database with thousands of writes a second. Maya realizes that *writes* need a cache strategy too, and that different data deserves different strategies.
+A cook changed a dish's price, and some customers saw the old price for ten minutes. Meanwhile, the "likes" counter was hammering the database with thousands of writes a second. Maya realized that *writes* need a cache strategy too. Here's the lesson that took me far too long to learn: different data deserves different strategies.
 
 ## 🎯 One-sentence idea
 
@@ -151,7 +151,7 @@ Many increments are combined (coalesced) in the cache and flushed as one DB writ
 - **Likely follow-up:** "What if the DB write succeeds but the cache write fails?" → retry, or delete the key so the next read reloads. The DB is the source of truth.
 </details>
 
-> 📖 *Next time: The cache is full, and Maya must decide what to throw out.*
+> 📖 *Next, the cache is full, and Maya has to decide what to throw out.*
 
 ---
 

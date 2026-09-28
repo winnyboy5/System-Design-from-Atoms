@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pantry's storage cluster now has 800 machines. A central list of "who's alive" can't keep up, and one slow network link keeps getting a perfectly healthy machine declared dead. Maya discovers how *rumours* can spread information reliably.
+Pantry's storage cluster now had 800 machines. A central list of "who's alive" couldn't keep up, and one slow network link kept getting a perfectly healthy machine declared dead. I showed Maya how computers can spread information the same way office gossip spreads, and it works remarkably well.
 
 ## 🎯 One-sentence idea
 
@@ -155,7 +155,7 @@ Messages can be arbitrarily delayed, so a slow node is indistinguishable from a 
 - **Likely follow-up:** "What's the trade-off?" → slower detection of real failures, which means a slightly longer outage when a node really dies.
 </details>
 
-> 📖 *Next time: A single checkout now spans five services. How can it still be all-or-nothing?*
+> 📖 *Next, a single checkout spans five services. How can it still be all-or-nothing?*
 
 ---
 

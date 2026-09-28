@@ -10,7 +10,7 @@
 
 ## 📖 Story
 
-Customers type "pa…" and expect "pad thai" to appear before they've finished typing. Running a full search on every keystroke would melt the search cluster. Maya designs autocomplete that answers in milliseconds.
+Customers typed "pa…" and expected "pad thai" to appear before they'd finished typing. Running a full search on every keystroke would melt the search cluster. I love this problem, because the solution is to do almost all of the work *before* anyone types. Let me show you.
 
 ## 🎯 One-sentence idea
 
@@ -181,7 +181,7 @@ Debouncing keystrokes, cancelling outdated requests, caching results, filtering 
 - **Likely follow-up:** "Privacy?" → don't suggest other users' personal queries. Only aggregate queries above a frequency threshold appear globally.
 </details>
 
-> 📖 *Next time: Pantry wants to find every recipe on the web.*
+> 📖 *Next, Pantry wants to find every recipe on the web.*
 
 ---
 

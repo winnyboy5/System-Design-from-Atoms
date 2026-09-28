@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-The recommendations service, a nice-to-have, got slow, and somehow checkout, the most important page, went down with it. Priya traces it: every server thread was stuck waiting on recommendations. Maya learns how to stop one broken part from sinking the whole ship.
+The recommendations service, a nice-to-have, got slow, and somehow checkout, the most important page, went down with it. Priya traced it: every server thread was stuck waiting on recommendations. When Maya asked me how to stop one broken part from sinking the whole ship, I drew her a picture of the Titanic. I'll draw it for you too.
 
 ## 🎯 One-sentence idea
 
@@ -155,7 +155,7 @@ By giving each dependency its own limited pool of resources, so a slow dependenc
 - **Likely follow-up:** "Per instance or shared state?" → usually per client instance (simple, and no coordination). Aggregate the metrics centrally for visibility.
 </details>
 
-> 📖 *Next time: The only database server dies at dinnertime, and there's no spare.*
+> 📖 *Next, the only database server dies at dinnertime, and there's no spare.*
 
 ---
 

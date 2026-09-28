@@ -6,7 +6,7 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
-> 📖 *Pantry's first faraway customers are happy. Take a breath with Maya, and check what you've learned so far.*
+> 📖 *Pantry's first faraway customers were happy. Take a breath with me, and let's check what you've learned so far.*
 
 ---
 

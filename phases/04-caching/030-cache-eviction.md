@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-The cache server runs out of memory, and suddenly random items vanish, including the most popular menus. Maya needs a rule for what gets kicked out when space runs short, and for when old data should expire on its own.
+The cache server ran out of memory, and random items started vanishing, including the most popular menus. Maya needed a rule for what gets kicked out when space runs short, and for when old data should expire on its own. I'll show you the rules, and a little data structure I still love to code by hand.
 
 ## 🎯 One-sentence idea
 
@@ -164,7 +164,7 @@ To prevent many keys from expiring at the same moment and causing a burst of DB 
 - **Likely follow-up:** "How would you detect this early?" → alerts on hit ratio, evictions/s, and memory fragmentation.
 </details>
 
-> 📖 *Next time: A cook adds an allergy warning to a dish, but customers keep seeing the old page.*
+> 📖 *Next, a cook adds an allergy warning to a dish, but customers keep seeing the old page.*
 
 ---
 

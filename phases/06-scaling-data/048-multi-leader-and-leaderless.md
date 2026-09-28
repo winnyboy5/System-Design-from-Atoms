@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pantry's European customers wait 150 milliseconds on every save, because the only leader lives in America. Maya wants a leader on each continent. But then two leaders might accept conflicting changes to the same shopping cart at the same moment.
+Pantry's European customers waited 150 milliseconds on every save, because the only leader lived in America. Maya wanted a leader on each continent. I warned her, and now I'm warning you: two leaders might accept conflicting changes to the same shopping cart at the same moment. Then what?
 
 ## 🎯 One-sentence idea
 
@@ -162,7 +162,7 @@ When a target replica is down, another node temporarily stores the write (with a
 - **Likely follow-up:** "What happens during a transatlantic partition?" → multi-leader keeps accepting writes on both sides and reconciles later. Strongly consistent systems reject writes on the minority side (CAP, lesson 052).
 </details>
 
-> 📖 *Next time: The orders table reaches 40 TB, and no single machine can hold it.*
+> 📖 *Next, the orders table reaches 40 TB, and no single machine can hold it.*
 
 ---
 

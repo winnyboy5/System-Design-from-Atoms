@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-A major cloud region suffers an outage, and every Pantry server, database, and backup lives in that region. For six hours, Pantry simply doesn't exist. Leo asks, "How much data could we lose, and how long could we be down?" Maya needs two numbers and a plan.
+A major cloud region suffered an outage, and every Pantry server, database, and backup lived in that region. For six hours, Pantry simply didn't exist. Leo asked, "How much data could we lose, and how long could we be down?" I told Maya she needed two numbers and a plan. Let me give you both.
 
 ## 🎯 One-sentence idea
 
@@ -144,7 +144,7 @@ Synchronous replication would add the cross-region round trip (~60–150 ms) to 
 - **Likely follow-up:** "Why not fail over to a replica?" → replicas received the same corruption.
 </details>
 
-> 📖 *Next time: The team keeps learning about problems from angry customers instead of from dashboards.*
+> 📖 *Next, the team keeps learning about problems from angry customers instead of from dashboards.*
 
 ---
 

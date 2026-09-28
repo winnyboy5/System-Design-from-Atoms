@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-A customer in the next town complains that Pantry "feels slow." Maya checks the average response time: 80 milliseconds. Perfectly fine! So why the complaint? Leo shrugs: "Maybe they're just impatient." But Maya has a hunch that the average is hiding something. She's right, and you're about to find out what.
+A customer in the next town told Maya that Pantry "feels slow." She checked the average response time: 80 milliseconds. Perfectly fine! Leo shrugged: "Maybe they're just impatient." But Maya had a hunch that the average was hiding something. I've been fooled by averages myself, more than once. Let me show you what they hide.
 
 ## 🎯 One-sentence idea
 
@@ -146,7 +146,7 @@ The page is only as fast as its *slowest* call. With many calls, it becomes like
 - **Likely follow-up:** "What if the data changes every second?" → short TTL, or skip caching, or write-through.
 </details>
 
-> 📖 *Next time: Leo asks a question that sounds simple: how many orders can Pantry actually handle?*
+> 📖 *Next, Leo asks a question that sounds simple: how many orders can Pantry actually handle?*
 
 ---
 

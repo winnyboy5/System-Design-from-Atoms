@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Leo wants a live "your courier is here" map and a button to call the cook. Maya notices something odd: order data must arrive perfectly, but a dot on a live map can afford to skip a beat. There are two ways to send data across the internet, and they suit very different jobs.
+Leo wanted a live "your courier is here" map and a button to call the cook. Maya noticed something odd, and I'd like you to notice it too: order data must arrive perfectly, but a dot on a live map can afford to skip a beat. There are two ways to send data across the internet, and I'll show you why they suit very different jobs.
 
 ## 🎯 One-sentence idea
 
@@ -151,7 +151,7 @@ Queries and answers are tiny and one-shot. A handshake would double the latency.
 - **Likely follow-up:** "Any downsides?" → some networks and firewalls block or throttle UDP, and it's more CPU-heavy in user space. Browsers fall back to HTTP/2.
 </details>
 
-> 📖 *Next time: Customers type pantry.com, not a string of numbers. So who does the translating?*
+> 📖 *Customers type pantry.com, not a string of numbers. Next, I'll show you who does the translating.*
 
 ---
 

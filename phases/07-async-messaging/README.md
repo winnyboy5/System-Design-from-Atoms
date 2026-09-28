@@ -5,7 +5,7 @@
 
 ## 📖 Chapter 7: The Dinner Rush
 
-Every evening, orders pour in all at once, and every checkout waits on a chain of slow side-tasks. In this chapter, Maya learns to say "I'll do that later, reliably": queues, announcements that many teams can hear, replayable logs, honest delivery promises, polite refusal under overload, and events that can never be lost.
+Every evening, orders poured in all at once, and every checkout waited on a chain of slow side-tasks. In this chapter, I'll teach you the phrase that saved Maya's dinner rush: "I'll do that later, reliably." You'll see queues, announcements that many teams can hear, replayable logs, honest delivery promises, polite refusal under overload, and events that can never be lost.
 
 ## 🗺️ Phase map
 

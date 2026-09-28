@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-With two servers running, customers complain that they're logged out every few clicks and their carts vanish. Maya digs in and finds that each server keeps its *own* memory of who's logged in. Whenever a request lands on the "other" server, the customer is a stranger.
+With two servers running, customers complained that they were logged out every few clicks, and their carts vanished. Maya dug in and found that each server kept its *own* memory of who was logged in. Whenever a request landed on the "other" server, the customer was a stranger. I love this bug, because it teaches the whole idea in one painful lesson.
 
 ## 🎯 One-sentence idea
 
@@ -145,7 +145,7 @@ Databases, caches, message brokers, WebSocket gateways (any two).
 - **Likely follow-up:** "What if the lock holder dies mid-job?" → the lease expires, another instance takes over, and idempotency protects against partial re-runs.
 </details>
 
-> 📖 *Next time: The servers no longer forget anyone. But who decides which server gets each request?*
+> 📖 *The servers no longer forget anyone. Next, I'll show you who decides which server gets each request.*
 
 ---
 

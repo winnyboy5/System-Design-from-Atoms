@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-The team argues. "Likes can be a bit stale," says one. "Balances can't," says another. "Comments must appear in order," says a third. They're all right. Maya learns there are many levels of consistency, and each feature gets to order its own.
+Maya's team argued. "Likes can be a bit stale," said one. "Balances can't," said another. "Comments must appear in order," said a third. I told Maya they were all right, and that's the point I'll make to you here: there are many levels of consistency, and each feature gets to order its own.
 
 ## 🎯 One-sentence idea
 
@@ -147,7 +147,7 @@ Read-your-writes, monotonic reads, monotonic writes, writes-follow-reads (any tw
 - **Likely follow-up:** "How do you explain eventual consistency to users?" → UX patterns: optimistic UI updates, "syncing…" indicators, and last-updated timestamps.
 </details>
 
-> 📖 *Next time: Maya wants fresh reads without asking every copy every time.*
+> 📖 *Next, Maya wants fresh reads without asking every copy every time.*
 
 ---
 

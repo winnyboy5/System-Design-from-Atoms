@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pantry now keeps three copies of every shopping cart. Waiting for all three on every write is slow, but reading just one copy might be stale. Maya finds the sweet spot with a little arithmetic that guarantees the reader and the writer always meet.
+Pantry now kept three copies of every shopping cart. Waiting for all three on every write was slow, but reading just one copy might be stale. I showed Maya a little piece of arithmetic that still delights me, because it guarantees the reader and the writer always meet. Let me show you too.
 
 ## 🎯 One-sentence idea
 
@@ -155,7 +155,7 @@ Any two majorities share at least one node, so two conflicting decisions (e.g., 
 - **Likely follow-up:** "Why not 7 or 9?" → more nodes = slower writes (more acks) for rare benefit. 5 is the usual max for consensus groups.
 </details>
 
-> 📖 *Next time: A network hiccup, an automatic retry, and a customer is charged twice.*
+> 📖 *Next, a network hiccup, an automatic retry, and a customer is charged twice.*
 
 ---
 

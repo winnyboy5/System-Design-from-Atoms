@@ -10,7 +10,7 @@
 
 ## 📖 Story
 
-Leo dreams up "Pantry Recipes," a search engine for every recipe on the internet. That means visiting billions of web pages politely, without getting stuck in loops or visiting the same page twice. Maya designs a web crawler.
+Leo dreamed up "Pantry Recipes," a search engine for every recipe on the internet. That meant visiting billions of web pages politely, without getting stuck in loops or visiting the same page twice. I warned Maya that crawlers are easy to start and hard to do well. I'll show you why.
 
 ## 🎯 One-sentence idea
 
@@ -176,7 +176,7 @@ SimHash or MinHash fingerprints, which are similar for pages with mostly the sam
 - **Likely follow-up:** "How do you keep it from starving other hosts?" → per-host quotas in the frontier, with round-robin across hosts.
 </details>
 
-> 📖 *Next time: The courier app needs to find the nearest driver in seconds.*
+> 📖 *Next, the courier app needs to find the nearest driver in seconds.*
 
 ---
 

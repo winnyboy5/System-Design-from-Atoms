@@ -5,7 +5,7 @@
 
 ## 📖 Chapter 9: Maya's Year of Big Features
 
-Leo has a list of ambitious features, and Maya must design each one properly and defend it in a design review. In this chapter, all the atoms you've learned combine into complete systems: short links, a rate limiter, a feed, chat, notifications, video streaming, and file sync. It ends with Maya's toughest review, and your 🏁 Practical Mastery gate.
+Leo handed Maya a list of ambitious features, and she had to design each one properly and defend it in a design review. In this chapter, I'll watch with you as all the atoms combine into complete systems: short links, a rate limiter, a feed, chat, notifications, video streaming, and file sync. It ends with Maya's toughest review, and your 🏁 Practical Mastery gate.
 
 ## 🗺️ Phase map
 

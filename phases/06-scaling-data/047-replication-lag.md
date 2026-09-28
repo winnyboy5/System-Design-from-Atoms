@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-A customer updates her delivery address, refreshes the page, and sees the old one. She updates it again. And again. Three dinners go to the wrong house. Her write went to the leader, but her reads went to a copy that was a second behind.
+A customer updated her delivery address, refreshed the page, and saw the old one. She updated it again. And again. Three dinners went to the wrong house. When Maya explained it, I recognized it right away: her write went to the leader, but her reads went to a copy that was a second behind.
 
 ## 🎯 One-sentence idea
 
@@ -155,7 +155,7 @@ Heavy write bursts or bulk jobs, long-running queries on the replica, network is
 - **Likely follow-up:** "What if all replicas lag?" → temporarily send reads to the leader (if capacity allows), degrade non-critical features, and alert.
 </details>
 
-> 📖 *Next time: Pantry opens in Europe, and every European write crawls across the ocean.*
+> 📖 *Next, Pantry opens in Europe, and every European write crawls across the ocean.*
 
 ---
 

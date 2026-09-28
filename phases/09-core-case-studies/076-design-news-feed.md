@@ -10,7 +10,7 @@
 
 ## 📖 Story
 
-Leo wants an Instagram-style feed: fresh recipes from the cooks you follow. Simple, until Maya learns that Pantry's most famous chef has twelve million followers. Every design choice now depends on *when* you build each person's feed.
+Leo wanted an Instagram-style feed: fresh recipes from the cooks you follow. It sounded simple, until Maya learned that Pantry's most famous chef had twelve million followers. This is my favourite interview question of all time, and I'll tell you why: every choice depends on *when* you build each person's feed.
 
 ## 🎯 One-sentence idea
 
@@ -196,7 +196,7 @@ They're filtered out during hydration (lazy deletion), instead of being removed 
 - **Likely follow-up:** "How do you keep latency < 300 ms?" → limit candidates (~500), precompute features, use a lightweight first-stage ranker and a heavier second stage on the top-K.
 </details>
 
-> 📖 *Next time: Customers want to message cooks in real time.*
+> 📖 *Next, customers want to message cooks in real time.*
 
 ---
 

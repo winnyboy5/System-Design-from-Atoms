@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pantry's European customers are unhappy. Every page has felt about 100 milliseconds slower since the team switched on "strong consistency everywhere." There's no outage and no cut cable, so why the cost? Maya realizes the CAP theorem only told her half of the story.
+Pantry's European customers were unhappy. Every page felt about 100 milliseconds slower since the team switched on "strong consistency everywhere." There was no outage and no cut cable, so why the cost? I told Maya what I wish someone had told me earlier: CAP only tells half the story.
 
 ## 🎯 One-sentence idea
 
@@ -136,7 +136,7 @@ Replicas must coordinate (quorum or consensus round trips) before answering, and
 - **Likely follow-up:** "What about a user who travels?" → route their writes to their home region (slightly slower abroad), or migrate their home region.
 </details>
 
-> 📖 *Next time: Two copies disagree about which update came first, and their clocks are lying.*
+> 📖 *Next, two copies disagree about which update came first, and their clocks are lying.*
 
 ---
 

@@ -10,7 +10,7 @@
 
 ## 📖 Story
 
-Pantry's cooking videos are a hit, but they buffer on phones, take hours to process, and the bandwidth bill is bigger than the salaries. Maya designs a proper video pipeline, all the way from the cook's upload to your screen.
+Pantry's cooking videos were a hit, but they buffered on phones, took hours to process, and the bandwidth bill was bigger than the salaries. Maya asked me where to even begin. Let me show you what I showed her: a video pipeline, all the way from the cook's upload to your screen.
 
 ## 🎯 One-sentence idea
 
@@ -183,7 +183,7 @@ Bandwidth (egress) for delivering video, which is why CDNs and efficient codecs 
 - **Likely follow-up:** "How does the player choose bitrate?" → throughput-based, buffer-based (BOLA), or hybrid algorithms.
 </details>
 
-> 📖 *Next time: The last big feature is shared recipe folders that sync across every device.*
+> 📖 *Next, the last big feature: shared recipe folders that sync across every device.*
 
 ---
 

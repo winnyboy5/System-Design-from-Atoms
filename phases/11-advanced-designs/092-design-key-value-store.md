@@ -10,7 +10,7 @@
 
 ## 📖 Story
 
-Pantry's shopping carts must *always* accept writes, even when a data centre fails, because a cart that can't be saved means lost sales. No off-the-shelf setup quite fits, so Leo asks Maya to design one from first principles. Everything from the last two chapters comes together here.
+Pantry's shopping carts had to *always* accept writes, even when a data centre failed, because a cart that can't be saved means lost sales. Nothing off the shelf quite fit, so Leo asked Maya to design one from first principles. I told her everything from the last two chapters comes together here. Let's build it with her.
 
 ## 🎯 One-sentence idea
 
@@ -182,7 +182,7 @@ With vector clocks: if neither version's vector dominates the other, they're con
 - **Likely follow-up:** "Multi-key transactions?" → add a transaction layer (2PC across Raft groups with a timestamp oracle or HLC, like Percolator or TiDB).
 </details>
 
-> 📖 *Next time: Customers want search suggestions to appear as they type.*
+> 📖 *Next, customers want search suggestions to appear as they type.*
 
 ---
 

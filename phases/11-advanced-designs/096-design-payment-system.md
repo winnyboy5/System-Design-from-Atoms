@@ -10,7 +10,7 @@
 
 ## 📖 Story
 
-Pantry now processes payments and payouts for millions of cooks in thirty countries. A single double-charge makes the news, and a single lost payout loses a cook's trust forever. Maya designs a payment system where every cent is accounted for.
+Pantry now processed payments and payouts for millions of cooks in thirty countries. A single double-charge makes the news, and a single lost payout loses a cook's trust forever. I've never been more careful than when designing payments, and I'll share every habit I taught Maya.
 
 ## 🎯 One-sentence idea
 
@@ -188,7 +188,7 @@ Comparing internal records (the ledger) with external records (PSP settlements, 
 - **Likely follow-up:** "Hot account contention?" → split the hot account into N sub-accounts and sum them, or post in batches every second.
 </details>
 
-> 📖 *Next time: Millions of reminders and payouts must run at exactly the right moment.*
+> 📖 *Next, millions of reminders and payouts must run at exactly the right moment.*
 
 ---
 

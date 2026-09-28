@@ -5,7 +5,7 @@
 
 ## 📖 Chapter 4: The Menu Page That Melted
 
-The same popular pages are requested millions of times a day, and the database is drowning in repeated work. In this chapter, Maya discovers caching, the art of keeping copies close, and learns the hard way that copies can go stale, overflow, stampede, and need a cluster of their own.
+The same popular pages were requested millions of times a day, and the database was drowning in repeated work. This is the chapter where I introduce you to caching, the art of keeping copies close. And, just as Maya did, you'll learn the hard way that copies can go stale, overflow, stampede, and need a cluster of their own.
 
 ## 🗺️ Phase map
 

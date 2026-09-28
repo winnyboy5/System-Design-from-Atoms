@@ -6,7 +6,7 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
-> 📖 *Pantry now grows and shrinks on its own. A quarter of the story is behind us. Let's check your notes.*
+> 📖 *Pantry now grows and shrinks on its own. We're a quarter of the way through the story. Let me check your notes.*
 
 ---
 

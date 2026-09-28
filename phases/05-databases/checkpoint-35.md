@@ -6,7 +6,7 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
-> 📖 *Checkout is safe from half-finished orders. Maya celebrates with a slice of Rosa's lasagna, and you get a checkpoint.*
+> 📖 *Checkout is safe from half-finished orders. Maya celebrated with a slice of Rosa's lasagna. You get a checkpoint from me.*
 
 ---
 

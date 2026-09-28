@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-The nightly payout job runs on an elected leader. One night, the leader freezes for twenty seconds during a memory clean-up pause. A new leader takes over, and then the old one wakes up, and *both* pay the cooks. Maya learns why locks need expiry dates and ticket numbers.
+The nightly payout job ran on an elected leader. One night, the leader froze for twenty seconds during a memory clean-up pause. A new leader took over, and then the old one woke up, and *both* paid the cooks. I've seen this bug cost real money. Let me show you why locks need expiry dates and ticket numbers.
 
 ## 🎯 One-sentence idea
 
@@ -158,7 +158,7 @@ The leader's ephemeral node / lease expires when it stops heartbeating, and watc
 - **Likely follow-up:** "How would you add fencing to a system writing to S3?" → it's hard, since S3 doesn't check tokens. Use conditional writes (ETag/version preconditions) or a coordinating DB that validates tokens.
 </details>
 
-> 📖 *Next time: With 800 servers, how does everyone even know who's still alive?*
+> 📖 *Next, with 800 servers, how does everyone even know who's still alive?*
 
 ---
 

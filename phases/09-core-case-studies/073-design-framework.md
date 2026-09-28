@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Leo announces a year of big features: short share links, a recipe feed, chat, notifications, cooking videos, and shared recipe folders. Maya will lead the designs, and each one will be reviewed by senior engineers, much like an interview. Before the first review, she learns a framework that works every time.
+Leo announced a year of big features: short share links, a recipe feed, chat, notifications, cooking videos, and shared recipe folders. Maya would lead the designs, and senior engineers would review each one, much like an interview. Before her first review, I gave her the framework I use every single time. Now I'm giving it to you.
 
 ## 🎯 One-sentence idea
 
@@ -149,7 +149,7 @@ At least one end-to-end write path and one read path through the components.
 - **Tip:** treat interruptions as hints about what they want to explore, and go there.
 </details>
 
-> 📖 *Next time: The first feature: tiny links for sharing dishes on social media.*
+> 📖 *Next, the first feature: tiny links for sharing dishes on social media.*
 
 ---
 

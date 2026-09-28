@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-A new hire studies Pantry's architecture diagram and asks, "Why so many databases?" Maya realizes she should be able to justify every single one. Let's learn a repeatable way to choose, so that you never pick a database based on hype again.
+A new hire studied Pantry's architecture diagram and asked, "Why so many databases?" Maya realized she should be able to justify every single one. I want the same for you. Let me give you a repeatable way to choose, so you never pick a database based on hype again.
 
 ## 🎯 One-sentence idea
 
@@ -158,7 +158,7 @@ You get the best tool for each job, but pay in operational burden and in keeping
 - **Likely follow-up:** "How do you generate unique short codes?" → lessons 072 and 074 (counter + base62, or a pre-generated key pool).
 </details>
 
-> 📖 *Next time: Chapter 6 begins. Pantry goes national, and one database machine is no longer enough.*
+> 📖 *Chapter 6 is next. Pantry goes national, and one database machine is no longer enough.*
 
 ---
 

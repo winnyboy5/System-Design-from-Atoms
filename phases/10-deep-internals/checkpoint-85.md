@@ -6,7 +6,7 @@
 
 **Rules:** answer out loud or on paper **before** opening answers.
 
-> 📖 *Maya can now explain what happens deep inside Pantry's databases and consensus clusters. Let's test your depth.*
+> 📖 *Maya can now explain what happens deep inside Pantry's databases and consensus clusters. Let me test your depth.*
 
 ---
 

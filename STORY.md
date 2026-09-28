@@ -1,7 +1,7 @@
 # 📖 The Story: How Pantry Grew Up
 
-> A story told to you, the reader, so the lessons have a reason to exist.
-> Every lesson opens with a short **📖 Story** scene and ends with a **📖 Next time…** teaser. Read them for motivation, or skip them when you just want the facts. The lessons work either way.
+> A story I, the author of this guide, tell you, the reader, so that every lesson has a reason to exist.
+> Every lesson opens with a short **📖 Story** scene and ends with a **📖** teaser for the next one. Read them for motivation, or skip them when you just want the facts. The lessons work either way.
 
 ---
 
@@ -9,11 +9,13 @@
 
 Let me tell you a story.
 
-It begins in a small apartment kitchen, with a laptop, a big idea, and a lot of optimism. **Leo** wants to build **Pantry**, a website where neighbours sell home-cooked meals to each other. He hires **Maya**, a junior engineer who has built websites before but has never designed a *system*.
+I've watched a lot of engineers learn system design. Most of them learned it the hard way: something broke, and they had to figure out why. I was one of them. So instead of handing you a textbook, I'm going to tell you about someone I know well.
 
-Over the next hundred lessons, you'll watch Pantry grow from one laptop to a global service feeding millions. Every time it grows, something breaks: a slow page, a crashed server, a double charge, a stampede of fans. And every time, Maya has to learn one new idea (one *atom*) to fix it.
+It begins in a small apartment kitchen, with a laptop, a big idea, and a lot of optimism. **Leo** wanted to build **Pantry**, a website where neighbours sell home-cooked meals to each other. He hired **Maya**, a junior engineer who had built websites before but had never designed a *system*.
 
-That's the trick of this guide. **You never learn a concept before you need it.** The story creates the need, and the lesson fills it. It's exactly how Richard Feynman believed we learn best: by wrestling with a real question before being handed the answer.
+Over the next hundred lessons, I'll show you how Pantry grew from one laptop into a global service feeding millions. Every time it grew, something broke: a slow page, a crashed server, a double charge, a stampede of fans. And every time, Maya had to learn one new idea (one *atom*) to fix it. I'll teach you each one at exactly the moment she needed it.
+
+That's my trick in this guide. **You never learn a concept before you need it.** The story creates the need, and the lesson fills it. It's how Richard Feynman believed we learn best, and it's how I learned: by wrestling with a real question before being handed the answer.
 
 ---
 
@@ -25,7 +27,8 @@ That's the trick of this guide. **You never learn a concept before you need it.*
 | **Leo** | Pantry's founder. Endlessly enthusiastic, always has a new feature idea, and occasionally causes outages by running reports at lunchtime. | Everywhere |
 | **Priya** | Pantry's on-call engineer, whose pager goes off at the worst moments. She teaches Maya that everything fails eventually. | From Chapter 8 |
 | **Grandma Rosa** | A home cook whose lasagna is so popular it causes a race condition. | Chapter 5 |
-| **You** | The reader. The narrator talks to you directly, and in the final chapter, hands you the pen. | The whole way |
+| **Me, your author** | The narrator. I've made most of Maya's mistakes myself, and I'll tell you so. I talk to you directly throughout. | The whole way |
+| **You** | The reader. In the final chapter, I hand you the pen. | The whole way |
 
 ---
 
@@ -81,9 +84,9 @@ flowchart TD
 
 ## 🧭 How to read it
 
-- **Story mode:** read each lesson's 📖 Story first, and pause. *What would you do in Maya's place?* Guess for 30 seconds, then read the lesson. This is the Feynman habit: attempt it before you're taught.
-- **Facts mode:** skip the 📖 parts entirely. Every lesson still stands on its own.
-- **Low-energy mode:** read only the 📖 Story and the 🎯 One-sentence idea. That's still progress.
+- **Story mode (my favourite):** read each lesson's 📖 Story first, and pause. *What would you do in Maya's place?* Guess for 30 seconds before I tell you. This is the Feynman habit: attempt it before you're taught.
+- **Facts mode:** skip the 📖 parts entirely. I've written every lesson so it stands on its own.
+- **Low-energy mode:** read only the 📖 Story and the 🎯 One-sentence idea. I promise that still counts as progress.
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-For the third time this month, Pantry learns about an outage from social media before a single alarm goes off. And when the site is slow, nobody can tell *which* of 30 services is to blame. Maya needs a way to see inside the system.
+For the third time that month, Pantry learned about an outage from social media before a single alarm went off. And when the site was slow, nobody could tell *which* of 30 services was to blame. I've been in that war room, and it's miserable. Maya needed a way to see inside the system.
 
 ## 🎯 One-sentence idea
 
@@ -168,7 +168,7 @@ Symptoms (errors, latency, SLO burn) reflect real user impact. Cause-based alert
 - **Likely follow-up:** "How do you find the needle in 1B requests?" → high-cardinality event exploration (Honeycomb-style), filtering by user, app version, region, and endpoint.
 </details>
 
-> 📖 *Next time: The latest outage? It started with a Friday afternoon deploy.*
+> 📖 *Next, the latest outage turns out to have started with a Friday afternoon deploy.*
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Maya moves the "later" work out of checkout. But where does it go? If the email service is down, the emails can't just vanish. She needs a to-do list between services that holds the work safely until someone is ready to do it.
+Maya moved the "later" work out of checkout. But where should it go? If the email service is down, the emails can't just vanish. I told her what she needed, and I'll show you the same thing: a to-do list between services that holds the work safely until someone is ready to do it.
 
 ## 🎯 One-sentence idea
 
@@ -150,7 +150,7 @@ Queue depth growing and/or the age of the oldest message rising.
 - **Likely follow-up:** "What's the cost of strict ordering?" → less parallelism: one slow message blocks the rest of its group.
 </details>
 
-> 📖 *Next time: Now five different teams all want to hear about every new order.*
+> 📖 *Next, five different teams all want to hear about every new order.*
 
 ---
 

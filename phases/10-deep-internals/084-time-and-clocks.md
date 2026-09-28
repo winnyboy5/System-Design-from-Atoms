@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Two edits to the same menu arrive at two data centres. The one with the later timestamp wins, except that it was actually written *first*: one server's clock was running 200 milliseconds fast. Maya learns that in distributed systems, even *time* can't be trusted.
+Two edits to the same menu arrived at two data centres. The one with the later timestamp won, except that it was actually written *first*: one server's clock was running 200 milliseconds fast. When I learned this lesson myself, it changed how I think about computers. In distributed systems, even *time* can't be trusted.
 
 ## 🎯 One-sentence idea
 
@@ -147,7 +147,7 @@ Waiting out the clock uncertainty interval before making a commit visible, so ti
 - **Likely follow-up:** "And for leases across machines?" → leases depend on bounded clock drift. Use conservative lease durations, and **fencing tokens** for safety (lesson 086).
 </details>
 
-> 📖 *Next time: So how can machines ever agree on anything at all?*
+> 📖 *Next, if time can't be trusted, how can machines agree on anything at all? I'll explain.*
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-A security researcher reports that changing `/orders/1234` to `/orders/1235` in the address bar shows *someone else's* order, home address and all. Pantry checked *who you are*, but never *what you're allowed to see*. Maya dives into identity, tokens, and permissions.
+A security researcher reported that changing `/orders/1234` to `/orders/1235` in the address bar showed *someone else's* order, home address and all. Pantry checked *who you are*, but never *what you're allowed to see*. This one keeps me up at night, and I want it to stick with you. Let's dive into identity, tokens, and permissions.
 
 ## 🎯 One-sentence idea
 
@@ -161,7 +161,7 @@ Authorization Code with PKCE.
 - **Likely follow-up:** "How do you list all docs a user can see?" → reverse indexes or materialized permission views. That's hard at scale.
 </details>
 
-> 📖 *Next time: The security audit that follows finds many more gaps.*
+> 📖 *Next, the security audit that follows finds many more gaps.*
 
 ---
 

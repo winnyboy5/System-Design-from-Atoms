@@ -6,7 +6,7 @@
 
 This gate is a **full mock interview** plus a **self-audit**. Treat it like the real thing: set a timer, talk out loud, and draw on paper.
 
-> 📖 *Maya walks into her design review. The panel slides a prompt she's never seen across the table. She smiles, because she has the atoms. So do you. Your turn.*
+> 📖 *I watched Maya walk into her design review. The panel slid a prompt she'd never seen across the table. She smiled, because she had the atoms. So do you. Your turn.*
 
 ---
 

@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-"Where's my food?" is Pantry's most common support question. Customers keep refreshing the tracking page, and the server groans under the load. Maya wants the *server* to speak up when something changes, but plain HTTP only lets the customer speak first.
+"Where's my food?" became Pantry's most common support question. Customers kept refreshing the tracking page, and the server groaned under the load. Maya wanted the *server* to speak up when something changed, but plain HTTP only lets the customer speak first. I'll show you the four ways around that, from clumsy to elegant.
 
 ## 🎯 One-sentence idea
 
@@ -162,7 +162,7 @@ The server holds each request until there's actually data (or a timeout), so the
 - **Likely follow-up:** "What if 1M users watch it?" → put a CDN or cache in front of the polled endpoint, since everyone reads the same data.
 </details>
 
-> 📖 *Next time: Chapter 3 begins. The festival article goes live tomorrow, and one server won't be enough.*
+> 📖 *Chapter 3 is next. The festival article goes live, and one server won't be enough.*
 
 ---
 

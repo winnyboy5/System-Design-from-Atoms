@@ -10,7 +10,7 @@
 
 ## 📖 Story
 
-Cooks want to share their dishes on social media, but Pantry's links are 140 characters of gibberish. Leo wants short links like `pan.try/x7Kp2`. It sounds like a weekend project, until Maya estimates *billions* of clicks a month.
+Cooks wanted to share their dishes on social media, but Pantry's links were 140 characters of gibberish. Leo wanted short links like `pan.try/x7Kp2`. Maya thought it was a weekend project. I smiled and asked her to estimate the traffic first. She came back with *billions* of clicks a month.
 
 ## 🎯 One-sentence idea
 
@@ -192,7 +192,7 @@ Each server gets a large block of IDs and assigns them locally. The coordinator 
 - **Likely follow-up:** "Does that break uniqueness?" → no, a bijective permutation maps unique inputs to unique outputs.
 </details>
 
-> 📖 *Next time: The short links go viral, and so do the bots abusing them.*
+> 📖 *Next, the short links go viral, and so do the bots abusing them.*
 
 ---
 

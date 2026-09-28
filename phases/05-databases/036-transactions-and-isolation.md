@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Only one portion of Grandma Rosa's famous lasagna is left. Two customers click "Buy" within the same millisecond, and *both* get a confirmation. Maya's checkout used transactions, so how did this happen? She's about to learn that "isolation" comes in levels.
+Only one portion of Grandma Rosa's famous lasagna was left. Two customers clicked "Buy" within the same millisecond, and *both* got a confirmation. Maya was stunned: "But I used transactions!" I nodded, because I've made this exact mistake. I'll show you that "isolation" comes in levels, and that the default one might not protect you.
 
 ## 🎯 One-sentence idea
 
@@ -161,7 +161,7 @@ Two transactions read overlapping data, and each updates different rows based on
 - **Likely follow-up:** "What about a distributed system with no single DB?" → a reservation service with a single owner per room (partitioned), or a distributed lock with fencing (lesson 086).
 </details>
 
-> 📖 *Next time: A loyal customer's order history now takes eight seconds to load.*
+> 📖 *Next, a loyal customer's order history takes eight seconds to load.*
 
 ---
 

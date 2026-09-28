@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pantry's new mobile app needs six requests just to draw the home screen, and it's painfully slow on a weak signal. Meanwhile, the backend is splitting into services that chatter constantly. Maya discovers three popular styles of API, and each one shines in a different place.
+Pantry's new mobile app needed six requests just to draw the home screen, and it was painfully slow on a weak signal. Meanwhile, the backend was splitting into services that chattered constantly. Maya asked me which API style was "best." My answer, as usual, was "it depends." So let me show you three popular styles and exactly where each one shines.
 
 ## 🎯 One-sentence idea
 
@@ -163,7 +163,7 @@ Resolving a list of N items and then fetching a related field for each one separ
 - **Likely follow-up:** "How do you rate limit GraphQL?" → by query cost points, not by request count.
 </details>
 
-> 📖 *Next time: Customers want to watch their courier move live, without pressing refresh.*
+> 📖 *Next, customers want to watch their courier move live, without pressing refresh.*
 
 ---
 

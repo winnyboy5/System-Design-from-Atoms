@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pantry launches wallets for cooks. The finance team asks, "Can we see exactly how every balance reached its value, on any day in history?" A single balance column can't answer that. Maya considers storing the *history itself* as the truth.
+Pantry launched wallets for cooks. The finance team asked, "Can we see exactly how every balance reached its value, on any day in history?" A single balance column couldn't answer that. I reminded Maya that accountants solved this centuries ago, and I'll show you how: store the *history itself* as the truth.
 
 ## 🎯 One-sentence idea
 
@@ -157,7 +157,7 @@ Crypto-shredding: encrypt personal data with a per-user key, and delete the key 
 - **Likely follow-up:** "How do you monitor it?" → projection lag = the latest event position minus the projector checkpoint, with alerts on growth.
 </details>
 
-> 📖 *Next time: Leo wants to count unique visitors across a billion events, using almost no memory.*
+> 📖 *Next, Leo wants to count unique visitors across a billion events, using almost no memory.*
 
 ---
 

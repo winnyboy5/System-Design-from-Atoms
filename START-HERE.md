@@ -16,7 +16,7 @@ flowchart LR
 
 ## 1½. It's a story 📖
 
-This guide is narrated like a book. You'll follow **Maya**, a junior engineer, as she grows **Pantry**, a food marketplace, from one laptop into a global system. Each lesson opens with a short **📖 Story** scene where something breaks, and closes with a **📖 Next time…** teaser.
+I've written this guide like a book I'm reading to you. I'll tell you the story of **Maya**, a junior engineer, as she grows **Pantry**, a food marketplace, from one laptop into a global system. Each lesson opens with a short **📖 Story** scene where something breaks, and closes with a **📖** teaser for the next one.
 
 - **Before reading a lesson, pause after the story and guess:** *what would you do?* Guessing first (even wrongly) makes the answer stick.
 - **Don't want the story?** Skip the 📖 parts. Every lesson works without them.

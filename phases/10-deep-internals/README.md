@@ -5,7 +5,7 @@
 
 ## 📖 Chapter 10: Inside the Engine Room
 
-Maya is now a senior engineer, and senior engineers are expected to know *why* things work. In this chapter, she opens up the machinery: how databases write to disk and keep versions, why clocks lie, how machines reach agreement, how locks go wrong, how rumours spread membership, how transactions span services, and how tiny probabilistic structures count billions.
+Maya was a senior engineer now, and I told her that senior engineers are expected to know *why* things work. In this chapter, I'll open the machinery with you: how databases write to disk and keep versions, why clocks lie, how machines reach agreement, how locks go wrong, how rumours spread membership, how transactions span services, and how tiny probabilistic structures count billions.
 
 ## 🗺️ Phase map
 

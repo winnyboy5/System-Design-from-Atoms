@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Pantry now has an API, an image service, and a chat server, all living behind pantry.com. Maya needs the front door to *read* each request and route it by its path. But some traffic, like the database's, doesn't even speak HTTP. Two kinds of doormen, for two kinds of jobs.
+Pantry now had an API, an image service, and a chat server, all behind pantry.com. Maya needed the front door to *read* each request and route it by its path. But some traffic, like the database's, doesn't even speak HTTP. I'll show you two kinds of doormen for two kinds of jobs, and how to tell which one you need.
 
 ## 🎯 One-sentence idea
 
@@ -157,7 +157,7 @@ L4 is cheap and fast at absorbing huge connection volumes (and some DDoS), and s
 - **Likely follow-up:** "What's direct server return?" → the L4 LB forwards the request, and the backend responds directly to the client, bypassing the LB on the way back (great for heavy responses like video).
 </details>
 
-> 📖 *Next time: Every service is re-implementing login checks. Maya wants one front desk for all of them.*
+> 📖 *Next, every service is re-implementing login checks, and Maya wants one front desk for all of them.*
 
 ---
 

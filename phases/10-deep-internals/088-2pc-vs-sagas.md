@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Checkout now spans the order, inventory, payment, and courier services, and each one has its own database. A payment fails *after* the stock was reserved and a courier booked. There's no single transaction to roll back. Maya must choose between locking everything and undoing things step by step.
+Checkout now spanned the order, inventory, payment, and courier services, and each one had its own database. A payment failed *after* the stock was reserved and a courier booked. There was no single transaction to roll back. I laid out Maya's two options for her, and I'll lay them out for you: lock everything, or undo step by step.
 
 ## 🎯 One-sentence idea
 
@@ -166,7 +166,7 @@ Other transactions can see intermediate states. Mitigate with semantic locks/sta
 - **Likely follow-up:** "What's 3PC?" → it adds a pre-commit phase to reduce blocking, but it isn't safe under network partitions, so it's rarely used. Consensus-based commit is the modern answer.
 </details>
 
-> 📖 *Next time: The finance team wants the full history of every wallet, forever.*
+> 📖 *Next, the finance team wants the full history of every wallet, forever.*
 
 ---
 

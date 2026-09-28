@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Every visitor loads the same "Top dishes near you" page, and every time, the database recomputes it from scratch. The database is gasping at 95% CPU, for an answer that barely changes all day. Maya wonders: why walk to the library for a book you could keep on your desk?
+Every visitor loaded the same "Top dishes near you" page, and every time the database recomputed it from scratch. It gasped at 95% CPU for an answer that barely changed all day. When Maya showed me, I asked her one question, and now I'll ask you: why walk to the library for a book you could keep on your desk?
 
 ## 🎯 One-sentence idea
 
@@ -143,7 +143,7 @@ Each server has its own copy, so data is duplicated and invalidation must reach 
 - **Likely follow-up:** "What if the hot queries are all different (search)?" → cache the building blocks, use a search index, or precompute.
 </details>
 
-> 📖 *Next time: Maya adds a cache, and now she must decide exactly how data flows into it.*
+> 📖 *Next, Maya adds a cache, and has to decide exactly how data flows into it.*
 
 ---
 

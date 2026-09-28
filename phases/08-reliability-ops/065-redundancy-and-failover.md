@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-At 6:45 pm, the primary database's disk fails. There's no standby. Pantry is down for ninety minutes while Priya restores from a backup. The next morning, Leo asks the question that starts every reliability project: "What else do we only have *one* of?"
+At 6:45 pm, the primary database's disk failed. There was no standby. Pantry was down for ninety minutes while Priya restored from a backup. The next morning, Leo asked the question that I believe starts every reliability project, and that I want you to ask of every design: "What else do we only have *one* of?"
 
 ## 🎯 One-sentence idea
 
@@ -151,7 +151,7 @@ After losing a node or AZ, the survivors must handle the full peak load, or fail
 - **Likely follow-up:** "Isn't breaking production risky?" → start small (one instance, low traffic), have a kill switch, and do it during business hours with the team ready. It's safer than discovering the gaps during a real outage.
 </details>
 
-> 📖 *Next time: Then an entire cloud region goes dark.*
+> 📖 *Next, an entire cloud region goes dark.*
 
 ---
 

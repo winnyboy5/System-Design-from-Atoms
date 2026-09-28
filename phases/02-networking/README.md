@@ -5,7 +5,7 @@
 
 ## 📖 Chapter 2: Strangers from Far Away
 
-Pantry's first customers from other towns (and soon, other countries) start arriving. Their requests cross oceans of cables and dozens of machines to reach Maya's server. In this chapter, Maya follows those messages hop by hop: how they're addressed, delivered, secured, and understood, and how Pantry can talk back in real time.
+Pantry's first customers from other towns (and soon, other countries) started arriving. Their requests crossed oceans of cables and dozens of machines to reach Maya's server. In this chapter, I'll follow those messages hop by hop with you: how they're addressed, delivered, secured, and understood, and how Pantry learned to talk back in real time.
 
 ## 🗺️ Phase map
 

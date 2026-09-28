@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-New Year's Eve. Orders arrive three times faster than Pantry can process them. The queue grows, memory fills, response times hit two minutes, and customers who gave up long ago still clog the line. Maya learns that sometimes "not now" is the kindest answer.
+New Year's Eve. Orders arrived three times faster than Pantry could process them. The queue grew, memory filled, response times hit two minutes, and customers who had given up long ago still clogged the line. It took me years to learn what Maya learned that night: sometimes "not now" is the kindest answer.
 
 ## 🎯 One-sentence idea
 
@@ -160,7 +160,7 @@ Passing the remaining time budget along the call chain, so downstream services c
 - **Likely follow-up:** "What do you return when the breaker is open?" → a cached or default response, or a fast error, depending on criticality.
 </details>
 
-> 📖 *Next time: An order was saved, but its announcement never reached the kitchen.*
+> 📖 *Next, an order is saved, but its announcement never reaches the kitchen.*
 
 ---
 

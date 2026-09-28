@@ -5,7 +5,7 @@
 
 ## 📖 Chapter 8: The Night Everything Went Down
 
-Success brings new dangers: slow dependencies, dead disks, whole regions going dark, risky deploys, and security holes. Priya, Pantry's on-call engineer, joins the story. In this chapter, Maya and Priya make Pantry survive failure, see inside itself, ship safely, lock its doors, find its own services, and name things uniquely across hundreds of machines.
+Success brought new dangers: slow dependencies, dead disks, whole regions going dark, risky deploys, and security holes. This is where Priya, Pantry's on-call engineer, joins our story. I've carried a pager for years, so this chapter is personal. I'll show you how Maya and Priya taught Pantry to survive failure, see inside itself, ship safely, lock its doors, find its own services, and name things uniquely across hundreds of machines.
 
 ## 🗺️ Phase map
 

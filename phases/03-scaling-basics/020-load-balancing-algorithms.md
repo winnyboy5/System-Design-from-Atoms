@@ -8,7 +8,7 @@
 
 ## 📖 Story
 
-Cooking-video uploads are huge and slow, while menu clicks are tiny and quick. Simply taking turns has just sent three giant uploads to one poor server while the others relax. Maya realizes that *how* the doorman picks a server matters as much as having a doorman at all.
+Cooking-video uploads are huge and slow, while menu clicks are tiny and quick. Simply taking turns had sent three giant uploads to one poor server while the others relaxed. When Maya showed me the graphs, I recognized them instantly. *How* the doorman picks a server matters as much as having a doorman at all.
 
 ## 🎯 One-sentence idea
 
@@ -141,7 +141,7 @@ Weighted routing: weight 5 for v2 and 95 for v1 (a canary release).
 - **Likely follow-up:** "What if the slowness is caused by one noisy tenant?" → isolate it with bulkheads or a separate pool, and rate-limit that tenant.
 </details>
 
-> 📖 *Next time: Maya wants `/api` requests to go one way and `/images` requests another.*
+> 📖 *Next, Maya wants `/api` requests to go one way and `/images` requests another.*
 
 ---
 
