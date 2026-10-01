@@ -8,157 +8,165 @@
 
 ## 📖 Story
 
-The nightly payout job ran on an elected leader. One night, the leader froze for twenty seconds during a memory clean-up pause. A new leader took over, and then the old one woke up, and *both* paid the cooks. I've seen this bug cost real money. Let me show you why locks need expiry dates and ticket numbers.
+2:00 a.m. Pantry's **nightly payout job** runs on whichever worker holds the "payout leader" lock: a 10-second lease, renewed every 3 seconds.
+
+At 2:04, Worker 1 enters a **stop-the-world garbage-collection pause**. It's frozen solid for **twenty seconds**, mid-loop, halfway through paying 9,000 cooks. Its lease expires. Worker 2 grabs the lock and, correctly, starts the payout run.
+
+At 2:04:21, Worker 1 **wakes up**. From its point of view, no time has passed. It still believes it's the leader. It picks up where it left off.
+
+Two workers. One lock. **Both paying cooks.**
+
+By morning, 3,100 cooks have been paid **twice**. Clawing it back takes a week and a lot of apologetic emails.
+
+I've seen this exact bug cost real money. Let me show you why locks need **expiry dates and ticket numbers**.
 
 ## 🎯 One-sentence idea
 
-**Leader election and distributed locks make sure only one node does something at a time. Because a paused or partitioned node can wrongly believe it still holds the lock, safe systems use leases (locks that expire) plus fencing tokens (increasing numbers the storage checks) so stale holders can't do damage.**
+**Leader election and distributed locks ensure only one node acts at a time, but because a paused or partitioned node can wrongly believe it still holds the lock, safe systems combine leases (locks that expire) with fencing tokens (ever-increasing numbers that the storage checks) so stale holders can't do damage.**
 
 ## 🧸 Analogy
 
 A **single key to the supply room**:
 
-- 🔑 **Lock:** only whoever holds the key can enter.
-- ⏳ **Lease:** the key **auto-expires after 10 minutes**, so if someone faints holding it, others aren't locked out forever.
-- 😴 **The problem:** Bob grabs the key, then **falls asleep for 15 minutes** (a GC pause). His lease expires, and Alice gets a **new** key. Bob wakes up, **still thinks he has access**, and walks in while Alice is inside. 💥
-- 🎫 **Fencing token:** each key comes with a **ticket number** that always goes up (Bob #33, Alice #34). The supply-room door **remembers the highest number it has seen** and refuses #33 after it has seen #34. Bob is stopped at the door. ✅
+- 🔑 **Lock:** only the key holder may enter.
+- ⏳ **Lease:** the key **self-destructs after 10 minutes**, so someone who faints doesn't lock everyone out forever.
+- 😴 **The trap:** Worker 1 holds the key and **falls asleep for 15 minutes**. The lease expires, and Worker 2 gets a **new** key. Worker 1 wakes up **still thinking it has access**. 💥
+- 🎫 **Fencing token:** every key carries an **ever-rising ticket number** (#33, then #34). The door **remembers the highest number it has seen** and rejects #33 after #34.
 
 ## 🖼️ Visual
 
+*Diagram brief:* a timeline where Worker 1 gets token 33, freezes (zzz), its lease expires, and Worker 2 gets token 34 and writes. Worker 1 wakes and tries to write with 33, and the storage slams the door: "33 < 34, rejected."
+
 ```mermaid
 sequenceDiagram
-    participant B as Bob (client 1)
-    participant L as Lock service (etcd/ZooKeeper)
-    participant S as Storage
-    participant A as Alice (client 2)
-    B->>L: acquire lock
-    L-->>B: granted, token=33, lease 10 s
-    Note over B: 💤 long GC pause (15 s)
+    participant W1 as Worker 1
+    participant L as Lock service (etcd)
+    participant S as Payout ledger
+    participant W2 as Worker 2
+    W1->>L: acquire payout-leader
+    L-->>W1: granted, token=33, lease 10 s
+    Note over W1: 💤 GC pause (20 s)
     Note over L: lease expired
-    A->>L: acquire lock
-    L-->>A: granted, token=34
-    A->>S: write (token 34) ✅ storage records max=34
-    B->>S: write (token 33) ❌ rejected, 33 < 34
+    W2->>L: acquire payout-leader
+    L-->>W2: granted, token=34
+    W2->>S: pay cook 7 (token 34) ✅ ledger records max=34
+    W1->>S: pay cook 7 (token 33) ❌ rejected: 33 < 34
 ```
 
 ## 🔬 How it works
 
-- **Why you need it:** exactly one scheduler runs cron jobs, one primary DB accepts writes, one worker processes a partition, one process renews certificates…
-- **Leader election approaches:**
-  - **Consensus-based:** a Raft/Paxos group elects a leader internally (etcd, Consul, ZooKeeper). This is the gold standard.
-  - **Using a coordination service:** candidates create an **ephemeral node / lease key** in ZooKeeper/etcd. Whoever succeeds is leader, and others **watch** and take over when it disappears.
-  - **Kubernetes Lease objects** for controller leader election.
-- **Distributed locks:**
-  - **Lease-based:** the lock has a TTL, and the holder must **renew** (heartbeat) before it expires.
-  - Must be **mutually exclusive** under failures, which means backed by a **strongly consistent** store (a consensus system). A single Redis node with `SET NX PX` is fine for **efficiency** locks (avoid duplicate work), but it's **not safe** for **correctness** locks under failover or pauses.
-- **The fundamental problem:** a holder can be **paused** (GC, VM migration, swapping) or **partitioned** past its lease **without knowing**. Clocks drift too (lesson 084).
-- **Fencing tokens:** the lock service issues a **monotonically increasing token** with each grant. **Every write to the protected resource includes the token**, and the resource **rejects tokens lower than the highest it has seen**. It turns "I think I'm the leader" into "the storage agrees."
-  - Raft **terms**, ZooKeeper **zxid/version**, and etcd **revision** all work as fencing tokens.
-- **Leader leases for reads:** a leader can serve reads locally while its lease is valid, but this relies on bounded clock drift. Use conservative margins.
+- **Why it exists:** exactly one cron scheduler, one DB primary, one consumer per partition, one certificate renewer, **one payout runner**.
+- **Leader election:** **consensus-native** (Raft/Paxos inside etcd, Consul, ZooKeeper), or candidates race to create an **ephemeral node / lease key** in a coordination service while the others **watch** it. **Kubernetes Lease** objects do this for controllers.
+- **Leases, not forever-locks:** the holder must **renew** before the TTL, and a crashed holder's lock expires on its own. **Correctness locks must live in a strongly consistent store**. A single Redis `SET NX PX` is fine for **efficiency** locks (avoid duplicate work), but it can be lost on failover and is **unsafe for correctness**.
+- **The unfixable truth:** a holder can be **paused** (GC, VM migration, swapping) or **partitioned** past its lease **without knowing**, and clocks drift (lesson 084). No amount of client-side checking closes this gap.
+- **Fencing tokens close it at the resource:** each grant carries a **monotonically increasing token**, **every protected write includes it**, and the **resource rejects any token lower than the highest it has seen**. **Raft terms, ZooKeeper zxids, and etcd revisions** make natural tokens. Release locks with **compare-and-delete** (only if you still own them).
 
 ## 🧩 Worked example
 
-**Efficiency lock with Redis (OK for "avoid duplicate work"):**
+**An efficiency lock (fine for "don't build the report twice"):**
 
 ```python
 token = uuid4().hex
-if redis.set("lock:nightly-report", token, nx=True, px=60_000):   # 60 s lease
+if redis.set("lock:nightly-report", token, nx=True, px=60_000):
     try:
-        build_report()                # if this runs twice by accident, it's only wasted work
+        build_report()          # running twice by accident only wastes CPU
     finally:
-        # release only if we still own it (atomic compare-and-delete via Lua)
         redis.eval("if redis.call('get',KEYS[1])==ARGV[1] then return redis.call('del',KEYS[1]) end",
-                   1, "lock:nightly-report", token)
+                   1, "lock:nightly-report", token)    # release only if still ours
 ```
 
-**Correctness lock with etcd + fencing:**
+**A correctness lock: etcd lease + fencing in the ledger:**
 
 ```python
 lease = etcd.lease(ttl=10)
 ok, resp = etcd.transaction(
-    compare=[etcd.transactions.create("/locks/ledger") == 0],        # the key doesn't exist
-    success=[etcd.transactions.put("/locks/ledger", me, lease)],
-    failure=[])
+    compare=[etcd.transactions.create("/locks/payout") == 0],
+    success=[etcd.transactions.put("/locks/payout", me, lease)], failure=[])
 if ok:
-    fencing_token = resp.header.revision        # monotonically increasing
-    ledger_db.execute(
-        "UPDATE ledger_meta SET owner=%s, token=%s WHERE token < %s",   # the storage enforces it
-        me, fencing_token, fencing_token)
-    # every subsequent write includes fencing_token, and the DB rejects stale ones
+    fence = resp.header.revision                       # monotonically increasing
+    for cook in due_payouts():
+        rows = ledger.execute("""
+            UPDATE payout_runs SET last_fence = %s
+            WHERE run_date = %s AND last_fence < %s     -- storage enforces the fence
+        """, fence, today, fence)
+        if rows == 0: raise StaleLeader()              # someone newer is in charge → stop
+        pay(cook, idempotency_key=f"{today}:{cook.id}")   # belt AND braces: idempotent payouts
 ```
+
+**2:04 a.m., replayed:** Worker 1 wakes with fence 33 → its first ledger update matches **0 rows** (the ledger has seen 34) → it raises `StaleLeader` and stops. **Zero double payouts.**
 
 ## ⚖️ Trade-offs
 
 | Approach | Safety | Cost | Use for |
 |---|---|---|---|
-| Single Redis `SET NX PX` | ⚠️ Not safe under failover or pauses | Cheap, fast | Efficiency locks (dedupe work) |
-| Redlock (multi-Redis) | Debated (timing assumptions) | Moderate | Efficiency. Avoid it for correctness. |
-| etcd/ZooKeeper/Consul lease | ✅ Consensus-backed | Latency of consensus | Leader election, correctness locks |
-| + Fencing tokens at the resource | ✅✅ Protects against paused holders | Resource must check tokens | Anything where double action corrupts data |
-| DB row lock / advisory lock | ✅ Within one DB | Ties you to that DB | Jobs coordinated through one DB |
+| Single Redis `SET NX PX` | ⚠️ Unsafe under failover or pauses | Cheap, fast | Efficiency locks |
+| Redlock (multi-Redis) | Debated (timing assumptions) | Moderate | Efficiency, not correctness |
+| etcd/ZooKeeper/Consul lease | ✅ Consensus-backed | Consensus latency | Leader election, correctness locks |
+| + Fencing at the resource | ✅✅ Defeats paused holders | Resource must check tokens | Anything where a double action corrupts data |
+| DB row / advisory lock | ✅ Within one DB | Tied to that DB | Jobs coordinated through one DB |
 
 ## 🌍 Real world
 
-- **Google Chubby** (a Paxos-based lock service) inspired ZooKeeper, and is used for leader election in Bigtable/GFS.
-- **Kubernetes** controllers use Lease objects (backed by etcd) for leader election.
-- **Martin Kleppmann's "How to do distributed locking"** critique of Redlock popularized fencing tokens.
+- **Google Chubby** (Paxos-based) provides locks and leader election for Bigtable and GFS, and inspired ZooKeeper.
+- **Kubernetes** controllers elect leaders with etcd-backed **Lease** objects.
+- **Martin Kleppmann's "How to do distributed locking"** critique of Redlock made fencing tokens famous.
 
 ## 📌 Cheat card
 
-> - **Lease = a lock with a timeout.** The holder must renew.
-> - **Paused/partitioned holders don't know they lost the lock** → use **fencing tokens** checked by the resource.
-> - **Correctness locks → a consensus store (etcd/ZooKeeper).** Redis locks → efficiency only.
-> - Raft **terms** / etcd **revisions** = natural fencing tokens.
-> - Release locks **only if you still own them** (compare-and-delete).
+> - **Lease = a lock with a timeout.** The holder renews.
+> - **Paused or partitioned holders don't know they lost the lock** → **fencing tokens** checked by the resource.
+> - **Correctness → a consensus store (etcd/ZooKeeper).** Redis locks → **efficiency only**.
+> - **Terms / zxids / revisions** = natural fencing tokens.
+> - **Compare-and-delete** to release, and make side effects **idempotent** too.
 
 ## 🧪 Feynman check
 
-Explain the supply-room key story, how Bob's nap causes trouble, and why the door checking ticket numbers fixes it even though Bob doesn't know he's late.
+Explain the supply-room key, how Worker 1's nap causes trouble, and why the door checking ticket numbers fixes it even though Worker 1 never realizes it's late.
 
-⚠️ **Common confusion:** "A lock with a TTL is safe because it expires." Expiry handles **crashed** holders, but it *creates* the paused-holder problem. Without fencing, the old holder can still write after expiry.
+⚠️ **Common confusion:** "A lock with a TTL is safe because it expires." Expiry solves **crashed** holders, and it **creates** the paused-holder problem. Without fencing at the resource, the old holder writes after expiry as if nothing happened.
 
 ## ⚡ Quick recall
 
 1. What problem do fencing tokens solve?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 A stale lock holder (paused or partitioned past its lease) performing writes after someone else acquired the lock. The resource rejects lower tokens.
 </details>
 
 2. Why aren't single-Redis locks safe for correctness?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Async replication means a failover can lose the lock key, so two clients can both "hold" the lock. Also, there's no fencing by default.
+Async replication can lose the lock key on failover, so two clients both "hold" it, and there's no fencing by default.
 </details>
 
-3. How does ZooKeeper/etcd leader election detect a dead leader?
-<details><summary>Answer</summary>
+3. How does ZooKeeper/etcd election detect a dead leader?
+<details><summary>Reveal Answer</summary>
 
-The leader's ephemeral node / lease expires when it stops heartbeating, and watchers are notified to elect a new leader.
+The leader's ephemeral node or lease expires when its heartbeats stop, and the watchers are notified to elect a successor.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Only one instance of a job should run across 20 servers. Design it."**
+**Q. "Exactly one instance of a job must run across 20 servers. Design it, then tell me whether Redlock is safe."**
 <details><summary>Model answer</summary>
 
-- **Leader election** via etcd/ZooKeeper/K8s Lease: the leader runs the scheduler, and the others stand by and watch.
-- The job itself is **idempotent** (keyed by run date), so an accidental double run is harmless.
-- For correctness-critical side effects, pass a **fencing token** (the lease revision) with every write, and the storage rejects stale tokens.
-- Alternatives: a managed scheduler (K8s CronJob with `concurrencyPolicy: Forbid`), or a DB row lock (`SELECT ... FOR UPDATE SKIP LOCKED`).
-- **Likely follow-up:** "What if the leader hangs but keeps its lease alive?" → add health checks, make the job heartbeat progress, and step down on a stall.
+- **Election:** an etcd/ZooKeeper **lease** or a **Kubernetes Lease**. The leader runs the job, and the followers **watch** the key and take over when it expires.
+- **Idempotency:** key the job's effects by **run date + entity** (`payout:2026-10-01:cook_7`), so even an accidental double run can't double-pay.
+- **Fencing:**
+  - Pass the lease **revision** with every protected write. The storage (a DB conditional update) **rejects stale tokens**.
+  - For stores that can't check tokens (S3), use **conditional writes** (ETag/version preconditions) or route writes through a DB that validates the fence.
+- **Hung-but-alive leaders:** the job **heartbeats progress**, and a watchdog makes the leader **step down** on a stall, so a renewing-but-stuck leader can't block forever.
+- **Alternatives:** a K8s CronJob with `concurrencyPolicy: Forbid`, or `SELECT … FOR UPDATE SKIP LOCKED` on a jobs table.
+- **Redlock:**
+  - It acquires the lock on a **majority of independent Redis nodes** within a time bound, which is better than one node.
+  - **Critique (Kleppmann):** it relies on **bounded clock drift and pause times**, and provides **no fencing tokens**, so a paused client can still act after expiry. Antirez argues the assumptions are reasonable in practice.
+  - **Practical verdict:** fine for **efficiency**. For **correctness**, use a **consensus-backed lease plus fencing at the resource**.
+- **Likely follow-up:** "Can idempotency replace fencing?" → often, for effects with natural keys. Fencing still protects **non-idempotent** or ordering-sensitive writes (config, ownership).
 </details>
 
-**Q2. "Is Redlock safe?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- It acquires the lock on a majority of independent Redis nodes within a time bound, which is better than a single node.
-- Critics (Kleppmann) point out it relies on **bounded clock drift and pause times**, and has **no fencing tokens**, so a paused client can still act after expiry. Antirez argued the assumptions are reasonable.
-- Practical answer: fine for **efficiency** locks. For **correctness**, use consensus-based locks **plus fencing** at the resource.
-- **Likely follow-up:** "How would you add fencing to a system writing to S3?" → it's hard, since S3 doesn't check tokens. Use conditional writes (ETag/version preconditions) or a coordinating DB that validates tokens.
-</details>
-
-> 📖 *Next, with 800 servers, how does everyone even know who's still alive?*
+> 📖 *One leader at a time is solved, but Pantry now runs 800 servers, and nobody can reliably say which of them are alive, which are slow, and which have quietly died.*
 
 ---
 

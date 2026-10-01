@@ -8,31 +8,41 @@
 
 ## 📖 Story
 
-Pantry's configuration service must never disagree with itself. Every server must see the same feature flags, in the same order, even while machines crash. Maya asked me how that's even possible. I'll show you the same thing I showed her: how a small group of computers can agree on a single truth, reliably.
+Pantry's **configuration service** holds the truth that 800 servers live by: feature flags, payout schedules, kill switches. It must **never disagree with itself**.
+
+Maya imagines the nightmare in vivid detail. Server A believes the "new checkout" flag is **ON**. Server B, which missed one update during a network blip, believes it's **OFF**. Half the customers see one checkout and half see another, and the payment data gets written in two incompatible formats.
+
+Now multiply that by machines crashing mid-update, messages arriving late, out of order, or never, and clocks that can't be trusted (lesson 084).
+
+*How can a handful of unreliable computers agree on one single, ordered truth, and keep agreeing while some of them are dying?*
+
+I'll show you what I showed Maya. It's one of the most beautiful algorithms in computing.
 
 ## 🎯 One-sentence idea
 
-**Consensus lets a group of servers agree on a single, ordered log of decisions, even if some crash or messages are delayed. Raft does it by electing one leader per term, which replicates log entries and commits each once a majority has stored it.**
+**Consensus lets a group of servers agree on one ordered log of decisions despite crashes and delays, and Raft does it by electing a single leader per term that replicates log entries and commits each one once a majority has stored it.**
 
 ## 🧸 Analogy
 
-A **club committee with 5 members** keeping the **official minutes**:
+A **five-person committee** keeping **official minutes**:
 
-- They **elect a chairperson** (leader) for a **term**. Only the chair proposes new minutes.
-- The chair reads out each new item. When **at least 3 of 5** (a majority) have written it down, it's **official** (committed).
-- If the chair goes silent for too long, someone says "**I nominate myself for term 8!**" and asks for votes. A majority vote = the new chair.
-- Because any two majorities **overlap in at least one member**, the new chair always learns about every official item. **Nothing committed is ever lost**, and there can't be two chairs in the same term.
+- They **elect a chair** for a **term**. Only the chair proposes new minutes.
+- An item becomes **official** once **at least 3 of 5** have written it down (a majority).
+- If the chair goes quiet too long, someone announces "**I'm standing for term 8!**" and collects votes.
+- Any two majorities **share at least one member**, so a new chair always inherits every official item. **Nothing committed is ever lost**, and there are **never two chairs** in one term.
 
 ## 🖼️ Visual
+
+*Diagram brief:* a three-state machine (follower → candidate → leader) above a replication timeline where the leader's entry glows "committed" the moment the third of five nodes stores it, while two slow followers lag behind.
 
 ```mermaid
 stateDiagram-v2
     [*] --> Follower
-    Follower --> Candidate: election timeout<br/>(no heartbeat from leader)
+    Follower --> Candidate: election timeout<br/>(no heartbeat)
     Candidate --> Leader: votes from majority
-    Candidate --> Follower: discovers current leader<br/>or higher term
-    Candidate --> Candidate: split vote → new election
-    Leader --> Follower: discovers higher term
+    Candidate --> Follower: sees current leader<br/>or higher term
+    Candidate --> Candidate: split vote → retry
+    Leader --> Follower: sees higher term
 ```
 
 ```mermaid
@@ -43,7 +53,7 @@ sequenceDiagram
     participant F2 as Follower 2
     participant F3 as Follower 3
     participant F4 as Follower 4
-    C->>L: SET x=5
+    C->>L: SET checkout_v2 = ON
     L->>L: append entry #42 (term 7)
     L->>F1: AppendEntries #42
     L->>F2: AppendEntries #42
@@ -51,125 +61,109 @@ sequenceDiagram
     L->>F4: AppendEntries #42
     F1-->>L: ok
     F2-->>L: ok
-    Note over L: 3 of 5 have it (leader + 2) → COMMITTED
-    L->>L: apply to state machine
+    Note over L: leader + 2 = 3 of 5 → COMMITTED
     L-->>C: OK
-    Note over F3,F4: slow or partitioned followers catch up later
+    Note over F3,F4: laggards catch up later
 ```
 
 ## 🔬 How it works
 
-- **Replicated state machine:** if every node applies the **same commands in the same order**, they all end up in the same state. Consensus agrees on that **order** (the log).
-- **Roles:** **leader** (handles all client writes), **followers** (replicate), **candidates** (during elections).
-- **Terms:** monotonically increasing election epochs. Each term has at most one leader. Stale leaders discover the higher term and step down.
-- **Leader election:**
-  - Followers expect **heartbeats**. On a **randomized election timeout** (e.g., 150–300 ms), a follower becomes a candidate, increments the term, and requests votes.
-  - Each node votes for **at most one** candidate per term, and **only if the candidate's log is at least as up-to-date** as its own (so the new leader has all committed entries).
-  - Randomized timeouts make split votes rare.
-- **Log replication:**
-  - The leader appends an entry and sends `AppendEntries` to the followers (with the previous index and term for consistency checks).
-  - **Committed** once stored on a **majority**. The leader then applies it and replies to the client.
-  - Followers with conflicting or missing entries are **repaired** by the leader (it overwrites uncommitted divergent suffixes).
-- **Safety:** committed entries are never lost or reordered, as long as a **majority survives**. 5 nodes tolerate 2 failures, and 3 tolerate 1.
-- **Liveness:** progress needs a majority that can communicate. The **minority side of a partition cannot commit** (it chooses C in CAP).
-- **Reads:** for linearizable reads, the leader must confirm it's still the leader (a quorum heartbeat or **ReadIndex**), or use **leases** (which assume bounded clock drift).
-- **Extras:** log compaction via **snapshots**, and membership changes via **joint consensus** / one-at-a-time changes.
+- **Replicated state machine:** if every node applies the **same commands in the same order**, every node reaches the same state. Consensus agrees on that **order** (the log).
+- **Terms and elections:** terms are increasing epochs with **at most one leader each**. A follower that misses heartbeats for a **randomized timeout (~150–300 ms)** becomes a candidate, bumps the term, and requests votes. Nodes vote **once per term**, and **only for candidates whose log is at least as up-to-date**, so a winner already holds every committed entry.
+- **Log replication:** the leader appends, sends `AppendEntries` (with the previous index and term for consistency checks), and **commits once a majority stores the entry**, then applies it and answers the client. Divergent follower suffixes are **overwritten** by the leader.
+- **Safety and liveness:** committed entries survive while a **majority lives** (**2f + 1 nodes tolerate f failures**). A **minority partition cannot commit**, so Raft is **CP**. Linearizable reads need **ReadIndex** (confirm leadership with a quorum) or **leader leases** (which assume bounded drift).
+- **Operations:** **snapshots** compact the log, and membership changes go **one node at a time** (or joint consensus). Write latency ≈ the leader's RTT to the **fastest majority** + an fsync. Scale out with **many Raft groups** (one per data range).
 
 ## 🧩 Worked example
 
-**Failure scenario (5 nodes: A is the leader in term 3):**
+**The chair vanishes (5 nodes, A leads term 3):**
 
 ```
-1. A replicates entry #10 to B and C (with A = 3 of 5) → committed ✅. D and E didn't get it yet.
+1. A replicates #10 to B and C (with A = 3 of 5) → COMMITTED ✅; D and E don't have it yet
 2. A crashes 💥
-3. D times out first → candidate for term 4 → asks for votes
-   B and C refuse: D's log (#9) is behind theirs (#10) → D can't win
-4. B times out → candidate for term 4 → votes from C, D, E (B's log is the most up to date) → leader ✅
-5. B replicates #10 to D and E → nobody loses the committed entry
-6. A recovers → sees term 4 > 3 → becomes a follower, catches up
+3. D times out first → candidate for term 4 → B and C refuse (D's log ends at #9 < #10) → D loses
+4. B times out → candidate for term 4 → C, D, E vote (B's log is the most up to date) → LEADER ✅
+5. B replicates #10 to D and E → the committed flag change is never lost
+6. A recovers → sees term 4 > 3 → steps down to follower → catches up
 ```
-
-**Cluster sizing:**
 
 | Nodes | Majority | Tolerated failures |
 |---|---|---|
 | 3 | 2 | 1 |
 | 5 | 3 | 2 |
-| 7 | 4 | 3 (rarely worth the write latency) |
+| 7 | 4 | 3 (rarely worth the extra write latency) |
 
-**Write latency ≈ the leader's round trip to the fastest majority**, plus an fsync. Across regions, that's ~cross-region RTT per commit.
+**Maya's config service:** a 5-node etcd cluster across 3 AZs (2-2-1). It survives any single AZ outage, and every server reads flags at the **same committed revision**, so the half-ON/half-OFF nightmare is now impossible.
 
 ## ⚖️ Trade-offs
 
-| You gain | You pay |
+| Maya gains | Maya pays |
 |---|---|
-| Strong consistency (linearizable log) | Every write needs majority round trips (latency) |
-| Automatic failover with no split brain | Unavailable if a majority is lost |
-| A simple mental model (a single leader) | Leader is a throughput bottleneck (shard into many Raft groups) |
-| Proven correctness | Tricky details (snapshots, membership changes) |
+| A linearizable, totally ordered log | Majority round trips on every write |
+| Automatic failover with no split brain | Unavailable without a majority |
+| A simple single-leader model | The leader is a throughput bottleneck (so shard into many groups) |
+| Proven safety | Tricky operational details (snapshots, membership changes) |
 
 ## 🌍 Real world
 
-- **etcd** (Kubernetes' brain), **Consul**, **CockroachDB** and **TiKV** (thousands of Raft groups, one per data range), **Kafka KRaft** (replacing ZooKeeper), and **MongoDB** (a Raft-like protocol).
-- **Paxos** (Lamport) is the older family: Google Chubby and Spanner use Paxos variants. **ZooKeeper** uses **ZAB**.
-- Raft was designed (Ongaro & Ousterhout, 2014) to be **understandable**. There's an excellent visualization at raft.github.io.
+- **etcd** (Kubernetes' brain), **Consul**, **CockroachDB** and **TiKV** (thousands of Raft groups), **Kafka KRaft**, and MongoDB's Raft-like replication.
+- **Paxos** is the older family behind **Chubby** and **Spanner**. **ZooKeeper** uses **ZAB**.
+- **Raft** (Ongaro & Ousterhout, 2014) was explicitly designed to be **understandable**. See raft.github.io for a live visualization.
 
 ## 📌 Cheat card
 
 > - **Consensus = agree on one ordered log → identical state machines.**
-> - Raft: **leader per term**, **randomized election timeouts**, **commit on majority**.
-> - Votes only go to candidates with an **up-to-date log**, so committed entries survive.
-> - **2f + 1 nodes tolerate f failures.** Use 3 or 5.
-> - The minority side **cannot commit** (CP). Scale by running **many Raft groups** (shards).
+> - Raft: **one leader per term**, **randomized timeouts**, **commit on majority**.
+> - Votes only go to **up-to-date logs**, so committed entries survive.
+> - **2f + 1 tolerate f.** Use 3 or 5.
+> - The minority **can't commit** (CP). Scale with **many Raft groups**.
 
 ## 🧪 Feynman check
 
-Explain the committee-minutes analogy, and why "at least 3 of 5 wrote it down" makes it impossible to lose an official decision when the chair suddenly leaves.
+Explain the committee minutes, and why "3 of 5 wrote it down" makes losing an official decision impossible, even if the chair walks out mid-meeting.
 
-⚠️ **Common confusion:** "Consensus makes the system always available." It's **consistent**, and available only while a **majority** is up and connected. Lose 3 of 5 nodes, or get partitioned into 2 | 3 on the wrong side, and writes stop.
+⚠️ **Common confusion:** "Consensus makes the system always available." It makes it **consistent**, and available only while a **majority** is alive and connected. Lose three of five nodes, or land on the minority side of a 2 | 3 split, and writes **stop**, by design.
 
 ## ⚡ Quick recall
 
 1. When is a Raft log entry committed?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 When the leader has replicated it to a majority of the nodes (including itself).
 </details>
 
 2. Why are election timeouts randomized?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-To make it unlikely that several followers become candidates at the same time and split the vote.
+So several followers rarely become candidates at the same moment and split the vote.
 </details>
 
 3. How many failures can a 5-node Raft cluster tolerate?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-2 (a majority of 3 must remain).
+Two (a majority of three must remain).
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Explain how Raft prevents two leaders from committing conflicting entries."**
+**Q. "Explain how Raft prevents two leaders from committing conflicting entries, and why CockroachDB runs thousands of Raft groups instead of one."**
 <details><summary>Model answer</summary>
 
-- There's at most **one leader per term** (each node votes once per term, and a leader needs a majority).
-- Committing needs a **majority**, and any two majorities overlap, so a new leader's electorate includes a node holding every committed entry.
-- The **vote restriction** (only up-to-date logs win) guarantees the new leader already has all the committed entries.
-- A stale leader from an older term can't commit, because followers reject its lower term, and it steps down on seeing the higher term.
-- **Likely follow-up:** "Can a stale leader still serve reads?" → yes, unless reads go through ReadIndex/quorum confirmation or leases, which prevent stale linearizable reads.
+- **One leader per term:** each node votes **at most once per term**, and winning needs a **majority**, so two candidates can't both win the same term.
+- **Commit needs a majority**, and **any two majorities intersect**, so every future electorate contains a node that holds each committed entry.
+- **The vote restriction:** nodes only vote for candidates whose log is **at least as up-to-date**, so the winner **already has** every committed entry and can't overwrite it.
+- **Stale leaders are neutralized:** a deposed leader from an older term can't commit, because followers reject its lower term, and it steps down on seeing the higher term.
+- **Stale reads:** a deposed leader could still answer reads, so linearizable reads use **ReadIndex** (a quorum confirmation) or **leader leases** with conservative timing.
+- **Why thousands of groups:**
+  - One group funnels **every write through one leader**, a CPU, network, and disk bottleneck, and one giant log.
+  - Splitting data into **ranges**, each its own 3–5-replica Raft group, **spreads the leaders and load** across the cluster.
+  - The costs: **cross-range transactions** need an atomic-commit protocol on top (parallel commits / 2PC-style), heartbeat overhead (coalesced), and complex rebalancing and leader placement.
+- **Likely follow-up:** "Why not 7 nodes for safety?" → each write waits for 4 ACKs, so latency rises for a third tolerated failure that's rarely needed. 5 is the common sweet spot.
 </details>
 
-**Q2. "Why do systems like CockroachDB run thousands of Raft groups instead of one?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- A single Raft group funnels **all writes through one leader**, which becomes a throughput and storage bottleneck.
-- Splitting data into **ranges** (shards), each with its own Raft group (3–5 replicas), spreads the leaders and load across the cluster.
-- Cross-range transactions then need a coordination protocol on top (e.g., parallel commits / 2PC-like protocols).
-- **Likely follow-up:** "What's the cost?" → the overhead of many heartbeats (so they coalesce them), and complex rebalancing and leader placement.
-</details>
-
-> 📖 *Next, a frozen server wakes up still believing it's in charge.*
+> 📖 *The config service never disagrees with itself now, but one night a payout leader freezes for twenty seconds, wakes up still certain it's in charge, and starts paying cooks a second time.*
 
 ---
 

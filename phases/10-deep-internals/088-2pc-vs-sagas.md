@@ -8,165 +8,174 @@
 
 ## 📖 Story
 
-Checkout now spanned the order, inventory, payment, and courier services, and each one had its own database. A payment failed *after* the stock was reserved and a courier booked. There was no single transaction to roll back. I laid out Maya's two options for her, and I'll lay them out for you: lock everything, or undo step by step.
+Pantry's checkout is no longer one database. It's **four services, four databases**: Order, Inventory, Payment, Courier.
+
+At 7:31 p.m., a checkout marches through its steps. The order is created ✅. The last portion of curry is reserved ✅. A courier is booked and starts riding toward the kitchen ✅. Then the card is **declined** ❌.
+
+In the old monolith, one `ROLLBACK` would have erased everything as if it never happened. Now there's nothing to roll back. Four separate databases have each committed their own little truth.
+
+So the curry sits **reserved for nobody**, hidden from other hungry customers. A courier pedals toward a pickup that will never happen. An order hangs in limbo, half-alive.
+
+I laid out Maya's two options, and I'll lay them out for you: **lock everything and commit together**, or **move forward step by step, with an undo button for each step.**
 
 ## 🎯 One-sentence idea
 
-**When one business operation spans several databases or services, you either lock everything and commit together (two-phase commit: atomic but blocking and fragile), or run a sequence of local transactions with an "undo" step for each (a saga: available and scalable, but only eventually consistent).**
+**When one business operation spans several databases or services, you either lock everything and commit together (two-phase commit: atomic, but blocking and fragile) or run a chain of local transactions, each with a compensating "undo" (a saga: available and scalable, but only eventually consistent).**
 
 ## 🧸 Analogy
 
 Booking a **holiday**: flight + hotel + car.
 
-- 💍 **2PC = a wedding ceremony.** The officiant asks each party, "**Do you commit?**" (prepare). Everyone must say "I do" and then **stay frozen at the altar** (holding locks). Only when *all* agree does the officiant say "**I now pronounce…**" (commit). If the officiant faints between the questions and the pronouncement, **everyone is stuck at the altar** (blocking).
-- 🔁 **Saga = booking step by step with free cancellation.** Book the flight ✅, the hotel ✅, the car ❌ (none available) → **cancel the hotel, cancel the flight** (compensations). No one waits frozen, but for a few minutes you *did* hold a flight you ended up cancelling.
+- 💍 **2PC = a wedding.** The officiant asks every party "**Do you commit?**" (prepare). They answer "I do" and **freeze at the altar** (holding locks) until "**I now pronounce…**" (commit). If the officiant faints in between, **everyone is stuck at the altar**.
+- 🔁 **Saga = booking with free cancellation.** Flight ✅, hotel ✅, car ❌ → **cancel the hotel, cancel the flight** (compensations). Nobody freezes, but for a few minutes you really *did* hold a flight.
 
 ## 🖼️ Visual
+
+*Diagram brief:* on top, a 2PC sequence where every participant locks and waits for the coordinator's final word, with a red 💥 if the coordinator dies after prepare. Below, a saga chain of forward steps, with a failing step that triggers a backward chain of undo arrows.
 
 ```mermaid
 sequenceDiagram
     participant C as Coordinator
-    participant A as DB A (orders)
-    participant B as DB B (payments)
+    participant A as Orders DB
+    participant B as Payments DB
     Note over C,B: Two-phase commit
-    C->>A: PREPARE (lock rows, write to log)
+    C->>A: PREPARE (lock rows, log intent)
     C->>B: PREPARE
-    A-->>C: YES (prepared, locks held)
-    B-->>C: YES
+    A-->>C: YES (locks held)
+    B-->>C: YES (locks held)
     C->>A: COMMIT
     C->>B: COMMIT
-    Note over A,B: 💥 If C crashes after PREPARE, A and B wait with locks held (in doubt)
+    Note over A,B: 💥 Coordinator dies after PREPARE → both stay "in doubt", locks held
 ```
 
 ```mermaid
 flowchart LR
-    subgraph Saga["🔁 Saga (orchestrated)"]
-        O["Orchestrator"] --> S1["1 Create order<br/>(PENDING)"]
-        S1 --> S2["2 Reserve stock"]
-        S2 --> S3["3 Charge card"]
-        S3 -->|"fails"| C2["↩️ Release stock"]
+    subgraph Saga["🔁 Orchestrated checkout saga"]
+        O["Orchestrator"] --> S1["1 Create order (PENDING)"]
+        S1 --> S2["2 Reserve curry (15-min hold)"]
+        S2 --> S3["3 Authorize card"]
+        S3 -->|"declined"| C2["↩️ Release curry"]
         C2 --> C1["↩️ Cancel order"]
-        S3 -->|"ok"| S4["4 Confirm order"]
+        S3 -->|"ok"| S4["4 Confirm + book courier"]
     end
 ```
 
 ## 🔬 How it works
 
-- **Two-phase commit (2PC):**
-  1. **Prepare:** the coordinator asks all participants to prepare. Each durably records its intent and **holds locks**, then votes yes or no.
-  2. **Commit/abort:** if all say yes → commit everywhere. If any says no → abort everywhere.
-  - ✅ **Atomicity** across resources. ❌ **Blocking:** if the coordinator dies after prepare, participants stay "in doubt" with **locks held** until it recovers. It also adds latency (2 round trips + fsyncs), reduces availability (**every** participant must be up), and scales poorly.
-  - Used within database systems (distributed SQL internally, XA transactions), usually over short distances and with few participants. Modern systems make the coordinator fault-tolerant (e.g., backing its state by consensus, as Spanner does).
-- **Sagas:**
-  - Split the business transaction into **local transactions T1…Tn**, each with a **compensating transaction C1…Cn** that semantically undoes it (refund, release, cancel).
-  - If step k fails → run C(k−1)…C1.
-  - **Orchestration:** a central orchestrator (a workflow engine like Temporal, AWS Step Functions, or a saga state machine) drives the steps. It's explicit, and easier to monitor.
-  - **Choreography:** services react to each other's events (lesson 062). It's decoupled, but the flow is implicit.
-  - ✅ No distributed locks, high availability, and it suits microservices and long-running processes. ❌ **No isolation:** others can see intermediate states (a "PENDING" order). Compensations must be **idempotent** and **always succeed eventually** (with retries). And some actions **can't be undone** (an email was sent), so order the steps carefully (put irreversible steps last).
-- **Making sagas robust:** the **outbox** for reliable events (062), **idempotency keys** per step (055), **semantic locks** (status fields like `PENDING`) to handle the lack of isolation, **timeouts** plus compensation for stuck steps, and a persisted saga state.
+- **2PC:**
+  - **Prepare:** each participant durably logs its intent, **holds its locks**, and votes. **Commit/abort:** all yes → commit, any no → abort.
+  - ✅ True atomicity and isolation.
+  - ❌ **Blocking:** a coordinator crash after prepare leaves participants **in doubt with locks held**. Plus 2 round trips + fsyncs, **every** participant must be up, and it scales poorly.
+- **Where 2PC lives today:** **inside distributed databases** (Spanner, CockroachDB), where the coordinator and participants are **consensus-replicated**, so a single crash doesn't block. Also XA across a few co-located resources. It's not suited to independently owned microservices or third-party APIs.
+- **Sagas:** local transactions **T1…Tn**, each with a **compensation C1…Cn** (refund, release, cancel). If step k fails, run **C(k−1)…C1**. Coordinate by **orchestration** (Temporal, Step Functions, a persisted state machine: explicit and observable) or **choreography** (services react to events, lesson 062: decoupled but implicit).
+- **The saga's price, no isolation:** others see intermediate states. Mitigate with **semantic locks** (`PENDING` status), **reservations with expiry**, **commutative updates**, and **ordering**: put the **pivot** (the point of no return) late and **irreversible steps last** (emails, courier dispatch).
+- **Robustness kit:** the **outbox** for reliable step events (062), **idempotency keys per step** (`saga_id + step`, lesson 055), a **persisted saga state**, **timeouts** that trigger compensation, and **compensations that retry until they succeed**, escalating to a human after N failures.
 
 ## 🧩 Worked example
 
-**Order saga with compensations:**
-
 | Step | Action | Compensation |
 |---|---|---|
-| 1 | Create order `PENDING` | Mark order `CANCELLED` |
-| 2 | Reserve inventory (hold for 15 min) | Release the reservation |
-| 3 | Authorize payment | Void the authorization / refund |
-| 4 | Confirm order, capture payment | (the pivot: after this, move forward only) |
-| 5 | Send confirmation email | (no compensation, which is why it's last) |
+| 1 | Create order `PENDING` | Mark `CANCELLED` |
+| 2 | Reserve curry (15-min hold) | Release the reservation |
+| 3 | **Authorize** card | Void the authorization |
+| 4 | **Pivot:** confirm order + capture payment | (forward only from here) |
+| 5 | Book courier | Cancel courier (only before pickup) |
+| 6 | Send confirmation email | — (irreversible, so it's last) |
 
-**Failure run:**
+**7:31 p.m., replayed:**
 
 ```
-T1 order PENDING ✅ → T2 stock reserved ✅ → T3 payment declined ❌
-→ C2 release stock ✅ → C1 cancel order ✅ → user sees "payment failed"
-Each step/compensation is idempotent (keyed by saga_id + step), so retries are safe.
+T1 order PENDING ✅ → T2 curry reserved ✅ → T3 card declined ❌
+→ C2 release curry ✅ (back on the menu in 40 ms) → C1 cancel order ✅
+→ courier was never booked (it's now AFTER the pivot) → customer sees "Card declined, try another"
+Every step and compensation is idempotent (saga_id + step), so retries are safe.
 ```
-
-**Orchestrator state (persisted):**
 
 ```json
-{"saga_id": "s_77", "order_id": "o_123", "state": "COMPENSATING",
- "completed": ["CREATE_ORDER", "RESERVE_STOCK"], "failed": "CHARGE_CARD",
- "compensated": ["RESERVE_STOCK"], "updated_at": "..."}
+{"saga_id":"s_77","order_id":"o_123","state":"COMPENSATING",
+ "completed":["CREATE_ORDER","RESERVE_STOCK"],"failed":"AUTHORIZE_CARD",
+ "compensated":["RESERVE_STOCK"],"updated_at":"2026-10-01T19:31:04Z"}
 ```
 
 ## ⚖️ Trade-offs
 
 | | 2PC | Saga |
 |---|---|---|
-| Atomicity | ✅ Real (all or nothing) | Eventually (via compensation) |
-| Isolation | ✅ (locks) | ❌ Intermediate states are visible |
-| Availability | ❌ All participants must be up | ✅ Steps retry independently |
-| Latency | Higher (locks held across round trips) | Lower per step, but longer end to end |
-| Coupling | Tight (shared protocol, XA) | Loose |
-| Best for | Few, short, co-located participants (inside a DB) | Microservices, long-running business flows |
+| Atomicity | ✅ Real | Eventual (via compensation) |
+| Isolation | ✅ Locks | ❌ Intermediate states visible |
+| Availability | ❌ Every participant must be up | ✅ Steps retry independently |
+| Latency | Locks held across round trips | Short steps, longer end to end |
+| Coupling | Tight (shared protocol) | Loose |
+| Best for | Inside a DB, few co-located participants | Microservices, long-running flows |
 
 ## 🌍 Real world
 
-- **Spanner and CockroachDB** use 2PC internally across shards, with consensus-replicated participants (so there's no blocking on a single coordinator failure).
-- **Uber (Cadence → Temporal)** and **AWS Step Functions** are used to orchestrate sagas for trips, payments, and provisioning.
-- The **Saga pattern** comes from a 1987 paper by Garcia-Molina & Salem, originally for long-lived database transactions.
+- **Spanner and CockroachDB** run 2PC across shards with **consensus-replicated participants**, so there's no single-coordinator blocking.
+- **Uber's Cadence → Temporal** and **AWS Step Functions** orchestrate sagas for trips, payments, and provisioning.
+- **Sagas** come from Garcia-Molina & Salem's 1987 paper on long-lived database transactions.
 
 ## 📌 Cheat card
 
-> - **2PC = the wedding:** prepare (all vote) → commit. Atomic, but **blocking** and fragile.
-> - **Saga = steps + undo buttons.** Available and scalable, but **no isolation**.
-> - Saga essentials: **idempotent steps and compensations, outbox, persisted state, irreversible steps last**.
+> - **2PC = the wedding:** everyone votes, then commits together. Atomic, **blocking**.
+> - **Saga = steps + undo buttons.** Available, **no isolation**.
+> - Saga kit: **idempotent steps and compensations · outbox · persisted state · pivot late · irreversible last**.
 > - **Orchestration** (explicit) vs **choreography** (events).
-> - Prefer **designing boundaries so most transactions stay in one service**.
+> - Best of all: **draw service boundaries so most transactions stay local.**
 
 ## 🧪 Feynman check
 
-Explain the wedding vs the cancellable holiday bookings, and why the confirmation email should be the very last step.
+Explain the wedding vs the cancellable holiday, and why the confirmation email (and the courier dispatch) must come after the point of no return.
 
-⚠️ **Common confusion:** "Compensation = rollback." A rollback erases as if nothing happened. A compensation is a **new action** that semantically reverses the effect. The customer may have *seen* the pending charge, and a refund is visible in their statement.
+⚠️ **Common confusion:** "Compensation = rollback." A rollback **erases** history as if nothing happened. A compensation is a **new, visible action** that semantically reverses the effect. The customer may have *seen* a pending authorization, and a void or refund shows up on their statement.
 
 ## ⚡ Quick recall
 
 1. Why is 2PC called "blocking"?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-If the coordinator fails after participants have prepared, they must hold their locks and wait (in doubt) until it recovers to learn the outcome.
+If the coordinator fails after participants prepare, they must hold their locks and wait, in doubt, until it recovers and reveals the outcome.
 </details>
 
 2. What's a compensating transaction?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-An action that semantically undoes a previously committed saga step (e.g., refund a charge, release a reservation).
+An action that semantically undoes a previously committed saga step, such as refunding a charge or releasing a reservation.
 </details>
 
-3. What isolation problem do sagas have, and a mitigation?
-<details><summary>Answer</summary>
+3. What isolation problem do sagas have, and how do you mitigate it?
+<details><summary>Reveal Answer</summary>
 
-Other transactions can see intermediate states. Mitigate with semantic locks/status fields (PENDING), reordering steps, and designing for commutative updates.
+Other transactions can see intermediate states. Mitigate with semantic locks (PENDING status), expiring reservations, step ordering, and commutative updates.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Design checkout across Order, Inventory, and Payment microservices."**
+**Q. "Design checkout across Order, Inventory, and Payment microservices. What if a compensation fails, and when would you still use 2PC?"**
 <details><summary>Model answer</summary>
 
-- An **orchestrated saga** (Temporal/Step Functions or an orchestrator service with persisted state).
-- Steps: create the order (PENDING) → reserve stock (with expiry) → authorize payment → confirm the order + capture → notify.
-- Compensations: void the authorization, release the stock, cancel the order. Every step is idempotent (saga_id + step key).
-- Communication via commands/events with the **outbox** (reliable), and retries with backoff. Timeouts trigger compensation.
-- The UI shows "processing" until it's confirmed. Reservations auto-expire if the saga dies.
-- **Likely follow-up:** "What if a compensation fails?" → retry until it succeeds (compensations must be retryable), and after N attempts, alert for manual intervention (a DLQ plus an operator dashboard).
+- **Orchestrated saga** (Temporal/Step Functions, or an orchestrator service with persisted state):
+  1. Create the order `PENDING`.
+  2. **Reserve stock** with a TTL.
+  3. **Authorize** payment.
+  4. **Pivot:** confirm the order + **capture**.
+  5. Dispatch the courier.
+  6. Notify.
+- **Compensations:** void the authorization, release the stock, cancel the order. **Every step and compensation is idempotent** (keyed by `saga_id + step`).
+- **Messaging:** commands and events via the **transactional outbox**, retries with backoff + jitter, and **timeouts** that trigger compensation. Reservations **self-expire** if the orchestrator dies.
+- **UX:** "Processing…" until the pivot completes. A declined card leaves no orphaned holds.
+- **Failed compensations:**
+  - Compensations must be **retryable until they succeed** (exponential backoff).
+  - After N attempts → **DLQ + an operator dashboard** for manual resolution, plus **reconciliation jobs** (e.g. find holds older than 15 minutes with no live saga, and release them).
+- **When 2PC is still right:**
+  - **Inside a distributed database** whose engine runs it on **consensus-replicated participants** (Spanner/CockroachDB). It's transparent to you.
+  - Short transactions across **a few reliable, co-located resources** where strict isolation is mandatory and the blocking risk is mitigated.
+  - **Never** across independently owned services or third-party APIs.
+- **Likely follow-up:** "What about 3PC?" → it adds a pre-commit phase to reduce blocking, but it's unsafe under partitions. Consensus-based commit is the modern answer.
 </details>
 
-**Q2. "When would you still use 2PC?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- Inside a **distributed database** where the engine handles it with consensus-backed participants (Spanner/CockroachDB), which is transparent to the app.
-- For short transactions across a **small number of reliable resources** in the same datacenter, where strict atomicity and isolation are mandatory, and blocking risk is acceptable or mitigated.
-- Avoid it across independently owned microservices or third-party APIs.
-- **Likely follow-up:** "What's 3PC?" → it adds a pre-commit phase to reduce blocking, but it isn't safe under network partitions, so it's rarely used. Consensus-based commit is the modern answer.
-</details>
-
-> 📖 *Next, the finance team wants the full history of every wallet, forever.*
+> 📖 *Checkout finally undoes itself cleanly, and then the finance team arrives with a demand that sounds simple and isn't: "Show us the full history of every wallet. Every change. Forever."*
 
 ---
 

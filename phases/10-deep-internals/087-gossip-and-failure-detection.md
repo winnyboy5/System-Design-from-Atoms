@@ -8,24 +8,34 @@
 
 ## 📖 Story
 
-Pantry's storage cluster now had 800 machines. A central list of "who's alive" couldn't keep up, and one slow network link kept getting a perfectly healthy machine declared dead. I showed Maya how computers can spread information the same way office gossip spreads, and it works remarkably well.
+Pantry's storage cluster has grown to **800 machines**, and it has a strange illness.
+
+Every few hours, a perfectly healthy node is declared **dead**. The cluster panics, starts copying terabytes of its data elsewhere, and then the "dead" node shows up again, confused, wondering why everyone is talking about it in the past tense.
+
+The cause: one **flaky network cable** between a single monitoring server and one rack. The central health checker couldn't reach those nodes, so it assumed they were gone. Meanwhile, that central list of "who's alive" is itself straining under 800 machines checking in every second, and if *it* dies, nobody knows anything at all.
+
+There's no reliable bird's-eye view of a cluster this big.
+
+So I showed Maya how computers can spread information the same way **office gossip** spreads, and it works remarkably well.
 
 ## 🎯 One-sentence idea
 
-**In a large cluster, nodes learn about each other by gossiping: each periodically shares what it knows with a few random peers, so information spreads to everyone in about log(N) rounds. They detect failures with heartbeats and suspicion, never certainty, because a slow node looks exactly like a dead one.**
+**In large clusters, nodes learn about each other by gossiping, periodically sharing state with a few random peers so news reaches everyone in about log(N) rounds, and they detect failures with suspicion rather than certainty, because from the outside a slow node looks exactly like a dead one.**
 
 ## 🧸 Analogy
 
 **Office rumours**:
 
-- Every minute, each person tells **2–3 random coworkers** the latest news ("Dave's on holiday").
-- Within a few minutes, **the whole building knows**, with no announcement system and no single point of failure.
-- **Failure detection:** if nobody has heard from Dave for a while, people start saying "**I think Dave might be out**" (suspicion). They check with others ("have *you* heard from Dave?") before declaring him gone, because maybe he's just in a long meeting (slow, not dead).
+- Every minute, each person tells **2–3 random coworkers** the latest news.
+- Within minutes **the whole building knows**, with no PA system and no single point of failure.
+- If nobody has heard from someone for a while, people say "**I think they might be out**" and **ask others** ("have *you* heard from them?") before declaring them gone. Maybe they're just in a long meeting.
 
 ## 🖼️ Visual
 
+*Diagram brief:* a grid of dots, one lit at round 0. Each round, every lit dot lights two random others, until the whole grid glows by round 4. Below, a suspicion sequence: a direct ping fails, two peers probe indirectly, and only then is the node marked suspect.
+
 ```
-Round 0:  ● ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○     (1 node knows)
+Round 0:  ● ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○
 Round 1:  ● ● ● ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○ ○     (each tells 2 random peers)
 Round 2:  ● ● ● ● ● ● ● ● ○ ○ ○ ○ ○ ○ ○ ○
 Round 3:  ● ● ● ● ● ● ● ● ● ● ● ● ● ● ○ ○
@@ -40,122 +50,118 @@ sequenceDiagram
     participant D as Node D
     A->>B: ping
     Note over A: no ack within timeout
-    A->>C: ping-req: please ping B for me
-    A->>D: ping-req: please ping B for me
+    A->>C: ping-req: probe B for me
+    A->>D: ping-req: probe B for me
     C->>B: ping
-    D->>B: ping
-    Note over C,D: no ack either
-    A->>A: mark B as SUSPECT → gossip it
-    Note over A,D: B doesn't refute before the suspicion timeout → B marked DEAD
+    B-->>C: ack ✅ (A's link was the problem!)
+    C-->>A: B is alive
+    Note over A: no false alarm, B stays ALIVE
 ```
 
 ## 🔬 How it works
 
-- **Gossip (epidemic) dissemination:**
-  - Every T (e.g., 1 s), each node picks **k random peers** and exchanges state (membership lists, versions, metadata).
-  - Information reaches all N nodes in **O(log N)** rounds, with fixed per-node load, and it's **robust** (no central coordinator, and it tolerates message loss).
-  - Uses: cluster **membership**, **failure information**, **schema/token ring metadata** (Cassandra), **anti-entropy** (syncing data differences, with Merkle trees in lesson 090).
-  - Versioned state (heartbeat counters, generation numbers) resolves "which info is newer."
-- **Failure detection:**
-  - **Heartbeats + timeout:** simple, but choosing the timeout is hard (too short → false positives, too long → slow detection).
-  - **Phi (φ) accrual detector (Cassandra, Akka):** instead of alive/dead, output a **suspicion level** based on the history of heartbeat intervals. Apps choose a threshold.
-  - **SWIM protocol (Consul/Serf, memberlist):** direct pings + **indirect pings via k peers** (so one bad link doesn't condemn a node) + a **suspect** state that the node can **refute** (by incrementing its incarnation number) + dissemination piggybacked on the pings.
-- **The fundamental limit:** in an asynchronous network you **can't distinguish** crashed from slow (the FLP impossibility result / partial synchrony). Failure detectors are **eventually accurate** at best, so design for false suspicions (idempotency, fencing, lesson 086).
-- **Gossip vs consensus:** gossip is **eventually consistent** (great for membership and metadata at scale). Consensus is **strongly consistent** (great for small, critical decisions like leader election and config).
+- **Epidemic dissemination:** every T (e.g. 1 s), each node exchanges **versioned state** (membership, heartbeat counters, token ranges, schema versions) with **k random peers**. News reaches N nodes in **O(log N)** rounds at a **constant per-node cost**, with no coordinator, and it tolerates message loss.
+- **Heartbeats + timeouts** are simple but brittle: too short gives false positives, too long gives slow detection.
+- **Phi (φ) accrual detection (Cassandra, Akka):** output a **suspicion level** from the statistical history of heartbeat arrivals, and let applications pick a threshold. It **adapts to jitter** automatically.
+- **SWIM (Consul/Serf, memberlist):**
+  - Direct pings + **indirect pings through k peers**, so one bad link can't condemn a node.
+  - A **suspect** state the node can **refute** by bumping its **incarnation number**.
+  - Membership updates piggybacked on the pings.
+- **The fundamental limit, and where gossip fits:** in an asynchronous network you **can't distinguish crashed from slow** (FLP / partial synchrony), so detectors are only *eventually* accurate. Design for false suspicions (idempotency, fencing, lesson 086). Use **gossip** for eventually consistent membership and metadata at scale, and **consensus** for small, critical decisions.
 
 ## 🧩 Worked example
 
-**How fast does gossip spread?**
+**Spread time:**
 
 ```
-N = 1,000 nodes, fanout k = 3, interval 1 s
-Rounds ≈ log_k(N) + small constant ≈ log_3(1000) ≈ 6.3 → ~7–10 s to reach everyone
-Per-node traffic: 3 small messages/s regardless of cluster size ✅
+N = 800 nodes, fanout k = 3, interval 1 s
+Rounds ≈ log_3(800) + small constant ≈ 6.1 → everyone knows in ~7–10 s
+Per-node traffic: ~3 small messages/s, no matter how big the cluster grows ✅
 ```
 
 **Phi accrual intuition:**
 
 ```
-Heartbeats normally arrive every ~1.0 s (±0.1 s)
-No heartbeat for 1.5 s → φ ≈ 1  (slightly unusual)
-No heartbeat for 3 s   → φ ≈ 8  (very unlikely if it's alive → treat it as down)
-Threshold φ = 8 → adapts automatically to networks with more jitter
+Heartbeats normally every ~1.0 s (±0.1 s)
+1.5 s of silence → φ ≈ 1   (slightly odd)
+3.0 s of silence → φ ≈ 8   (very unlikely if alive → treat as down)
+On a jittery network, the learned distribution widens, so the same silence yields a lower φ automatically
 ```
+
+**Maya's illness, cured:** the flaky cable means the monitoring node's **direct** ping fails → SWIM's **indirect probes** from two other racks succeed → the node stays **ALIVE**. False "deaths" drop from **several a day to zero**, and the membership view no longer depends on any single machine.
 
 ## ⚖️ Trade-offs
 
-| Choice | Gain | Cost |
+| Maya's choice | What she gains | What she pays |
 |---|---|---|
-| Gossip membership | Scales to thousands, no SPOF | Eventual (seconds) convergence, a bit of redundant traffic |
-| Central registry (etcd/ZooKeeper) | Strongly consistent view | Scale limits, dependency on that cluster |
-| Aggressive failure timeouts | Fast failover | False positives → flapping, unnecessary failovers |
-| Conservative timeouts | Fewer false alarms | Slower detection → longer impact |
-| Indirect probing (SWIM) | Fewer false positives from one bad link | Extra messages |
+| Gossip membership | Scales to thousands, no SPOF | Seconds of convergence, redundant chatter |
+| Central registry (etcd/ZooKeeper) | A strongly consistent view | Scale limits, a hard dependency |
+| Aggressive timeouts | Fast failover | False positives, flapping |
+| Conservative timeouts | Fewer false alarms | Slower detection of real deaths |
+| Indirect probing (SWIM) | Bad links don't condemn nodes | A few extra messages |
 
 ## 🌍 Real world
 
-- **Cassandra and ScyllaDB** use gossip for ring membership and schema, and a phi accrual failure detector.
-- **HashiCorp Serf/Consul (memberlist)** implement SWIM with Lifeguard improvements.
-- **Amazon Dynamo** (2007) used gossip for membership and failure detection.
-- **Redis Cluster** nodes gossip over the cluster bus to agree on failed masters.
+- **Cassandra and ScyllaDB** gossip ring membership and schema, and use **phi accrual** detection.
+- **HashiCorp Serf/Consul** (memberlist) implement **SWIM** with Lifeguard refinements.
+- **Amazon Dynamo** used gossip for membership. **Redis Cluster** gossips over its cluster bus to agree on failed masters.
 
 ## 📌 Cheat card
 
-> - **Gossip = rumours to k random peers every T** → everyone knows in **O(log N)** rounds, and there's no SPOF.
-> - **Failure detection = suspicion, not certainty.** Slow ≈ dead from the outside.
-> - **Phi accrual** (adaptive suspicion level) · **SWIM** (indirect pings + suspect + refute).
-> - **Gossip for membership and metadata (eventual). Consensus for critical decisions (strong).**
+> - **Gossip = rumours to k random peers every T** → **O(log N)** rounds, no SPOF.
+> - **Failure detection = suspicion, not certainty.** Slow ≈ dead from outside.
+> - **Phi accrual** (adaptive suspicion) · **SWIM** (indirect pings + suspect + refute).
+> - **Gossip** for membership and metadata. **Consensus** for critical decisions.
 > - Design for **false suspicions**: idempotency + fencing.
 
 ## 🧪 Feynman check
 
-Explain office rumours spreading, and why coworkers ask others "have you heard from Dave?" before deciding Dave has left.
+Explain office rumours, and why coworkers ask others "have you heard from them?" before deciding someone has left the company.
 
-⚠️ **Common confusion:** "A heartbeat timeout tells us a node is dead." It tells us **we haven't heard from it**. The node may be alive but slow or partitioned, and may still be acting (hence the need for fencing).
+⚠️ **Common confusion:** "A heartbeat timeout tells us a node is dead." It only tells us **we haven't heard from it**. It might be alive, slow, or partitioned, and **still acting**. That's exactly why stale actors need to be fenced.
 
 ## ⚡ Quick recall
 
 1. How many rounds does gossip take to reach N nodes?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-About O(log N) rounds.
+About O(log N).
 </details>
 
 2. What does SWIM's indirect ping achieve?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-It asks other nodes to probe the suspect, so a single faulty network path doesn't cause a false failure declaration.
+Other nodes probe the suspect, so a single faulty network path doesn't trigger a false failure declaration.
 </details>
 
 3. Why is perfect failure detection impossible in asynchronous networks?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 Messages can be arbitrarily delayed, so a slow node is indistinguishable from a crashed one.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "How do nodes in a 1,000-node storage cluster know which nodes are alive and which data ranges they own?"**
+**Q. "How do nodes in a 1,000-node storage cluster know who's alive and who owns which data, and how do you stop failover from firing on healthy nodes?"**
 <details><summary>Model answer</summary>
 
-- **Gossip-based membership:** each node periodically exchanges membership state (node, status, heartbeat version, token ranges) with a few random peers. It converges in seconds.
-- **Failure detection** with phi accrual or SWIM (indirect probes + suspicion) to limit false positives.
-- The ring/ownership metadata spreads via gossip, and clients learn the topology from any node.
-- Critical coordination (e.g., schema changes, lightweight transactions) can use consensus separately.
-- **Likely follow-up:** "What happens during a network partition?" → each side marks the other as down, and gossip reconverges when the partition heals. Data repair via hinted handoff and anti-entropy.
+- **Membership and ownership:**
+  - **Gossip:** each node periodically exchanges versioned membership (status, heartbeat counter, incarnation, token ranges) with a few random peers, converging in seconds.
+  - Ring and ownership metadata ride the same channel, so **clients can bootstrap the topology from any node**.
+  - Critical coordination (schema changes, lightweight transactions) uses **consensus** separately.
+  - During a **partition**, each side marks the other down. On healing, gossip reconverges, and data heals via **hinted handoff + anti-entropy** (Merkle trees).
+- **Stopping false failovers:**
+  - The cause is timeouts tuned tighter than real variance (GC pauses, jitter, one bad link).
+  - Use **adaptive phi accrual**, **SWIM indirect probing**, require **several consecutive misses**, and add a **suspect state with refutation**.
+  - Tune GC to avoid long pauses, and give heartbeat traffic **priority** (separate queues or ports).
+  - Add **hysteresis/cooldowns** to failover. For DB primaries, require a **quorum of observers** to agree.
+- **The trade-off:** slower detection of genuine deaths means a slightly longer impact when a node really dies, which is usually a far better deal than flapping.
+- **Likely follow-up:** "Gossip or etcd for service membership?" → gossip for very large, churny fleets that tolerate eventual views. etcd when you need a single, strongly consistent registry and the fleet size allows it.
 </details>
 
-**Q2. "Our failover triggers too often on healthy nodes. How do you fix it?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- Timeouts are too aggressive for real latency variance (GC pauses, network jitter).
-- Use **adaptive detectors** (phi accrual), **indirect probing** (SWIM), **multiple consecutive misses**, and a **suspect** state with refutation.
-- Tune GC to avoid long pauses, and separate the heartbeat traffic onto a priority path.
-- Add **hysteresis/cooldowns** on failover decisions. For DB primaries, require a consensus of observers.
-- **Likely follow-up:** "What's the trade-off?" → slower detection of real failures, which means a slightly longer outage when a node really dies.
-</details>
-
-> 📖 *Next, a single checkout spans five services. How can it still be all-or-nothing?*
+> 📖 *The cluster finally knows its own health, but checkout now spans four services with four databases, and a payment fails after the stock is reserved and the courier is booked. There's no single transaction to undo.*
 
 ---
 
