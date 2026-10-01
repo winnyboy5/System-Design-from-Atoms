@@ -42,7 +42,7 @@ flowchart LR
     U["👩‍🍳 Porto kitchen user"] -->|"JWT: tenant=porto-17,<br/>groups=[chefs, owners]"| API["🔐 Retrieval API"]
     API -->|"filter injected by code,<br/>never by the model"| S{"🗂️ Search scope"}
     S --> T1[("Namespace: porto-17<br/>chunks with ACL tags")]
-    S -. "no access" .-x T2[("Namespace: rival-kitchen")]
+    S -.->|"🚫 no access"| T2[("Namespace: rival-kitchen")]
     T1 --> LB["✅ Late check:<br/>doc still exists +<br/>user still allowed?"]
     LB --> P["📝 Prompt (only allowed chunks)"]
 ```
