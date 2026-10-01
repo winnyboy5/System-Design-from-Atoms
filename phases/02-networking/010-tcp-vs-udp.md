@@ -8,34 +8,44 @@
 
 ## 📖 Story
 
-Leo wanted a live "your courier is here" map and a button to call the cook. Maya noticed something odd, and I'd like you to notice it too: order data must arrive perfectly, but a dot on a live map can afford to skip a beat. There are two ways to send data across the internet, and I'll show you why they suit very different jobs.
+Maya is building Pantry's **live courier map**: a little scooter icon gliding across the street grid toward your door.
+
+In testing, the scooter doesn't glide. It **freezes**. For two full seconds it sits motionless at an intersection. Then it **teleports** half a block, stuttering through four stale positions in a blur.
+
+She digs in. One GPS packet got lost on a flaky mobile connection. Her protocol, TCP, refused to deliver the *newer* positions until the *old* lost one had been resent. Fresh data was stuck behind stale data like cars behind a stalled truck.
+
+Meanwhile, her order data, *one lasagna, card ending 4421*, absolutely must arrive perfectly, in order, every time.
+
+Two kinds of data with two completely different needs. I'll show you the two ways to send bytes across the internet, and why each one suits its job.
 
 ## 🎯 One-sentence idea
 
-**TCP is a reliable, ordered connection that resends anything lost (slower but safe). UDP just fires packets with no guarantees (fast but lossy). Pick based on whether a late packet is worse than a missing one.**
+**TCP is a reliable, ordered connection that resends anything lost, and UDP fires packets with no guarantees, so you pick based on whether late data is worse than missing data.**
 
 ## 🧸 Analogy
 
-- 📞 **TCP = a phone call.** You dial, the other person says "hello?", you both confirm. If they miss a word, they ask "sorry, say that again?" Everything arrives, in order.
-- 📬 **UDP = throwing postcards.** You just send them. Some get lost, some arrive out of order, and nobody checks. But there's no setup, so it's very fast.
+- 📞 **TCP = a phone call.** You dial, they answer, you both confirm. Miss a word? "Sorry, say that again?" Everything arrives, in order.
+- 📬 **UDP = throwing postcards.** No setup, no confirmation. Some get lost or arrive out of order. But it's instant.
 
-For a **live video call**, a lost frame from 1 second ago isn't worth re-sending, because it's already too late. Postcards win. For a **bank transfer**, every byte matters. The phone call wins.
+For a live map, a position from 2 seconds ago is worthless, so postcards win. For a payment, every byte matters, so the phone call wins.
 
 ## 🖼️ Visual
+
+*Diagram brief:* two side-by-side timelines. On the left, TCP: a handshake, then a lost segment that blocks everything behind it until it's resent. On the right, UDP: datagrams flying with no ACKs, and a lost one simply gone.
 
 ```mermaid
 sequenceDiagram
     participant C as Client
     participant S as Server
-    Note over C,S: TCP 3-way handshake (1 round trip)
+    Note over C,S: TCP: 3-way handshake (1 RTT)
     C->>S: SYN
     S-->>C: SYN-ACK
     C->>S: ACK
-    C->>S: Data segment 1
-    C->>S: Data segment 2 (lost ❌)
+    C->>S: Segment 1
+    C->>S: Segment 2 (lost ❌)
+    C->>S: Segment 3 (arrives, but must WAIT)
     S-->>C: ACK 1 (still waiting for 2)
-    C->>S: Data segment 2 (resent ✅)
-    S-->>C: ACK 2
+    C->>S: Segment 2 (resent ✅) → 2 and 3 delivered
 ```
 
 ```mermaid
@@ -45,113 +55,103 @@ sequenceDiagram
     Note over C,S: UDP: no handshake, no ACKs
     C->>S: Datagram 1
     C->>S: Datagram 2 (lost ❌, nobody notices)
-    C->>S: Datagram 3
+    C->>S: Datagram 3 (delivered immediately)
 ```
 
 ## 🔬 How it works
 
-- **TCP (Transmission Control Protocol):**
-  - **Connection setup:** 3-way handshake (SYN → SYN-ACK → ACK) costs **1 RTT** before any data.
-  - **Reliable:** sequence numbers + ACKs + retransmission. Lost data is resent.
-  - **Ordered:** the receiver reassembles bytes in order.
-  - **Flow control** (don't overwhelm the receiver) and **congestion control** (don't overwhelm the network).
-  - **Head-of-line blocking:** if packet 2 is lost, packets 3, 4, 5 wait, even if they already arrived.
-- **UDP (User Datagram Protocol):**
-  - **No handshake, no ACKs, no ordering, no retransmission.** Just "here's a datagram."
-  - Tiny header (8 bytes vs TCP's 20+), and low latency.
-  - Apps add *only* the reliability they need (e.g., QUIC adds it back, smartly).
-- **QUIC / HTTP/3:** built on UDP, with its own reliability and encryption, and **no head-of-line blocking across streams**. Best of both.
+- **TCP setup costs 1 RTT** (SYN → SYN-ACK → ACK) before any data, plus TLS on top. **UDP has no setup**: the first packet carries data.
+- **TCP is reliable and ordered:** sequence numbers, ACKs, and retransmission timers guarantee every byte arrives, in order. It also does **flow control** (protect the receiver) and **congestion control** (protect the network: slow start, backoff on loss).
+- **TCP's weakness is head-of-line (HOL) blocking:** one lost segment stalls every later byte, even ones that already arrived. That's exactly Maya's frozen scooter.
+- **UDP is a bare datagram:** an 8-byte header (vs TCP's 20+), with no ordering, no ACKs, and no retransmits. The application adds *only* the reliability it needs.
+- **QUIC (HTTP/3)** rebuilds reliability, congestion control, and TLS 1.3 **on top of UDP**, with independent streams so one loss doesn't block the others, 0-RTT resumption, and connection migration across networks.
 
 ## 🧩 Worked example
 
-**Choosing protocols for a multiplayer game:**
+**Maya's protocol choices:**
 
-| Data | Protocol | Why |
+| Pantry data | Protocol | Why |
 |---|---|---|
-| Player position (60×/second) | **UDP** | The next update replaces the old one, so resending stale positions is pointless |
-| Voice chat | **UDP** | A 50 ms glitch beats a 500 ms delay |
-| Chat messages | **TCP** | Every message must arrive, in order |
-| In-game purchases | **TCP** (HTTPS) | Money, so it must be correct |
-| Login | **TCP** (HTTPS) | Security + reliability |
+| Courier GPS, every 2 s | **UDP** (or WebRTC/QUIC datagrams) | The next update replaces the old one, so resending stale positions is pointless |
+| Voice call to the cook | **UDP** (WebRTC) | A 50 ms glitch beats a 500 ms delay |
+| Chat messages | **TCP** (WebSocket) | Every message, in order |
+| Checkout | **TCP** (HTTPS) | Money must be correct |
 
-A tiny UDP sender in Python, to show how little setup it needs:
+The cost of HOL blocking on a lossy mobile link, with 2% loss and a 300 ms retransmit timeout: across 50 updates, P(at least one loss) = 1 − 0.98⁵⁰ ≈ **64%** chance of a visible freeze. With UDP, the map just skips one dot.
 
 ```python
 import socket
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)   # DGRAM = UDP
-s.sendto(b"player:42 x=10 y=7", ("game.example.com", 9000))  # no connect, no handshake
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)          # DGRAM = UDP
+s.sendto(b"courier:7 lat=51.507 lon=-0.127 t=1730", ("track.pantry.app", 9000))  # no handshake
 ```
 
 ## ⚖️ Trade-offs
 
 | | TCP | UDP |
 |---|---|---|
-| Reliability | ✅ Guaranteed delivery | ❌ Best effort |
+| Reliability | ✅ Guaranteed | ❌ Best effort |
 | Order | ✅ In order | ❌ Any order |
-| Setup cost | 1 RTT handshake | None |
-| Latency under loss | Higher (retransmits, HOL blocking) | Lower |
-| Use it when | Web, APIs, DBs, file transfer, email | Video/voice calls, games, DNS, metrics, streaming |
+| Setup | 1 RTT (+ TLS) | None |
+| Latency under loss | High (retransmits, HOL) | Low |
+| Use it for | APIs, DBs, files, email, payments | Voice/video, games, DNS, metrics, live telemetry |
 
 ## 🌍 Real world
 
-- **HTTP/1.1 and HTTP/2** run on TCP. **HTTP/3** runs on **QUIC over UDP** (Google, Cloudflare, most big sites).
-- **DNS** uses UDP for most queries (small, fast), and falls back to TCP for large responses.
-- **Zoom, WebRTC, online games** use UDP. **StatsD** sends metrics over UDP, where losing a few is fine.
+- **HTTP/1.1 and HTTP/2** run on TCP. **HTTP/3** runs on **QUIC over UDP**, at Google, Cloudflare, Meta, and most large sites.
+- **DNS** uses UDP for most queries and falls back to TCP for large responses.
+- **Zoom, WebRTC, and multiplayer games** use UDP. **StatsD** ships metrics over UDP, where losing a few is acceptable.
 
 ## 📌 Cheat card
 
 > - **TCP = phone call** (reliable, ordered, handshake). **UDP = postcards** (fast, fire-and-forget).
-> - Ask: **"Is late data worse than lost data?"** Yes → UDP. No → TCP.
-> - TCP handshake = **1 RTT**, plus TLS.
-> - **Head-of-line blocking** is TCP's weakness, and QUIC/HTTP/3 fixes it.
-> - Defaults: **APIs/DBs → TCP · real-time media/games → UDP**.
+> - The deciding question: **"Is late data worse than lost data?"** Yes → UDP. No → TCP.
+> - **TCP handshake = 1 RTT**, and TLS 1.3 adds 1 more.
+> - **HOL blocking** is TCP's tax. **QUIC** removes it per stream.
 
 ## 🧪 Feynman check
 
-Explain to a friend why a video call app would *rather lose* a bit of data than wait for it to be resent.
+Explain why a video call app would *rather lose* a bit of data than wait for it to be resent, and why your bank would never make that choice.
 
-⚠️ **Common confusion:** "UDP is unreliable, so it's bad." UDP is **simple**. Reliability is a *feature you may not need*, and it costs latency. Many modern protocols (QUIC) build smarter reliability on top of UDP.
+⚠️ **Common confusion:** "UDP is unreliable, so it's bad." UDP is **minimal**. Reliability is a feature you may not need, and it costs latency. QUIC proves you can build *better* reliability on top of UDP than TCP offers.
 
 ## ⚡ Quick recall
 
-1. What does the TCP 3-way handshake cost before data can flow?
-<details><summary>Answer</summary>
+1. What does the TCP handshake cost before data can flow?
+<details><summary>Reveal Answer</summary>
 
 One round trip (SYN → SYN-ACK → ACK).
 </details>
 
 2. What is head-of-line blocking?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-When one lost packet makes all the later (already received) data wait until the lost one is retransmitted, because TCP delivers bytes in order.
+One lost segment makes all later, already-received data wait until the lost one is retransmitted, because TCP delivers bytes strictly in order.
 </details>
 
 3. Why does DNS usually use UDP?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Queries and answers are tiny and one-shot. A handshake would double the latency. If one's lost, the client simply asks again.
+Queries and answers are tiny and one-shot. A handshake would double the latency, and if a packet is lost the client simply asks again.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Would you use TCP or UDP for a live-streaming sports app? What about for the chat next to it?"**
+**Q. "HTTP/3 runs over UDP. Isn't that unreliable for loading web pages? Why did the industry move to it?"**
 <details><summary>Model answer</summary>
 
-- **Live video (ultra-low latency):** UDP-based (WebRTC or QUIC-based protocols). Late frames are useless, so accept small losses.
-- **Standard live streaming** (a few seconds of delay is OK): often **HLS/DASH over HTTP (TCP)**, since it's easier to scale via CDNs.
-- **Chat:** TCP (WebSocket over TCP). Messages must arrive, in order.
-- **Likely follow-up:** "How do you handle packet loss in UDP video?" → forward error correction, adaptive bitrate, and the codec concealing lost frames.
+- **It isn't unreliable.** HTTP/3 runs on **QUIC**, which implements reliable delivery, per-stream ordering, congestion control, and **TLS 1.3** inside the transport, in user space, **on top of UDP**.
+- **Why UDP underneath:**
+  - **No cross-stream HOL blocking.** HTTP/2 multiplexes many streams over *one* TCP connection, so a single lost packet stalls every stream. QUIC streams are independent.
+  - **Faster setup.** The transport and TLS handshakes are combined into **1 RTT**, and **0-RTT** on resumption, vs 2–3 RTTs for TCP + TLS.
+  - **Connection migration.** Connections are identified by a connection ID rather than the 5-tuple, so a phone switching from Wi-Fi to 5G keeps its session.
+  - **Deployability.** TCP lives in OS kernels and middleboxes and evolves slowly. QUIC ships in the app and evolves fast.
+- **Costs:** some networks block or rate-limit UDP (browsers **fall back to HTTP/2**), and there's higher CPU per byte from user-space crypto and less mature hardware offload.
+- **Likely follow-up:** "When would you still pick plain TCP?" → database protocols and internal RPC inside a low-loss datacenter, where HOL blocking rarely triggers and the tooling is mature.
 </details>
 
-**Q2. "HTTP/3 uses UDP. Isn't that unreliable for web pages?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- HTTP/3 uses **QUIC**, which implements reliability, ordering (per stream), congestion control, and TLS 1.3 **on top of UDP**.
-- It uses UDP because it avoids **TCP head-of-line blocking** across multiplexed streams, allows **faster handshakes** (combined transport + TLS, 0-RTT resumption), and supports **connection migration** (a phone switching Wi-Fi → 4G keeps its connection).
-- **Likely follow-up:** "Any downsides?" → some networks and firewalls block or throttle UDP, and it's more CPU-heavy in user space. Browsers fall back to HTTP/2.
-</details>
-
-> 📖 *Customers type pantry.com, not a string of numbers. Next, I'll show you who does the translating.*
+> 📖 *Customers type pantry.app, not 93.184.215.14, and Maya is about to find out who does the translating and how badly it can betray her.*
 
 ---
 

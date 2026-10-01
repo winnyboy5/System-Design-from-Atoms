@@ -8,171 +8,155 @@
 
 ## 📖 Story
 
-A grocery chain wanted to list its ingredients on Pantry automatically. Their developer asked, "Where's your API documentation?" Maya winced. Her endpoints were named things like `/getStuff` and `/doOrderNow`. I've shipped names like that too, and I've paid for it later. Before strangers build on top of it, let me show you how to design a clean, predictable menu of operations.
+A grocery chain wants to stock ingredients on Pantry automatically. Their developer sends one polite line: *"Where's your API documentation?"*
+
+Maya opens her route file, and her face goes hot.
+
+```
+/getStuff
+/doOrderNow
+/orders_list_v2_FINAL
+/deleteThingById?id=
+```
+
+Her API reads like the junk drawer in a kitchen. Every endpoint is a surprise. The order list returns **all 400,000 orders at once**, a JSON blob so big the partner's test client freezes. If she renames anything, the mobile app breaks. If a request retries, it might create a **duplicate order**.
+
+Strangers are about to build their business on top of this. I've shipped names like these too, and I paid for them for years.
+
+Let me show you how to design a clean, predictable menu of operations.
 
 ## 🎯 One-sentence idea
 
-**A good REST API uses nouns for URLs (resources), HTTP methods for actions, and real status codes, and it plans ahead for pagination, versioning, idempotency, and errors so clients never break.**
+**A good REST API uses nouns for URLs, HTTP methods for actions, and real status codes, and it plans from day one for pagination, versioning, idempotency, and consistent errors so that clients never break.**
 
 ## 🧸 Analogy
 
 A **library**:
 
 - The **shelves** are resources: `/books`, `/books/42`, `/members/7/loans`.
-- The **actions** are always the same few verbs: *look* (GET), *add* (POST), *replace* (PUT), *edit* (PATCH), *remove* (DELETE).
-- You don't have a special door for "borrow-book-now". You **create a loan**: `POST /loans`.
-- When there are 10,000 books, the librarian hands you **one page at a time** (pagination).
+- There are only a few **verbs**: look (GET), add (POST), replace (PUT), edit (PATCH), remove (DELETE).
+- There's no special "borrow-book-now" door. You **create a loan**: `POST /loans`.
+- With 10,000 books, the librarian hands you **one page at a time**.
 
 ## 🖼️ Visual
 
+*Diagram brief:* a resource tree. Collections branch into items, and items into sub-collections. Dotted self-loops show which verbs apply at each level.
+
 ```mermaid
 flowchart TD
-    R["/users"] --> U["/users/{id}"]
-    U --> O["/users/{id}/orders"]
-    O --> OI["/users/{id}/orders/{orderId}"]
+    R["/v1/dishes"] --> U["/v1/dishes/{id}"]
+    U --> O["/v1/dishes/{id}/reviews"]
+    O --> OI["/v1/dishes/{id}/reviews/{reviewId}"]
     R -.->|"GET list · POST create"| R
     U -.->|"GET · PUT · PATCH · DELETE"| U
 ```
 
 ## 🔬 How it works
 
-- **Resources are nouns, plural:** `/orders`, `/orders/123`. **Never verbs:** ❌ `/getOrder`, ❌ `/createOrder`.
-- **Methods are the verbs:**
-
-  | Action | Method + path | Success code |
-  |---|---|---|
-  | List | `GET /orders` | 200 |
-  | Read one | `GET /orders/123` | 200 |
-  | Create | `POST /orders` | 201 + `Location` |
-  | Replace | `PUT /orders/123` | 200/204 |
-  | Partial update | `PATCH /orders/123` | 200 |
-  | Delete | `DELETE /orders/123` | 204 |
-
-- **Pagination:** never return unbounded lists.
-  - **Offset:** `?limit=20&offset=40`. Simple, but slow for deep pages and it shifts when data changes.
-  - **Cursor (keyset):** `?limit=20&cursor=eyJpZCI6MTIzfQ`. Stable and fast, and the one to use at scale.
-- **Filtering & sorting:** `GET /orders?status=shipped&sort=-created_at`.
-- **Versioning:** `/v1/orders` (URL), or a header (`Accept: application/vnd.shop.v2+json`). **Never break existing clients.** Add fields, don't remove or rename them.
-- **Idempotency:** `POST` with an `Idempotency-Key` header, so retries don't create duplicates (lesson 055).
-- **Consistent errors:** a single shape, like `{"error": {"code": "OUT_OF_STOCK", "message": "...", "request_id": "..."}}`.
-- **Other essentials:** auth (Bearer tokens), rate-limit headers, `ETag` for caching and optimistic concurrency, and HATEOAS links (optional).
+- **Nouns + methods:** `GET /orders` (200), `GET /orders/123` (200), `POST /orders` (**201 + `Location`**), `PUT`/`PATCH /orders/123` (200/204), `DELETE /orders/123` (204). Never ❌ `/getOrder` or ❌ `/createOrder`.
+- **Always paginate:** **offset** (`?limit=20&offset=40`) is simple but scans and discards rows, and pages shift as data changes. **Cursor/keyset** (`?limit=20&cursor=…` → `WHERE id > last_id`) is O(page) via the index and stable. Use cursors at scale.
+- **Version from day one, evolve additively:** `/v1/…` (or an `Accept` header). Add optional fields freely. Never remove, rename, or change the meaning of a field without a new version and a deprecation window.
+- **Make writes retry-safe:** `POST` accepts an **`Idempotency-Key`**, so a retry returns the original result instead of a duplicate (lesson 055). `ETag` + `If-Match` gives **optimistic concurrency** (412 on conflict).
+- **One error shape everywhere:** `{"error":{"code":"OUT_OF_STOCK","message":"…","request_id":"…"}}`, plus rate-limit headers and Bearer auth.
 
 ## 🧩 Worked example
 
-**Designing the API for a to-do app:**
-
 ```http
-POST /v1/lists/9/tasks
-Idempotency-Key: 5f1c7e...
+POST /v1/orders
+Idempotency-Key: 5f1c7e2a-…
 Content-Type: application/json
 
-{"title": "Buy milk", "due": "2026-10-01"}
+{"dish_id": 17, "qty": 2}
 
 → 201 Created
-Location: /v1/lists/9/tasks/311
-{"id": 311, "title": "Buy milk", "done": false}
+Location: /v1/orders/311
+{"id": 311, "status": "received"}
 ```
 
 ```http
-GET /v1/lists/9/tasks?limit=2&cursor=MzEw
-
+GET /v1/orders?limit=2&cursor=MzEw
 → 200 OK
-{
-  "data": [{"id": 311, ...}, {"id": 312, ...}],
-  "next_cursor": "MzEy"          ← the client passes this to get the next page
-}
+{"data": [{"id": 311, …}, {"id": 312, …}], "next_cursor": "MzEy"}
 ```
 
-**Cursor pagination in SQL (why it's fast):**
+**Why the cursor wins, at page 5,000:**
 
 ```sql
--- Offset: the DB still walks past 100,000 rows 😩
-SELECT * FROM tasks WHERE list_id = 9 ORDER BY id LIMIT 20 OFFSET 100000;
-
--- Cursor: jumps straight there using the index 🚀
-SELECT * FROM tasks WHERE list_id = 9 AND id > 312 ORDER BY id LIMIT 20;
-```
-
-**Optimistic concurrency with ETag:**
-
-```http
-PUT /v1/tasks/311
-If-Match: "v3"
-→ 412 Precondition Failed   (someone else changed it, so re-fetch and retry)
+-- Offset: reads and throws away 100,000 rows 😩  (~hundreds of ms)
+SELECT * FROM orders WHERE cook_id = 9 ORDER BY id LIMIT 20 OFFSET 100000;
+-- Cursor: one index seek 🚀  (~1 ms)
+SELECT * FROM orders WHERE cook_id = 9 AND id > 312 ORDER BY id LIMIT 20;
 ```
 
 ## ⚖️ Trade-offs
 
-| Choice | Gain | Cost |
+| Maya's choice | What she gains | What she pays |
 |---|---|---|
-| Offset pagination | Simple, can jump to page N | Slow deep pages, duplicates or skips on changes |
-| Cursor pagination | Fast, stable | No "jump to page 50" |
+| Offset pagination | "Jump to page N", simple | Slow deep pages, duplicates or skips during writes |
+| Cursor pagination | Fast and stable at any depth | No random page access |
 | URL versioning (`/v1`) | Obvious, easy to route and cache | URL clutter |
-| Header versioning | Clean URLs | Less visible, harder to test in a browser |
-| Fine-grained resources | Clean, reusable | Chatty (many calls) → consider GraphQL/BFF (lesson 015) |
+| Header versioning | Clean URLs | Invisible, harder to test |
+| Fine-grained resources | Clean and reusable | Chatty clients → consider a BFF or GraphQL (lesson 015) |
 
 ## 🌍 Real world
 
-- **Stripe's API** is the gold standard: resource-oriented, idempotency keys, cursor pagination (`starting_after`), dated versions, and consistent errors.
-- **GitHub's API** uses `Link` headers for pagination and `X-RateLimit-*` headers.
+- **Stripe** is the gold standard: resource-oriented URLs, idempotency keys, cursor pagination (`starting_after`), dated versions, and consistent errors.
+- **GitHub** uses `Link` headers for pagination and `X-RateLimit-*` headers for quotas.
 
 ## 📌 Cheat card
 
 > - **Nouns in URLs, verbs in methods, real status codes.**
-> - **Always paginate.** Use a **cursor** at scale.
-> - **Version from day one** (`/v1`). **Add, never break.**
-> - **Idempotency-Key** on POSTs that create or charge.
-> - **One error format** with a `request_id` for debugging.
+> - **Always paginate. Use cursors at scale.**
+> - **Version from day one. Add, never break.**
+> - **`Idempotency-Key`** on every POST that creates or charges.
+> - **One error format** with a `request_id`.
 
 ## 🧪 Feynman check
 
-Explain to a friend why `POST /createOrder` is worse than `POST /orders`, and why "page 5,000" is slow with offset pagination.
+Explain why `POST /createOrder` is worse than `POST /orders`, and why "page 5,000" is slow with offset pagination.
 
-⚠️ **Common confusion:** "REST = JSON over HTTP." REST is a *style* (resources, uniform interface, stateless). Plenty of "REST" APIs are really RPC with JSON, and that's OK, as long as they're consistent.
+⚠️ **Common confusion:** "REST = JSON over HTTP." REST is a *style*: resources, a uniform interface, statelessness. Plenty of "REST" APIs are really RPC with JSON. That's fine if they're **consistent**. Inconsistency is what hurts.
 
 ## ⚡ Quick recall
 
 1. Design the endpoint to cancel order 55.
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Either `POST /orders/55/cancellation` (create a cancellation resource) or `PATCH /orders/55 {"status":"cancelled"}`. Not `POST /cancelOrder?id=55`.
+`POST /orders/55/cancellation` (create a cancellation resource) or `PATCH /orders/55 {"status":"cancelled"}`. Not `POST /cancelOrder?id=55`.
 </details>
 
 2. Why is cursor pagination better at scale?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-It uses an index to jump directly to the next page (`WHERE id > last_id`), and it doesn't skip or duplicate rows when data changes.
+It seeks straight to the next page through the index (`WHERE id > last_id`) instead of scanning and discarding rows, and it doesn't skip or duplicate rows as data changes.
 </details>
 
 3. How do you evolve an API without breaking clients?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Only make additive changes (new optional fields/endpoints). Introduce a new version for breaking changes, and deprecate old versions with notice.
+Make only additive changes (new optional fields or endpoints). Ship breaking changes as a new version and deprecate the old one with notice.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Design the API for a URL shortener."**
+**Q. "Design the public API for a URL shortener. Cover creation, redirects, stats, retries, and how you'd evolve it."**
 <details><summary>Model answer</summary>
 
-- `POST /v1/links` with `{"url": "...", "custom_alias": "opt", "expires_at": "opt"}` → `201 {"short": "abc123", "url": "..."}`.
-- `GET /{short}` → `301/302` redirect with a `Location` header (302 if you need click analytics on every hit).
-- `GET /v1/links/{short}/stats` → click counts.
-- `DELETE /v1/links/{short}` → `204`.
-- Auth for creation, rate limits per user, and an idempotency key for creation.
-- **Likely follow-up:** "301 or 302?" → 301 is cached by browsers (less load, but you lose analytics). 302 hits your server every time.
+- **Endpoints:**
+  - `POST /v1/links` with `{"url": "…", "custom_alias?": "…", "expires_at?": "…"}` → `201 Created`, `Location: /v1/links/abc123`, body `{"short":"abc123","url":"…"}`. Return `409` if the alias is taken and `422` for an invalid URL.
+  - `GET /{short}` → **301 or 302** with a `Location` header. Return `404` for unknown links and `410 Gone` for expired ones.
+  - `GET /v1/links/{short}/stats?from=…&to=…` → click counts, cursor-paginated time buckets.
+  - `DELETE /v1/links/{short}` → `204`.
+- **301 vs 302:** a 301 is cached by browsers (less load, but you **lose per-click analytics**). A 302 hits you every time. Pick 302 if analytics matter.
+- **Retries:** `Idempotency-Key` on `POST /v1/links`, so a mobile retry doesn't mint two short codes.
+- **Protection:** Bearer auth for creation, **per-key rate limits** returning `429 + Retry-After`, and a consistent error envelope with `request_id`.
+- **Evolution:** `/v1` from day one. New fields (e.g. `tags`) are optional and additive. A breaking change becomes `/v2`, with a `Sunset` header on v1 and a migration window.
+- **Likely follow-up:** "The mobile home screen needs 6 of your endpoints. What now?" → a **BFF** endpoint that aggregates server-side, GraphQL, or at least parallel calls over HTTP/2 (lesson 015).
 </details>
 
-**Q2. "Your mobile app needs data from 6 endpoints to render the home screen. What do you do?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- The client makes 6 round trips on a slow mobile network, which is slow.
-- Options: a **Backend-for-Frontend (BFF)** endpoint `GET /home` that aggregates server-side. **GraphQL**, so the client asks for exactly what it needs in one query. Or **HTTP/2 multiplexing** to at least run the calls in parallel.
-- Trade-off: a BFF couples the endpoint to one screen. GraphQL adds complexity (caching, query cost limits).
-- **Likely follow-up:** "How do you cache a GraphQL response?" → per-field/entity caching (DataLoader), persisted queries, CDN caching of persisted query IDs.
-</details>
-
-> 📖 *Next, the mobile team says REST is too chatty, so I'll show you the other ways software can talk.*
+> 📖 *The partner is happy, but Pantry's own mobile app needs six round trips to draw one screen on a weak signal, and Maya starts to wonder whether REST is the right language at all.*
 
 ---
 

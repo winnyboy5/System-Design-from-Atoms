@@ -8,31 +8,41 @@
 
 ## 📖 Story
 
-Pantry's new mobile app needed six requests just to draw the home screen, and it was painfully slow on a weak signal. Meanwhile, the backend was splitting into services that chattered constantly. Maya asked me which API style was "best." My answer, as usual, was "it depends." So let me show you three popular styles and exactly where each one shines.
+Maya rides the bus home with Pantry's app open on a one-bar signal. She taps the home screen and watches.
+
+**Request 1**: the user profile. 400 ms. **Request 2**: nearby dishes. 600 ms. **Request 3**: reviews for each dish. **Request 4**: cook profiles. **Request 5**: the cart. **Request 6**: promotions.
+
+Six round trips, one after another, and each one drags back a fat JSON blob full of fields the screen never shows. By the time the screen paints, the bus has passed two stops.
+
+Back in the datacentre, things are no better. Pantry's backend has started splitting into services that chatter at each other thousands of times per second, each call serializing and parsing bloated text.
+
+Maya asks me which API style is *best*. My answer, as usual: *"It depends."* Let me show you three styles and exactly where each one shines.
 
 ## 🎯 One-sentence idea
 
-**REST is simple and universal (great for public APIs), gRPC is fast and strongly typed (great between internal services), and GraphQL lets clients ask for exactly the data they need (great for varied front-ends).**
+**REST is simple and universal (great for public APIs), gRPC is fast and strongly typed (great between internal services), and GraphQL lets each client ask for exactly the data it needs (great for many different front-ends).**
 
 ## 🧸 Analogy
 
 Ordering food:
 
-- 🍽️ **REST** = a **fixed menu**. Each dish (endpoint) comes as it comes. Want soup *and* salad? Order twice.
-- 📞 **gRPC** = **calling the kitchen on a direct intercom** with a strict order form. Super fast, and both sides know the exact format. But customers off the street (browsers) can't easily use the intercom.
-- 🥗 **GraphQL** = a **build-your-own bowl**. One order, and you list exactly the ingredients you want: "rice, chicken, no beans, extra sauce."
+- 🍽️ **REST** = a **fixed menu**. Each dish comes as it comes. Soup *and* salad? Order twice.
+- 📞 **gRPC** = a **direct intercom to the kitchen** with a strict order form. Lightning fast, but walk-in customers (browsers) can't easily use it.
+- 🥗 **GraphQL** = a **build-your-own bowl**. One order listing exactly the ingredients you want.
 
 ## 🖼️ Visual
+
+*Diagram brief:* three panels. REST shows three separate arrows from client to API. GraphQL shows one arrow carrying a shaped query. gRPC shows two services joined by a thick, two-way binary pipe.
 
 ```mermaid
 flowchart LR
     subgraph REST
         C1["Client"] -->|"GET /users/1"| A1["API"]
-        C1 -->|"GET /users/1/posts"| A1
-        C1 -->|"GET /users/1/followers"| A1
+        C1 -->|"GET /users/1/orders"| A1
+        C1 -->|"GET /users/1/favourites"| A1
     end
     subgraph GraphQL
-        C2["Client"] -->|"1 query: user + posts + followers"| A2["GraphQL server"]
+        C2["Client"] -->|"1 query: user + orders + favourites"| A2["GraphQL server"]
     end
     subgraph gRPC
         S1["Service A"] <-->|"binary Protobuf over HTTP/2<br/>typed methods, streaming"| S2["Service B"]
@@ -41,37 +51,25 @@ flowchart LR
 
 ## 🔬 How it works
 
-- **REST** (lesson 014): resources + HTTP methods, usually JSON. Easy to cache (GET + CDN), works in every browser and tool.
-  - ⚠️ **Over-fetching** (you get fields you don't need) and **under-fetching** (you need several calls).
-- **gRPC:** you define services in a `.proto` file, and code is generated for many languages. It uses **HTTP/2 + Protobuf (binary)**.
-  - ✅ Small, fast payloads, strict types, and **streaming** (client, server, or both directions), plus deadlines.
-  - ⚠️ Browsers need a proxy (gRPC-Web), messages aren't human-readable, and HTTP caching is harder.
-- **GraphQL:** a single endpoint (`POST /graphql`). The client sends a **query** describing the shape it wants, and the server resolves each field.
-  - ✅ No over- or under-fetching, one round trip, a typed schema, and front-ends can move fast.
-  - ⚠️ Harder caching, **N+1 resolver problems** (fix with DataLoader batching), and expensive queries (add depth/complexity limits).
-- **JSON vs Protobuf:** JSON is text, self-describing, and readable. Protobuf is binary, schema-based, **about 3–10× smaller and faster to parse**, and supports safe schema evolution (field numbers).
+- **REST:** resources + HTTP verbs, usually JSON. **HTTP caching and CDNs just work**, and every tool understands it. The weaknesses are **over-fetching** (fields you don't need) and **under-fetching** (N calls per screen).
+- **gRPC:** contracts in `.proto`, generated clients in ~10 languages, **HTTP/2 + Protobuf**, plus **deadlines** and client, server, and bidirectional **streaming**. Browsers need gRPC-Web or a proxy, and HTTP caching doesn't apply.
+- **GraphQL:** a single endpoint and a typed schema. The client sends the **exact shape** it wants, and per-field resolvers fill it. Watch for the **N+1 resolver problem** (fix with DataLoader batching), harder caching, and expensive queries (enforce depth and cost limits).
+- **JSON vs Protobuf:** JSON is self-describing text. Protobuf is schema-based binary, **~3–10× smaller and faster to parse**, and it evolves safely through **field numbers** (add new numbers, never reuse old ones).
+- **Mixing them is normal:** GraphQL or REST at the edge, gRPC between internal services.
 
 ## 🧩 Worked example
 
-**The same "get user" in each style:**
+**The same "get user":**
 
-REST:
 ```http
 GET /v1/users/42
-→ {"id":42,"name":"Ada","email":"ada@x.com","bio":"...","created_at":"..."}
+→ {"id":42,"name":"Maya","email":"…","bio":"…","created_at":"…", …}   # everything, always
 ```
 
-GraphQL:
 ```graphql
-query {
-  user(id: 42) {
-    name
-    posts(last: 3) { title }
-  }
-}
+query { user(id: 42) { name  orders(last: 3) { dish { name } } } }    # exactly this shape
 ```
 
-gRPC (`user.proto`):
 ```protobuf
 service UserService {
   rpc GetUser (GetUserRequest) returns (User);
@@ -81,11 +79,11 @@ message GetUserRequest { int64 id = 1; }
 message User { int64 id = 1; string name = 2; string email = 3; }
 ```
 
-**A common real architecture that mixes all three:**
+**Maya's bus ride, fixed:** 6 sequential REST calls × ~400 ms RTT ≈ **2.4 s** → **1 GraphQL query ≈ 450 ms**, with a ~70% smaller payload. Internally, swapping JSON for Protobuf cut a hot service's serialization CPU by roughly **5×**.
 
 ```
-Browser/Mobile ──GraphQL or REST──▶ API Gateway / BFF ──gRPC──▶ internal microservices
-Partners       ──REST (public)───▶ API Gateway
+Mobile/Web ──GraphQL──▶ API Gateway / BFF ──gRPC──▶ internal services
+Partners   ──REST─────▶ API Gateway
 ```
 
 ## ⚖️ Trade-offs
@@ -93,77 +91,73 @@ Partners       ──REST (public)───▶ API Gateway
 | | REST | gRPC | GraphQL |
 |---|---|---|---|
 | Format | JSON (text) | Protobuf (binary) | JSON |
-| Transport | HTTP/1.1+ | HTTP/2 | HTTP |
 | Browser-friendly | ✅ | ⚠️ needs a proxy | ✅ |
-| HTTP caching | ✅ easy | ❌ | ⚠️ hard |
+| HTTP/CDN caching | ✅ easy | ❌ | ⚠️ hard |
 | Performance | Good | 🚀 Best | Good (can be heavy) |
-| Streaming | ⚠️ (SSE/WebSocket) | ✅ built in | ⚠️ subscriptions |
-| Flexibility for clients | Low | Low | 🚀 High |
-| Best for | Public APIs, simple CRUD | Internal service-to-service calls | Many clients with different data needs |
+| Streaming | ⚠️ SSE/WS | ✅ built in | ⚠️ subscriptions |
+| Client flexibility | Low | Low | 🚀 High |
+| Best for | Public APIs, CRUD | Internal service-to-service calls | Many varied front-ends |
 
 ## 🌍 Real world
 
-- **Google** uses gRPC (Stubby) internally everywhere. **Netflix, Square, Uber** use gRPC between services.
-- **GitHub, Shopify, Facebook** offer **GraphQL** APIs. Facebook invented it for mobile apps.
-- **Stripe, Twilio, AWS** public APIs are **REST**.
+- **Google** runs gRPC (from Stubby) internally. **Netflix, Square, and Uber** use gRPC between services.
+- **GitHub, Shopify, and Meta** expose **GraphQL**. Meta invented it for its mobile apps.
+- **Stripe, Twilio, and AWS** public APIs are **REST**.
 
 ## 📌 Cheat card
 
 > - **Public → REST. Internal → gRPC. Many hungry front-ends → GraphQL.**
 > - gRPC = **HTTP/2 + Protobuf + codegen + streaming + deadlines**.
-> - GraphQL pitfalls: **N+1 (use DataLoader), caching, query cost limits**.
-> - Protobuf ≈ **3–10× smaller** than JSON. Never reuse field numbers.
-> - Mixing them is normal: **GraphQL/REST at the edge, gRPC inside**.
+> - GraphQL pitfalls: **N+1 (DataLoader), caching, query cost limits**.
+> - Protobuf ≈ **3–10× smaller** than JSON. **Never reuse field numbers.**
 
 ## 🧪 Feynman check
 
-Use the restaurant analogy to explain when you'd pick each style. Then say what "over-fetching" means.
+Use the restaurant to explain when you'd pick each style, then explain "over-fetching" in one sentence.
 
-⚠️ **Common confusion:** "GraphQL is faster than REST." Not inherently. It *reduces round trips and payload size for clients*, but a badly written GraphQL query can hammer your DB much harder than a REST endpoint.
+⚠️ **Common confusion:** "GraphQL is faster than REST." Not inherently. It **cuts client round trips and payload size**, but one careless nested query can fan out into thousands of database calls and hammer the backend far harder than a REST endpoint would.
 
 ## ⚡ Quick recall
 
 1. Why is gRPC popular for internal microservices?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Fast binary Protobuf over HTTP/2, strongly typed contracts with generated clients, streaming, and deadlines.
+Compact binary Protobuf over HTTP/2, typed contracts with generated clients, built-in streaming, and deadline propagation.
 </details>
 
 2. What problem was GraphQL designed to solve?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Over-fetching and under-fetching, where clients (especially mobile) needed many round trips or got too much data from fixed REST endpoints.
+Over-fetching and under-fetching: mobile clients needed many round trips or got far more data than they needed from fixed REST endpoints.
 </details>
 
 3. What's the N+1 problem in GraphQL?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Resolving a list of N items and then fetching a related field for each one separately, which makes 1 + N database calls. Fix it by batching (DataLoader).
+Resolving a list of N items and then fetching a related field for each one individually, which makes 1 + N backend calls. Fix it by batching with DataLoader.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "You're designing a platform with a web app, iOS app, Android app, and 30 internal microservices. What API styles do you use where?"**
+**Q. "You have web, iOS, and Android apps, 30 internal microservices, and partners who want an API. Which API styles go where, and what are the risks of exposing GraphQL publicly?"**
 <details><summary>Model answer</summary>
 
-- **Internal:** gRPC for performance, typed contracts, and streaming, with deadlines propagated across calls.
-- **Client-facing:** GraphQL (or a REST BFF per client) behind an **API gateway**, so each app fetches exactly what its screens need.
-- **Third-party/public:** REST with versioning, since it's the most accessible and has the best tooling.
-- The gateway handles auth, rate limiting, and translation (lesson 022).
-- **Likely follow-up:** "How do you evolve Protobuf schemas safely?" → only add fields with new numbers, never reuse or renumber, and use `reserved` for removed fields.
+- **Internal, service-to-service:** **gRPC**. It has typed contracts, small payloads, streaming, and **deadline propagation**, so a timeout at the edge cancels work deep inside. Evolve schemas by only *adding* fields and marking removed numbers `reserved`.
+- **First-party clients:** **GraphQL** (or a REST **BFF** per client) behind an **API gateway**, so each screen fetches exactly what it needs in one round trip.
+- **Partners:** **versioned REST**. It's the most accessible, cacheable, and best documented, with idempotency keys and rate limits.
+- **The gateway** owns auth, rate limiting, and protocol translation (lesson 022).
+- **Public GraphQL risks and mitigations:**
+  - **Malicious or expensive queries:** enforce depth and complexity limits, pagination caps, and timeouts, or allow only **persisted queries**.
+  - **Rate limiting:** limit by **query cost points**, not by request count.
+  - **N+1 load:** batch with DataLoader.
+  - **Caching:** use persisted queries over GET (CDN-cacheable) plus entity-level caches.
+  - **Authorization:** check per field, because the schema exposes a lot.
+- **Likely follow-up:** "Why not gRPC all the way to the browser?" → browsers can't speak raw HTTP/2 framing to gRPC, so you need gRPC-Web plus a proxy, and you lose HTTP caching and easy debugging.
 </details>
 
-**Q2. "What are the risks of exposing GraphQL publicly?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- **Expensive or malicious queries** (deeply nested, huge lists) → enforce **depth and complexity limits**, timeouts, pagination caps, and **persisted queries** (allow-list).
-- **Caching is harder** (it's one POST endpoint) → persisted queries over GET plus entity-level caching.
-- **N+1 DB load** → DataLoader.
-- **Authorization per field**, since the schema exposes a lot.
-- **Likely follow-up:** "How do you rate limit GraphQL?" → by query cost points, not by request count.
-</details>
-
-> 📖 *Next, customers want to watch their courier move live, without pressing refresh.*
+> 📖 *The home screen loads fast now, but customers keep hammering refresh on the tracking page, and Maya needs the server to speak first.*
 
 ---
 

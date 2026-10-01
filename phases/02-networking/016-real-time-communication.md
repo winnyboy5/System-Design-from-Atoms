@@ -8,22 +8,34 @@
 
 ## 📖 Story
 
-"Where's my food?" became Pantry's most common support question. Customers kept refreshing the tracking page, and the server groaned under the load. Maya wanted the *server* to speak up when something changed, but plain HTTP only lets the customer speak first. I'll show you the four ways around that, from clumsy to elegant.
+*"Where's my food?"*
+
+It's now the most common message in Pantry's support inbox. So customers do what anxious, hungry people do: they **refresh the tracking page. Again. And again.**
+
+Maya watches the request graph at 7 p.m. It looks like a seismograph during an earthquake. Twelve thousand people are each refreshing every few seconds, and the server is drowning in **4,000 requests per second** of the same question, *anything new?*, to which the answer is almost always **no**.
+
+It's like a crowd of people each walking to their mailbox every thirty seconds, all evening, to find it empty.
+
+Maya wants the **server** to speak up when a courier moves. But plain HTTP has an iron rule: **the client always speaks first.**
+
+I'll show you the four ways around that rule, from clumsy to elegant.
 
 ## 🎯 One-sentence idea
 
-**Plain HTTP only lets the client speak first. To push updates from the server, you can poll repeatedly, long-poll (the server holds the request until there's news), stream with Server-Sent Events (one-way), or open a WebSocket (two-way, always on).**
+**To push updates over a protocol where the client always speaks first, you can poll repeatedly, long-poll (the server holds the request until there's news), stream with Server-Sent Events (one-way), or open a WebSocket (two-way, always on).**
 
 ## 🧸 Analogy
 
 Waiting for a package:
 
-- 🔁 **Polling** = walking to the mailbox every 5 minutes. Usually empty. Wasteful.
-- ⏳ **Long polling** = standing at the mailbox **until** the mail carrier comes, then going home and coming right back.
-- 📻 **SSE** = a **radio**. The station keeps broadcasting to you, but you can't talk back on it.
+- 🔁 **Polling** = walking to the mailbox every 5 minutes. Usually empty.
+- ⏳ **Long polling** = standing at the mailbox **until** the carrier comes, then immediately coming back.
+- 📻 **SSE** = a **radio**. The station keeps broadcasting, but you can't talk back.
 - 📞 **WebSocket** = an **open phone line**. Either side can talk any time.
 
 ## 🖼️ Visual
+
+*Diagram brief:* four horizontal strips, one per technique. Polling shows many empty round trips. Long polling shows one held request. SSE shows one request answered by a stream of events. WebSocket shows an upgrade followed by arrows in both directions.
 
 ```mermaid
 sequenceDiagram
@@ -33,136 +45,125 @@ sequenceDiagram
     C->>S: Anything new?
     S-->>C: No
     C->>S: Anything new?
-    S-->>C: Yes, here's 1 message
+    S-->>C: Yes, 1 update
     Note over C,S: ⏳ Long polling
     C->>S: Anything new? (I'll wait)
-    Note right of S: holds the request...
-    S-->>C: Yes, message arrived
-    Note over C,S: 📻 SSE (one HTTP response that never ends)
+    Note right of S: holds up to ~30 s
+    S-->>C: Courier moved!
+    Note over C,S: 📻 SSE: one never-ending response
     C->>S: GET /events (Accept: text/event-stream)
-    S-->>C: data: score 1-0
-    S-->>C: data: score 2-0
-    Note over C,S: 📞 WebSocket (upgrade, then full duplex)
+    S-->>C: data: courier at 51.507,-0.127
+    S-->>C: data: courier at 51.508,-0.126
+    Note over C,S: 📞 WebSocket: upgrade, then full duplex
     C->>S: HTTP Upgrade: websocket
     S-->>C: 101 Switching Protocols
-    C->>S: typing...
-    S-->>C: new message!
+    C->>S: "Ring the bell please"
+    S-->>C: "Arriving in 2 min"
 ```
 
 ## 🔬 How it works
 
-- **Short polling:** the client asks every N seconds. Simple, works everywhere, but **wastes requests** and adds **up to N seconds of delay**.
-- **Long polling:** the server **holds the request open** until data arrives or a timeout (~30 s), then the client immediately re-asks. Near real-time over plain HTTP, but each message costs a new request.
-- **SSE (Server-Sent Events):** one long HTTP response with the `text/event-stream` format. **Server → client only.** Auto-reconnects, and it resumes with `Last-Event-ID`. Easy through proxies and HTTP/2.
-- **WebSockets:** starts as HTTP, **upgrades** to a persistent TCP connection. **Two-way**, with low overhead per message (a few bytes of framing).
-- **Scaling persistent connections (the real design challenge):**
-  - Servers become **stateful**: each holds thousands to millions of open connections.
-  - You need a **connection registry** ("user 42 is connected to gateway-7"), usually in Redis.
-  - Use **pub/sub** (Redis, Kafka) to route messages to whichever server holds the recipient's connection (lesson 058).
-  - Load balancers need to support long-lived connections. Plan for **reconnect storms** after deploys (add jitter).
+- **Short polling** asks every N seconds. It's trivial and works everywhere, but it **wastes requests** and adds up to **N seconds of latency**.
+- **Long polling**: the server **parks the request** until data arrives or ~30 s passes, and the client re-asks immediately. Near-real-time over plain HTTP, but one request per message.
+- **SSE**: one long-lived HTTP response in `text/event-stream` format. **Server → client only**, with built-in auto-reconnect and resume via `Last-Event-ID`. It multiplexes cleanly over HTTP/2.
+- **WebSocket**: an HTTP request **upgrades** into a persistent, **full-duplex** connection with ~2–14 bytes of framing per message. Best for chat, games, and collaborative editing.
+- **The real challenge is scaling persistent connections:** servers become **stateful**. You need a **connection registry** (`user → gateway`, in Redis with a TTL), **pub/sub** to route messages to the right gateway (lesson 058), LBs tuned for long-lived connections, and **jittered reconnects** to survive deploys.
 
 ## 🧩 Worked example
 
-**SSE in the browser (it's about 3 lines):**
+**Cost check for Maya's 12,000 trackers:**
+
+| Approach | Load |
+|---|---|
+| Polling every 3 s | 12,000 ÷ 3 = **4,000 req/s**, ~99% returning "nothing new" |
+| SSE | **12,000 idle connections** (~a few KB each ≈ tens of MB of RAM), traffic only on real updates (~1 per courier every 5 s) |
 
 ```javascript
-const es = new EventSource("/v1/games/7/score");
-es.onmessage = (e) => render(JSON.parse(e.data));   // auto-reconnects for you
+// SSE: about 3 lines, auto-reconnects for free
+const es = new EventSource("/v1/orders/311/track");
+es.onmessage = (e) => moveScooter(JSON.parse(e.data));
 ```
-
-**WebSocket chat client:**
-
-```javascript
-const ws = new WebSocket("wss://chat.example.com/ws?token=...");
-ws.onmessage = (e) => showMessage(JSON.parse(e.data));
-ws.send(JSON.stringify({ to: "room-9", text: "hi!" }));
-```
-
-**Routing a chat message across servers:**
 
 ```mermaid
 flowchart LR
-    A["👩 Alice"] -- WS --> G1["Gateway 1"]
-    B["👨 Bob"] -- WS --> G2["Gateway 2"]
-    G1 -->|"publish to user:bob"| PS["📢 Redis pub/sub"]
-    PS -->|"subscriber on Gateway 2"| G2
-    G1 -.->|"where is Bob?"| REG[("Connection registry<br/>bob → gateway 2")]
+    CR["🛵 Courier app"] -->|"GPS"| API["Tracking API"]
+    API -->|"publish order:311"| PS["📢 Redis pub/sub"]
+    PS --> G2["SSE gateway 2"]
+    G2 -- "event stream" --> CU["👩 Customer"]
+    API -.->|"who watches order 311?"| REG[("Registry:<br/>order:311 → gateway 2")]
 ```
-
-**Cost check:** 1M connected users polling every 5 s = **200,000 requests/s** of mostly "nothing new." The same users on WebSockets = **1M idle connections** (memory) and only real messages as traffic.
 
 ## ⚖️ Trade-offs
 
 | | Short polling | Long polling | SSE | WebSocket |
 |---|---|---|---|---|
 | Direction | Client → server | Client → server | **Server → client** | **Both** |
-| Latency | Up to interval | Low | Low | Lowest |
-| Server cost | Many wasted requests | Held requests | Open connections | Open connections |
+| Latency | Up to the interval | Low | Low | Lowest |
+| Server cost | Many wasted requests | Parked requests | Open connections | Open connections |
 | Complexity | 🟢 Trivial | 🟡 | 🟢 Easy | 🔴 Stateful scaling |
-| Best for | Rare updates, dashboards | Legacy fallback | Feeds, notifications, live scores, AI token streaming | Chat, games, collaborative editing |
+| Best for | Rare updates | Legacy fallback | Tracking, notifications, scores, token streaming | Chat, games, co-editing |
 
 ## 🌍 Real world
 
-- **Slack, Discord, WhatsApp Web** use WebSockets. Discord runs millions of concurrent WebSocket connections on its Elixir gateways.
-- **ChatGPT-style token streaming** commonly uses **SSE**.
-- **Old Facebook chat** used long polling before WebSockets were everywhere.
+- **Slack, Discord, and WhatsApp Web** run on WebSockets. Discord holds millions of concurrent connections on Elixir gateways.
+- **LLM chat apps** stream tokens over **SSE**.
+- **Early Facebook chat** used long polling before WebSockets were widely supported.
 
 ## 📌 Cheat card
 
-> - **Mailbox (poll) · wait at mailbox (long poll) · radio (SSE) · phone line (WebSocket).**
+> - **Mailbox (poll) · wait at the mailbox (long poll) · radio (SSE) · phone line (WebSocket).**
 > - **One-way push → SSE. Two-way → WebSocket. Rare updates → polling.**
-> - Persistent connections make servers **stateful**, so you need a **connection registry + pub/sub** to route messages.
-> - **Reconnect with jitter** to avoid thundering herds after deploys.
-> - Mobile apps in the background → use **push notifications** (APNs/FCM), not sockets (lesson 078).
+> - Persistent connections = **stateful servers** → **registry + pub/sub** + **jittered reconnects**.
+> - Backgrounded mobile apps → **APNs/FCM push**, not sockets (lesson 078).
 
 ## 🧪 Feynman check
 
-Explain the four mailbox/radio/phone options to a friend, and which one a live football score app should use and why.
+Explain mailbox, radio, and phone line to a friend, and say which one a live football-score app should use and why.
 
-⚠️ **Common confusion:** "WebSockets are always better." They add stateful infrastructure. If the server only pushes (notifications, scores), **SSE is simpler** and works well over normal HTTP infrastructure.
+⚠️ **Common confusion:** "WebSockets are always better." They bring stateful infrastructure, sticky routing, and harder deploys. If only the server talks (tracking, scores, notifications), **SSE is simpler** and runs through ordinary HTTP load balancers and proxies.
 
 ## ⚡ Quick recall
 
-1. Which option is one-way server-to-client over plain HTTP?
-<details><summary>Answer</summary>
+1. Which technique is one-way, server-to-client, over plain HTTP?
+<details><summary>Reveal Answer</summary>
 
 Server-Sent Events (SSE).
 </details>
 
 2. What makes scaling WebSockets harder than scaling a REST API?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Connections are long-lived and stateful. You must track which server holds each user's connection and route messages between servers (pub/sub), and handle reconnect storms.
+Connections are long-lived and stateful. You must track which server holds each user, route messages across servers with pub/sub, and handle reconnect storms.
 </details>
 
-3. How does long polling reduce wasted requests compared with short polling?
-<details><summary>Answer</summary>
+3. How does long polling reduce waste compared with short polling?
+<details><summary>Reveal Answer</summary>
 
-The server holds each request until there's actually data (or a timeout), so the client isn't making many empty requests.
+The server holds each request until there's real data (or a timeout), so clients stop sending streams of empty requests.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Design how a chat app delivers messages in real time to 10M concurrent users."**
+**Q. "Deliver real-time chat messages to 10M concurrent users. Walk me through connections, routing, offline users, and deploys."**
 <details><summary>Model answer</summary>
 
-- Clients keep a **WebSocket** to a fleet of **gateway servers** (about 50–100k connections each → ~100–200 gateways).
-- On connect, record `user → gateway` in a **connection registry** (Redis with TTL and heartbeats).
-- On send: persist the message (DB) → look up the recipient's gateway → deliver via **pub/sub** or direct RPC → the gateway pushes it down the socket.
-- Offline recipients → store it, and send a **mobile push notification**.
-- Handle reconnects (resume from the last message ID), heartbeats to detect dead connections, and graceful drains on deploy.
-- **Likely follow-up:** "What about group chats with 10k members?" → fan-out via pub/sub topics per group, and maybe pull-based delivery for huge groups (lesson 077).
+- **Connections:** clients hold a **WebSocket** to a fleet of **gateway servers**, ~50–100k connections each → **100–200 gateways** behind an L4 load balancer that supports long-lived TCP.
+- **Registry:** on connect, write `user → gateway-id` to Redis with a TTL refreshed by **heartbeats** (every ~30 s). Missing heartbeats mean a dead connection.
+- **Send path:**
+  1. Persist the message (durable store, ordered per conversation).
+  2. Look up the recipient's gateway.
+  3. Publish via **pub/sub** or a direct RPC.
+  4. The gateway pushes it down the socket.
+  5. The client ACKs, and the server marks it delivered.
+- **Offline users:** the message stays stored, a **mobile push** (APNs/FCM) is sent, and on reconnect the client **syncs from its last-seen message ID**.
+- **Big groups (10k members):** a pub/sub topic per group, or pull-on-open for huge rooms, to avoid write amplification (lesson 077).
+- **Deploys:** **drain** gateways gradually, send a "reconnect" frame, and have clients reconnect with **exponential backoff + jitter** to avoid a thundering herd of 10M reconnects.
+- **Likely follow-up:** "A dashboard updates once a minute. WebSockets?" → No. **Poll every 30–60 s with ETags** behind a CDN, or use SSE. Statefulness buys nothing there.
 </details>
 
-**Q2. "A dashboard shows metrics that update every minute. Do you need WebSockets?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- No. **Polling every 30–60 s** (with HTTP caching/ETags) is simple and cheap for this update rate. **SSE** is a good option if you want push semantics.
-- WebSockets add stateful infrastructure for no real benefit here.
-- **Likely follow-up:** "What if 1M users watch it?" → put a CDN or cache in front of the polled endpoint, since everyone reads the same data.
-</details>
-
-> 📖 *Chapter 3 is next. The festival article goes live, and one server won't be enough.*
+> 📖 *Chapter 3 is next. A food festival article goes live at noon, traffic multiplies by 50, and Maya's single server starts to smoke.*
 
 ---
 
