@@ -8,26 +8,36 @@
 
 ## 📖 Story
 
-Pantry's cache now held 300 GB, far too much for one machine. When that machine rebooted last week, the database nearly collapsed under the flood of misses. Maya needed a cache that spreads across many machines, survives failures, and can do more than store simple strings. I'll show you the two tools I'd reach for.
+Pantry's hot data has grown to **300 GB**. Maya's single Redis box has 64.
+
+Last Thursday that box rebooted for a kernel patch. For eleven minutes the cache was **empty**, and every one of 40,000 requests per second fell straight through to Postgres, like the floor of a warehouse giving way under its shelves. The database's CPU hit 100% in eight seconds. Checkout timed out. The on-call phone screamed.
+
+One machine can't hold it all, and one machine can't be allowed to take Pantry down when it blinks.
+
+Maya needs a cache that **spreads across many machines**, **survives a node dying**, and can do more than store plain strings: leaderboards, counters, rate limits.
+
+I'll show you the two tools I'd reach for.
 
 ## 🎯 One-sentence idea
 
-**A distributed cache spreads cached data across many machines so it can grow beyond one server's RAM and survive failures. Redis (rich data structures, persistence, replication) and Memcached (simple, multi-threaded key-value) are the two classic choices.**
+**A distributed cache spreads data across many machines so it can grow beyond one server's RAM and survive failures, and Redis (rich data structures, persistence, replication) and Memcached (simple, multi-threaded key-value) are the two classic choices.**
 
 ## 🧸 Analogy
 
-A **chain of lockers** at a train station:
+A **chain of locker banks** at a train station:
 
-- One locker bank fills up quickly, so you install **many banks** (nodes).
-- A **rule** tells everyone which bank holds which locker number (hashing / consistent hashing).
-- Important lockers have a **duplicate key in a second bank** (replicas), so a broken bank doesn't lose them.
-- **Memcached lockers** only hold boxes. **Redis lockers** can hold boxes, lists, sorted leaderboards, counters, and even keep a logbook so they can be restored after a power cut.
+- One bank fills up, so you install **many banks** (nodes).
+- A **rule** says which bank holds which locker number (hashing).
+- Important lockers have a **duplicate in a second bank** (replicas).
+- **Memcached lockers** only hold boxes. **Redis lockers** hold boxes, lists, sorted leaderboards, and counters, and keep a **logbook** so they can be restored after a power cut.
 
 ## 🖼️ Visual
 
+*Diagram brief:* app servers with a cluster-aware client hash each key to a slot. Three primaries each own a third of the 16,384 slots, each with a shadow replica ready to take over.
+
 ```mermaid
 flowchart LR
-    APP["🖥️ App servers<br/>(cluster-aware client)"] -->|"hash(key) → slot"| M1
+    APP["🖥️ App servers<br/>(cluster-aware client)"] -->|"CRC16(key) mod 16384"| M1
     APP --> M2
     APP --> M3
     subgraph RC["Redis Cluster: 16,384 hash slots"]
@@ -39,124 +49,110 @@ flowchart LR
 
 ## 🔬 How it works
 
-- **Partitioning (sharding):** each key maps to one node. **Redis Cluster**: `CRC16(key) mod 16384` → a hash slot → a node. **Memcached**: the client uses **consistent hashing** (lesson 051).
-- **Replication:** each primary has replicas. On failure, a replica is **promoted** (Redis Sentinel / Cluster failover). Replication is **asynchronous**, so the last few writes can be lost on failover.
-- **Redis highlights:**
-  - **Data structures:** strings, hashes, lists, sets, **sorted sets** (leaderboards), streams, bitmaps, HyperLogLog, geo indexes.
-  - **Atomic ops:** `INCR`, `SETNX`, Lua scripts, transactions (`MULTI`).
-  - **Persistence:** **RDB** (periodic snapshots) and/or **AOF** (an append-only log of writes). This lets Redis act as a durable-ish **data store**, not just a cache.
-  - **Pub/sub and streams** for messaging.
-  - Mostly **single-threaded** command execution (with I/O threads), so there are no locks, and it's very fast (100k+ ops/s per core). But **one slow command (`KEYS *`) blocks everything**.
-- **Memcached highlights:** a pure key-value store with **multi-threading** (it scales across cores), a simple slab memory allocator, no persistence, and no replication built in. Great for plain, huge, volatile caches.
-- **Hash tags** in Redis Cluster: `{user42}:cart` and `{user42}:profile` land in the **same slot**, so multi-key ops on them work.
-- **Client patterns:** connection pooling, pipelining (batch many commands per round trip), and timeouts + circuit breakers (the cache must never take down the app).
+- **Partitioning:** Redis Cluster maps `CRC16(key) mod 16384` → a **hash slot** → a node, and resharding moves slots live. Memcached relies on **client-side consistent hashing** (lesson 051). **Hash tags** (`{user42}:cart`, `{user42}:profile`) force related keys into one slot, so multi-key ops work.
+- **Replication + failover:** each primary has replicas, and on failure a replica is **promoted** (Cluster or Sentinel, in seconds). Replication is **asynchronous**, so acknowledged writes **can be lost** in a failover.
+- **Redis is a Swiss-army knife:** strings, hashes, lists, sets, **sorted sets** (O(log N) leaderboards), streams, bitmaps, HyperLogLog, geo. Atomic `INCR`/`SETNX`/Lua, plus **RDB snapshots** and an **AOF** log for persistence. Command execution is mostly single-threaded (100k+ ops/s per core), so **one slow command (`KEYS *`) freezes the whole shard**.
+- **Memcached is a scalpel:** a pure key-value blob store, **multi-threaded** across cores, a slab allocator, no persistence, no built-in replication. Ideal for huge, simple, volatile object caches.
+- **Client discipline:** connection pools, **pipelining** (N commands per round trip), tight timeouts, and a **circuit breaker**. The cache must never take the app down with it.
 
 ## 🧩 Worked example
 
-**Sorted set leaderboard (Redis's superpower):**
+**Sizing Maya's cluster:**
+
+```
+Hot data 300 GB; keep ≤ 70% memory per node (fork + fragmentation headroom)
+64 GB node → ~45 GB usable → 300 ÷ 45 ≈ 6.7 → 8 primaries
++ 1 replica each → 16 nodes
+Throughput ≈ 8 × 100k+ ops/s ≈ 800k+ ops/s
+A node dies → its replica is promoted in ~5–15 s; only 1/8 of keys are briefly affected
+```
+
+**Sorted-set leaderboard ("top cooks this week"):**
 
 ```bash
-ZADD game:leaderboard 3200 "alice" 2950 "bob" 4100 "carol"
-ZREVRANGE game:leaderboard 0 2 WITHSCORES    # top 3 → carol 4100, alice 3200, bob 2950
-ZINCRBY game:leaderboard 500 "bob"           # bob scores 500 more
-ZREVRANK game:leaderboard "bob"              # bob's rank (0-based)
+ZADD cooks:week:40 320 "cook:7" 295 "cook:12" 410 "cook:3"
+ZREVRANGE cooks:week:40 0 2 WITHSCORES     # top 3
+ZINCRBY  cooks:week:40 5 "cook:12"         # +5 orders
+ZREVRANK cooks:week:40 "cook:12"           # her rank
 ```
 
-**Sizing a cluster:**
-
-```
-Hot data: 300 GB, target ≤ 70% memory use per node
-Node RAM: 64 GB → usable ~45 GB → 300 / 45 ≈ 7 primaries → round to 8
-+ 1 replica each → 16 nodes
-Throughput: 8 primaries × ~100k+ ops/s ≈ 800k+ ops/s
-```
-
-**Pipelining (cutting round trips):**
-
-```python
-pipe = redis.pipeline()
-for pid in product_ids:           # 100 lookups
-    pipe.get(f"product:{pid}")
-results = pipe.execute()          # 1 network round trip instead of 100
-```
+**Pipelining:** 100 `GET`s × 0.5 ms RTT = **50 ms**. Pipelined, it's **one round trip, ~1 ms**.
 
 ## ⚖️ Trade-offs
 
 | | Redis | Memcached |
 |---|---|---|
-| Data model | Rich structures | Strings (blobs) only |
+| Data model | Rich structures | Blobs only |
 | Threads | Mostly single-threaded execution | Multi-threaded |
-| Persistence | RDB/AOF | ❌ None |
-| Replication / failover | ✅ Built in | ❌ (client-side or external) |
-| Clustering | Redis Cluster (hash slots) | Client-side consistent hashing |
-| Extras | Pub/sub, streams, Lua, geo, HLL | — |
-| Best for | Most use cases, leaderboards, rate limiting, sessions, queues | Huge, simple, volatile object caches |
+| Persistence | RDB / AOF | ❌ |
+| Replication / failover | ✅ Built in | ❌ External / client |
+| Clustering | Hash slots | Client consistent hashing |
+| Best for | Most cases: leaderboards, limits, sessions, queues | Giant, simple, volatile caches |
 
 ## 🌍 Real world
 
-- **Redis** powers caching, sessions, rate limiting, and leaderboards at GitHub, Twitter/X, Snapchat, and Stack Overflow, among many others.
-- **Facebook** runs Memcached at enormous scale (with its own routing layer, `mcrouter`).
-- **Managed options:** AWS ElastiCache/MemoryDB, GCP Memorystore, Azure Cache for Redis, and Redis Cloud. **Valkey** is the open-source Redis fork.
+- **Redis** powers caching, sessions, rate limiting, and leaderboards at GitHub, X, Snapchat, and Stack Overflow.
+- **Meta** runs Memcached at enormous scale behind its **mcrouter** routing layer.
+- **Managed options:** ElastiCache/MemoryDB, Memorystore, Azure Cache. **Valkey** is the open-source Redis fork.
 
 ## 📌 Cheat card
 
-> - **Redis = Swiss-army cache** (structures, persistence, replication). **Memcached = simple, fast, multi-threaded KV.**
-> - Redis Cluster: **16,384 hash slots**, and a **primary + replica** per shard.
-> - **Async replication → possible loss of recent writes on failover.**
-> - **Never run `KEYS *` in production.** Use `SCAN`.
-> - Use **pipelining**, **pooling**, **timeouts**, and a **circuit breaker** around the cache.
-> - Redis sorted sets = **leaderboards**. `INCR` = **counters/rate limits**. `SETNX` = **simple locks**.
+> - **Redis = Swiss-army cache. Memcached = simple, fast, multi-threaded KV.**
+> - Redis Cluster = **16,384 slots**, **primary + replica per shard**.
+> - **Async replication → recent writes can vanish on failover.**
+> - **Never `KEYS *`.** Use `SCAN`, and `UNLINK` for big deletes.
+> - **Pipeline, pool, time out, circuit-break.**
+> - Sorted sets = leaderboards · `INCR` = counters/limits · `SET NX EX` = simple locks.
 
 ## 🧪 Feynman check
 
-Explain the locker-bank analogy, including what happens when one bank breaks and why a "duplicate key" in another bank helps.
+Explain the locker banks, what happens when one bank breaks, and why a duplicate key in another bank saves the day.
 
-⚠️ **Common confusion:** "Redis is persistent, so it's my database." It *can* be (with AOF `fsync` and careful setup), but async replication and memory limits make it riskier than a real database for critical data. Treat it as a cache unless you've designed deliberately for durability.
+⚠️ **Common confusion:** "Redis persists, so it's my database." It *can* be, with AOF `fsync always`, careful failover, and memory planning, but async replication can drop acknowledged writes and RAM caps the dataset. **Default to "cache"** unless you've deliberately designed for durability.
 
 ## ⚡ Quick recall
 
 1. How does Redis Cluster decide which node holds a key?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 `CRC16(key) mod 16384` gives a hash slot, and each node owns a range of slots.
 </details>
 
 2. Why can a Redis failover lose data?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 Replication is asynchronous, so writes acknowledged by the old primary may not have reached the replica that gets promoted.
 </details>
 
 3. Name one thing Redis can do that Memcached can't.
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Any of: data structures (sorted sets, lists, hashes), persistence, built-in replication/failover, pub/sub, Lua scripting.
+Any of: rich data structures, persistence, built-in replication and failover, pub/sub and streams, Lua scripting.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Design a real-time leaderboard for a game with 50M players."**
+**Q. "Design a real-time leaderboard for 50M players with 500k score updates per second. Then: Redis p99 spikes to 200 ms every few minutes. Why?"**
 <details><summary>Model answer</summary>
 
-- A **Redis sorted set**: `ZADD` on score updates, `ZREVRANGE` for the top N, `ZREVRANK` for a player's rank. All are O(log N).
-- 50M members × ~100 bytes ≈ 5 GB → fits on a single primary (+ replica). Shard by region/season if needed. A global top-N can merge per-shard top-Ns.
-- Persist scores in a durable DB (source of truth). Redis is rebuilt from it if lost.
-- For "rank among friends": fetch the friends' scores with `ZMSCORE` and sort, or keep per-user friend leaderboards.
-- **Likely follow-up:** "Updates are 500k/s?" → batch or pipeline updates, shard by game mode, and accept that an approximate rank for players outside the top N is fine.
+- **Leaderboard:**
+  - A **Redis sorted set**. `ZINCRBY` on update, `ZREVRANGE 0 99` for the top 100, `ZREVRANK` for a player. All are **O(log N)**.
+  - 50M members × ~100 B ≈ **5 GB**, so one primary + replica holds it.
+  - **500k updates/s** exceeds one shard's comfortable write rate, so **batch and pipeline** updates. Optionally pre-aggregate per player for 1 s, or **shard by game mode or region** and merge per-shard top-N lists for the global view.
+  - **Durability:** scores live in a durable DB or event log (the source of truth). Redis is rebuilt from it on loss.
+  - **Friends' ranks:** `ZMSCORE` on the friend list and sort client-side.
+- **The 200 ms spikes, usual suspects:**
+  - **Blocking commands:** `KEYS *`, a giant `HGETALL`/`SMEMBERS`, a synchronous `DEL` of a huge key, long Lua scripts. Check `SLOWLOG GET`.
+  - **Persistence:** an RDB `fork()` of a large heap (copy-on-write stalls), or AOF `fsync` on slow disks. Move persistence to the replicas.
+  - **Memory pressure:** swapping or eviction storms.
+  - **Hot keys** saturating one shard. **Big values** saturating the NIC.
+- **Fixes:** rename or disable dangerous commands, split big keys, `UNLINK` instead of `DEL`, tune or offload persistence, shard or replicate hot keys, and track `LATENCY DOCTOR`.
+- **Likely follow-up:** "How do you delete a 10M-member set safely?" → `UNLINK` (async free), or incremental `SSCAN` + `SREM` batches.
 </details>
 
-**Q2. "Our Redis latency spikes to 200 ms every few minutes. What could it be?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- **Slow commands** blocking the single thread: `KEYS *`, big `SMEMBERS`/`HGETALL`, huge `DEL` of big keys (use `UNLINK`), long Lua scripts. Check `SLOWLOG`.
-- **Persistence:** RDB `fork` on a large dataset, or AOF `fsync` on slow disks.
-- **Memory pressure:** swapping or eviction storms. **Network saturation** from big values.
-- **Hot keys** overloading one shard.
-- Fixes: ban dangerous commands, split big keys, tune persistence (or offload it to replicas), shard hot keys, and monitor latency (`LATENCY DOCTOR`).
-- **Likely follow-up:** "How do you delete a 10M-member set safely?" → `UNLINK` (async delete) or delete incrementally with `SSCAN` + `SREM`.
-</details>
-
-> 📖 *Chapter 5 is next. Pantry's data has outgrown its very first database design.*
+> 📖 *Chapter 5 is next. The cache is a fortress now, but behind it Pantry's very first database schema is cracking under shapes of data it was never designed to hold.*
 
 ---
 
