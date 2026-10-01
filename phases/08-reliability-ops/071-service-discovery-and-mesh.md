@@ -8,163 +8,158 @@
 
 ## 📖 Story
 
-Pantry now ran 60 services across hundreds of containers that came and went all day. Hard-coded addresses broke every week, and each team wrote its own retry and encryption code, each slightly differently. I told Maya she needed a live directory, and maybe a helper standing beside every service. I'll show you both.
+Pantry now runs **60 services** across **hundreds of containers** that are born, scaled, rescheduled, and killed all day long. An IP address that was the payments service at 9 a.m. is a log shipper by 9:15.
+
+Every Monday, something breaks because a **hard-coded address** in some config file points at a container that no longer exists. Calls vanish into empty space like letters posted to a demolished house.
+
+And every team has written its **own** retry logic, its **own** TLS setup, its **own** timeout values. Some in Go, some in Python, one in Kotlin. Each slightly different, each slightly wrong. When Maya asks *"which services talk to payments?"*, nobody can answer.
+
+I told Maya she needed two things: a **live directory** that always knows where everyone is right now, and maybe a **helper standing beside every service** to make each call safely. I'll show you both.
 
 ## 🎯 One-sentence idea
 
-**In a dynamic fleet where instances come and go, service discovery lets services find each other's current addresses through a registry. A service mesh adds a proxy next to every service that handles discovery, load balancing, retries, mTLS, and telemetry, so app code doesn't have to.**
+**In a fleet where instances come and go, service discovery lets services find each other's current healthy addresses through a registry, and a service mesh puts a proxy beside every service to handle discovery, load balancing, retries, mTLS, and telemetry so app code doesn't have to.**
 
 ## 🧸 Analogy
 
-- 📒 **Service discovery = a hotel's front-desk directory.** Guests (instances) check in and out all day. To reach "housekeeping," you don't memorize room numbers. You **ask the front desk**, which always has the **current** list.
-- 🧑‍✈️ **Service mesh = a personal assistant for every employee.** Every call goes through your assistant, who **looks up the number**, **retries if busy**, **uses a secure line**, **logs the call**, and **won't connect you** to departments you're not allowed to contact. Employees just say "call accounting."
+- 📒 **Discovery = the hotel front desk.** Guests check in and out all day. To reach "housekeeping", you **ask the desk**, which always has the **current** list.
+- 🧑‍✈️ **Mesh = a personal assistant for every employee.** The assistant **looks up the number**, **retries if busy**, **uses a secure line**, **logs the call**, and **refuses** to connect you to departments you're not allowed to call.
 
 ## 🖼️ Visual
 
+*Diagram brief:* pods register with a registry and heartbeat. Inside the checkout pod, the app talks only to localhost, where a sidecar proxy does the lookup, the encryption, and the retries. A control plane above pushes certificates and policies to every sidecar.
+
 ```mermaid
 flowchart LR
-    subgraph Discovery["📒 Service registry"]
-        REG[("Consul / etcd / K8s DNS<br/>orders → 10.0.1.5, 10.0.1.9")]
+    subgraph Discovery["📒 Registry"]
+        REG[("K8s EndpointSlices / Consul / etcd<br/>payments → 10.0.1.5, 10.0.1.9")]
     end
-    O1["orders pod"] -->|"register + heartbeat"| REG
-    O2["orders pod"] -->|"register + heartbeat"| REG
+    P1["payments pod"] -->|"ready / heartbeat"| REG
+    P2["payments pod"] -->|"ready / heartbeat"| REG
     subgraph MeshPod["checkout pod"]
-        APP["checkout app"] -->|"localhost"| SC["🧑‍✈️ sidecar proxy (Envoy)"]
+        APP["checkout app"] -->|"localhost"| SC["🧑‍✈️ Envoy sidecar"]
     end
     SC -->|"lookup"| REG
-    SC -->|"mTLS + retries + LB"| O1
-    CP["🎛️ Mesh control plane<br/>(Istio / Linkerd)"] -.->|"config, certs, policies"| SC
+    SC -->|"mTLS + retries + LB"| P1
+    CP["🎛️ Control plane (Istio / Linkerd)"] -.->|"certs, routes, policies"| SC
 ```
 
 ## 🔬 How it works
 
-- **Why:** in autoscaled or containerized systems, IPs change constantly. Hard-coded addresses break.
-- **Registration:**
-  - **Self-registration:** the instance registers on start and sends heartbeats. It's removed on failure or TTL expiry.
-  - **Platform registration:** the orchestrator does it (Kubernetes knows every pod and updates Endpoints/EndpointSlices).
-- **Discovery:**
-  - **Client-side:** the client queries the registry and picks an instance itself (Netflix Eureka + Ribbon, gRPC xDS).
-  - **Server-side:** the client calls a stable name or virtual IP, and a load balancer or proxy routes it (Kubernetes Service, AWS ALB).
-  - **DNS-based:** `orders.default.svc.cluster.local` resolves to the healthy endpoints (watch out for DNS caching TTLs).
-- **The registry must be highly available and consistent:** Consul, etcd, and ZooKeeper use consensus (lesson 085).
-- **Service mesh:**
-  - **Data plane:** a **sidecar proxy** (Envoy) next to each instance (or per node, in "ambient"/sidecar-less modes) intercepts all traffic.
-  - **Control plane:** pushes routing rules, **certificates** (automatic mTLS), and policies to the proxies.
-  - **Features without code changes:** mTLS and service identity, retries, timeouts, circuit breaking, traffic splitting (canaries), **golden-signal metrics and traces** for every call, and authorization policies ("only checkout may call payments").
-  - **Costs:** extra latency per hop (~sub-ms to a few ms), resource overhead, and operational complexity.
+- **Registration:** **self-registration** (the instance registers and heartbeats, and is evicted on TTL expiry) or **platform registration** (Kubernetes adds **Ready** pods to EndpointSlices automatically).
+- **Discovery styles:** **client-side** (the client fetches endpoints and balances itself: Eureka, gRPC xDS), **server-side** (call a stable name or VIP, and an LB or proxy picks: K8s Service, ALB), and **DNS** (`payments.prod.svc.cluster.local`, but watch the DNS caching TTLs).
+- **The registry is critical infrastructure:** Consul, etcd, and ZooKeeper run **consensus** (lesson 085) on 3–5 nodes. Clients **cache the last-known endpoints** to survive a registry outage.
+- **Service mesh:** the **data plane** is an Envoy **sidecar** per pod (or per node in ambient/eBPF modes) intercepting all traffic. The **control plane** pushes routes, **automatic mTLS certificates**, and policies. You get identity, retries, timeouts, circuit breaking, canary traffic splits, per-call golden-signal metrics, and **authorization** ("only checkout may call payments") **without code changes**.
+- **The bill:** extra latency per hop (~sub-ms to a few ms, twice per call), CPU and memory per sidecar, control-plane upgrades, and **retry amplification** if the mesh and the app both retry. Adopt it when **many services + polyglot stacks + zero-trust** justify it.
 
 ## 🧩 Worked example
-
-**Kubernetes built-in discovery:**
 
 ```yaml
 apiVersion: v1
 kind: Service
-metadata: { name: orders }
+metadata: { name: payments }
 spec:
-  selector: { app: orders }        # all pods labelled app=orders (and Ready) become endpoints
+  selector: { app: payments }          # every Ready pod labelled app=payments becomes an endpoint
   ports: [{ port: 80, targetPort: 8080 }]
-# Any pod can call http://orders/ → kube-proxy/DNS routes it to a healthy pod
+# Any pod calls http://payments/ → routed to a healthy pod, whatever its IP is today
 ```
 
-**Istio traffic split for a canary (no app changes):**
-
 ```yaml
-kind: VirtualService
+kind: VirtualService                    # canary + resilience, zero app changes
 spec:
-  hosts: [orders]
+  hosts: [payments]
   http:
     - route:
-        - destination: { host: orders, subset: v1 }
+        - destination: { host: payments, subset: v1 }
           weight: 95
-        - destination: { host: orders, subset: v2 }
+        - destination: { host: payments, subset: v2 }
           weight: 5
       retries: { attempts: 2, perTryTimeout: 300ms }
       timeout: 1s
-```
-
-**Mesh authorization policy:**
-
-```yaml
-kind: AuthorizationPolicy
+---
+kind: AuthorizationPolicy               # only checkout may call payments
 spec:
   selector: { matchLabels: { app: payments } }
   rules:
-    - from: [{ source: { principals: ["cluster.local/ns/shop/sa/checkout"] } }]   # only checkout may call payments
+    - from: [{ source: { principals: ["cluster.local/ns/pantry/sa/checkout"] } }]
 ```
+
+**Maya's Monday, after:** zero hard-coded IPs, **mTLS on 100% of internal calls**, one retry policy defined in one place, and a live **service graph** that finally answers *"who calls payments?"* (exactly 3 services, each with its own p99).
 
 ## ⚖️ Trade-offs
 
-| Choice | Gain | Cost |
+| Maya's choice | What she gains | What she pays |
 |---|---|---|
-| DNS-based discovery | Simple, universal | Caching delays, basic load balancing |
-| Client-side discovery | Smart LB, no extra hop | Library per language |
-| Server-side (LB/K8s Service) | Clients stay simple | An extra hop, or relies on kube-proxy |
-| Service mesh | mTLS, telemetry, traffic control for free | Latency, resources, complexity |
-| No mesh (libraries) | Less infrastructure | Duplicated resilience code per language |
+| DNS-based discovery | Simple, universal | Caching delays, basic balancing |
+| Client-side discovery | Smart LB, no extra hop | A library per language |
+| Server-side (LB / K8s Service) | Thin clients | An extra hop, or kube-proxy limits |
+| Service mesh | mTLS, telemetry, traffic control for free | Latency, resources, operational complexity |
+| Libraries only, no mesh | Less infrastructure | Duplicated resilience code per language |
 
 ## 🌍 Real world
 
-- **Kubernetes Services + CoreDNS** is the most common discovery mechanism today.
-- **Netflix Eureka** (client-side discovery) was a pioneer. **HashiCorp Consul** is used across VMs and containers.
-- **Istio, Linkerd, Consul Connect**, and **AWS App Mesh** (retired in favour of other options) are service meshes. **Envoy** is the dominant data-plane proxy.
+- **Kubernetes Services + CoreDNS** is today's most common discovery mechanism.
+- **Netflix Eureka** pioneered client-side discovery. **HashiCorp Consul** spans VMs and containers.
+- **Istio, Linkerd, and Consul service mesh** are the meshes, and **Envoy** dominates the data plane.
 
 ## 📌 Cheat card
 
-> - **Discovery = a live directory of healthy instances** (register + heartbeat → lookup).
-> - **Client-side** (the client picks) vs **server-side** (an LB or proxy picks) vs **DNS**.
-> - **Mesh = a sidecar proxy per service + a control plane**: mTLS, retries, timeouts, canaries, telemetry, and authZ **without code changes**.
-> - The registry needs **consensus-level reliability** (etcd, Consul).
-> - Only adopt a mesh when you have **many services** and the need for it.
+> - **Discovery = a live directory of healthy instances** (register/heartbeat → lookup).
+> - **Client-side · server-side · DNS.**
+> - **Mesh = sidecar proxies + a control plane** → mTLS, retries, canaries, telemetry, authZ with **no code changes**.
+> - The registry needs **consensus-grade reliability**, and clients cache endpoints.
+> - **Adopt a mesh when its value beats its cost.**
 
 ## 🧪 Feynman check
 
 Explain the hotel front desk and the personal assistant, and why moving retries and encryption into the "assistant" helps a company with 300 services written in 5 languages.
 
-⚠️ **Common confusion:** "We need a service mesh for microservices." Many teams run well with Kubernetes Services + good client libraries. A mesh pays off with **many services, polyglot stacks, and zero-trust or mTLS requirements**.
+⚠️ **Common confusion:** "Microservices require a service mesh." Plenty of teams thrive on **Kubernetes Services + solid client libraries**. A mesh pays off with **many services, polyglot stacks, and mandatory mTLS/zero-trust**. Before that, it's mostly extra moving parts.
 
 ## ⚡ Quick recall
 
 1. Client-side vs server-side discovery?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Client-side: the client queries the registry and chooses an instance. Server-side: the client calls a stable address, and a load balancer or proxy chooses the instance.
+Client-side: the client queries the registry and chooses an instance. Server-side: the client calls a stable address, and an LB or proxy chooses.
 </details>
 
 2. What's a sidecar proxy?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-A proxy (like Envoy) deployed alongside each service instance that intercepts its network traffic to add features like mTLS, retries, and metrics.
+A proxy (like Envoy) deployed beside each service instance that intercepts its traffic to add mTLS, retries, load balancing, and metrics.
 </details>
 
-3. How do instances get removed from a registry when they die?
-<details><summary>Answer</summary>
+3. How do dead instances leave the registry?
+<details><summary>Reveal Answer</summary>
 
-Missed heartbeats or TTL expiry (or the orchestrator removes them when they fail health or readiness checks).
+Missed heartbeats or TTL expiry, or the orchestrator removing them when health or readiness checks fail.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "How do services find each other in your design?"**
+**Q. "How do services find each other in your design, and what are the downsides of adding a service mesh?"**
 <details><summary>Model answer</summary>
 
-- On Kubernetes: **Services + DNS** (`payments.prod.svc`), with endpoints based on readiness probes, and optionally gRPC client-side balancing via headless services or xDS.
-- For mixed VMs and containers: a **Consul** registry with health checks.
-- Add a **mesh** (Istio/Linkerd) if you need mTLS between all services, uniform retries and timeouts, canary routing, and per-call telemetry.
-- **Likely follow-up:** "What if the registry is down?" → clients cache the last known endpoints. The registry runs as a 3–5 node consensus cluster.
+- **Discovery:**
+  - On Kubernetes: **Services + DNS** (`payments.prod.svc`), with endpoints gated by **readiness probes**.
+  - For gRPC, prefer **client-side / xDS** load balancing (headless services or proxyless gRPC), because long-lived HTTP/2 connections otherwise pin to one pod (lesson 021).
+  - For mixed VMs + containers: **Consul** with health checks.
+  - The registry runs as a 3–5 node consensus cluster, and clients **cache endpoints** if it's unavailable.
+- **Mesh value:** uniform **mTLS** and workload identity, consistent timeouts, retries, and breakers, **canary traffic splits**, per-call **golden signals and traces**, and **service-to-service authorization**, all without touching app code.
+- **Mesh costs:**
+  - **Latency:** two proxy traversals per call (~sub-ms to a few ms).
+  - **Resources:** CPU and memory per sidecar across thousands of pods.
+  - **Operations:** control-plane upgrades, certificate rotation, and debugging through proxies.
+  - **Retry amplification:** if both the app and the mesh retry, so coordinate one owner.
+  - **Learning curve.**
+- **Reducing overhead:** sidecar-less **ambient** modes (per-node proxies, eBPF) and **proxyless gRPC** with xDS.
+- **Likely follow-up:** "What if the control plane goes down?" → the data plane keeps its last config and keeps serving. You just can't push changes or rotate certs until it's back, so watch certificate lifetimes.
 </details>
 
-**Q2. "What are the downsides of a service mesh?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- **Latency** per hop (two extra proxy traversals per call), and **CPU/memory** for every sidecar.
-- **Operational complexity:** control plane upgrades, certificate rotation, and debugging through proxies.
-- **Retry amplification** if the mesh and the app both retry. You must coordinate the policies.
-- **Learning curve** for the team.
-- **Likely follow-up:** "How do newer meshes reduce the overhead?" → sidecar-less / ambient modes (per-node proxies, eBPF) and proxyless gRPC with xDS.
-</details>
-
-> 📖 *Next, two database shards generate the same order number, and chaos follows.*
+> 📖 *Services find each other perfectly now, and then two database shards both generate order #558201, and one customer receives a stranger's refund.*
 
 ---
 
