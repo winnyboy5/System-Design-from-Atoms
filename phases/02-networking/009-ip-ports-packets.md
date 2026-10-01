@@ -8,32 +8,40 @@
 
 ## 📖 Story
 
-Pantry's first out-of-town order came from a city 300 kilometres away. Maya realized that message had hopped across dozens of machines to reach her little server. How did it know where to go? And how did it find the right program when it arrived? I still find this part of the internet quietly beautiful. Let me show you its addressing system.
+The order notification chimes at 9:14 p.m. The delivery address is **300 kilometres away**, in a city Maya has never visited.
+
+She leans back and the hair on her arms stands up. That message, *one lasagna, extra basil*, was sliced into fragments, flung across fibre-optic cables under highways, bounced through a dozen anonymous machines in buildings she'll never see, and reassembled perfectly on her little server.
+
+Nobody hand-carried it. Nobody gave it directions.
+
+So how did it know where to go? And when it arrived, how did it find *Pantry* among all the programs on that machine, rather than Postgres or SSH?
+
+I still find this part of the internet quietly beautiful. Let me show you its addressing system.
 
 ## 🎯 One-sentence idea
 
-**Every machine on a network has an IP address, every program on it listens on a port, and data travels in small chunks called packets that routers pass hop by hop toward the destination.**
+**Every network interface has an IP address, every program listens on a port, and data travels in small packets that routers forward hop by hop toward the destination.**
 
 ## 🧸 Analogy
 
 Sending mail to an **apartment building**:
 
 - 🏢 **IP address** = the building's street address (`142.250.72.14`)
-- 🚪 **Port** = the apartment number (`443` = the HTTPS apartment, `5432` = the Postgres apartment)
-- ✉️ **Packets** = your long letter split into many numbered envelopes
-- 📮 **Routers** = post offices that each forward the envelope one step closer
+- 🚪 **Port** = the apartment number (`443` = HTTPS, `5432` = Postgres)
+- ✉️ **Packets** = your long letter split into numbered envelopes
+- 📮 **Routers** = post offices, each forwarding the envelope one step closer
 
 ## 🖼️ Visual
 
+*Diagram brief:* a laptop on the left, a server on the right, and a chain of post-office routers between them. Under it, a four-layer cake showing where IPs and ports live.
+
 ```mermaid
 flowchart LR
-    C["💻 Your laptop<br/>192.168.1.20:52344"] --> R1["📮 Home router<br/>(NAT)"]
+    C["💻 Laptop<br/>192.168.1.20:52344"] --> R1["📮 Home router<br/>(NAT)"]
     R1 --> R2["📮 ISP router"]
     R2 --> R3["📮 Internet<br/>backbone"]
     R3 --> S["🖥️ Server<br/>142.250.72.14:443"]
 ```
-
-**The layer cake** (simplified TCP/IP model):
 
 ```
 ┌──────────────────────────────┐
@@ -49,102 +57,96 @@ flowchart LR
 
 ## 🔬 How it works
 
-- **IPv4:** 32-bit address like `10.0.0.5`, about **4.3 billion** addresses (not enough!). **IPv6:** 128-bit, like `2001:db8::1`, practically unlimited.
-- **Public vs private IPs:** private ranges (`10.x`, `192.168.x`, `172.16–31.x`) work only inside a network. **NAT** lets many private devices share one public IP.
-- **Ports (0–65535):** identify *which program* on a machine. Well-known ones: **80 HTTP, 443 HTTPS, 22 SSH, 53 DNS, 5432 Postgres, 3306 MySQL, 6379 Redis**.
-- **A connection is identified by 5 things:** source IP, source port, destination IP, destination port, and protocol.
-- **Packets:** data is split into chunks (about **1,500 bytes**, the MTU). Each is routed independently, and they may arrive out of order or get lost. TCP fixes that (lesson 010).
-- **Routing:** each router looks at the destination IP and forwards the packet to the next hop. `traceroute` shows those hops.
+- **IPv4** is 32 bits (`10.0.0.5`, ~**4.3 billion** addresses, long exhausted). **IPv6** is 128 bits (`2001:db8::1`, effectively unlimited).
+- **Private ranges** (`10/8`, `172.16/12`, `192.168/16`) are only routable inside a network. **NAT** rewrites addresses and ports so that many private devices share one public IP.
+- **Ports (0–65535)** pick the *program*: **80 HTTP, 443 HTTPS, 22 SSH, 53 DNS, 5432 Postgres, 3306 MySQL, 6379 Redis**. A connection is uniquely identified by its **5-tuple**: src IP, src port, dst IP, dst port, protocol.
+- **Packets** are capped by the **MTU (~1,500 bytes on Ethernet)**. Each one is routed independently, so they can arrive late, out of order, or not at all. TCP repairs that (lesson 010).
+- **Routing** is hop by hop: each router matches the destination IP against its routing table (longest prefix wins) and forwards to the next hop. `traceroute` reveals the chain.
 
 ## 🧩 Worked example
 
 ```bash
-# Which IP does a name point to?
-$ dig +short example.com
+$ dig +short example.com                # name → IP
 93.184.215.14
 
-# What path do packets take?
-$ traceroute example.com
+$ traceroute example.com                # the hop chain
  1  192.168.1.1     1 ms   (home router)
  2  10.20.0.1       8 ms   (ISP)
  ...
  9  93.184.215.14  32 ms   (destination)
 
-# Which program is listening on which port on my server?
-$ ss -ltnp
-LISTEN 0.0.0.0:443   users:(("nginx"))
-LISTEN 127.0.0.1:5432 users:(("postgres"))   ← only reachable from this machine
+$ ss -ltnp                              # who listens on which port?
+LISTEN 0.0.0.0:443     users:(("nginx"))
+LISTEN 127.0.0.1:5432  users:(("postgres"))   ← localhost only: unreachable from the internet
 ```
 
-Notice that Postgres listens on `127.0.0.1` (localhost), so the internet can't reach it. That's a simple, common security practice.
+A 1 MB image on a 1,500-byte MTU ≈ **~700 packets**. Lose one and TCP must notice it and resend it.
 
 ## ⚖️ Trade-offs
 
-| You gain | You pay | Use it when |
+| Maya's choice | What she gains | What she pays |
 |---|---|---|
-| Private IPs + NAT | Harder to reach devices from outside | Home networks, private cloud subnets |
-| Public IPs | Exposure to the internet (must secure it) | Load balancers, public endpoints |
-| IPv6 | Some legacy tooling friction | New networks, mobile, huge fleets |
+| Private IPs + NAT | The DB and app servers are invisible to attackers | Harder to reach from outside; a NAT gateway to run |
+| Public IPs | Directly reachable | Every open port is attack surface |
+| IPv6 | A huge address space, no NAT | Some legacy tooling and firewall friction |
 
 ## 🌍 Real world
 
-- In the cloud (**AWS VPC**), app servers and DBs sit in **private subnets**. Only the **load balancer** has a public IP.
-- **Kubernetes** gives each pod its own IP, and services get stable virtual IPs.
+- **AWS VPCs:** app servers and databases live in **private subnets**. Only the load balancer has a public IP.
+- **Kubernetes** gives every pod its own IP, and Services get stable virtual IPs.
+- **Mobile carriers** run **CGNAT**, so thousands of phones share a handful of public IPv4 addresses.
 
 ## 📌 Cheat card
 
 > - **IP = building, Port = apartment, Packet = envelope, Router = post office.**
 > - Ports: **80 HTTP · 443 HTTPS · 22 SSH · 53 DNS · 5432 PG · 3306 MySQL · 6379 Redis**.
-> - **MTU ≈ 1,500 bytes.** IPv4 ≈ **4.3B** addresses.
-> - Only expose what must be public. Keep DBs on **private IPs**.
+> - **MTU ≈ 1,500 B.** IPv4 ≈ **4.3B** addresses.
+> - **Only expose what must be public.** Databases bind to **private IPs or localhost**.
 
 ## 🧪 Feynman check
 
-Explain to a friend how a message from your laptop finds the right program on a server on the other side of the world. Use the apartment-building analogy.
+Explain how a message from your laptop finds the right *program* on a server across the world, using the apartment building.
 
-⚠️ **Common confusion:** "An IP identifies a computer." Really, it identifies a **network interface**. One machine can have many IPs, and many machines can hide behind one IP (NAT, load balancers).
+⚠️ **Common confusion:** "An IP identifies a computer." It identifies a **network interface**. One machine can have many IPs, and thousands of machines can hide behind one IP (NAT, load balancers).
 
 ## ⚡ Quick recall
 
 1. What's the difference between an IP and a port?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-An IP identifies the machine/interface on the network. A port identifies the specific program/service on that machine.
+The IP identifies the interface/machine on the network. The port identifies the specific program on that machine.
 </details>
 
 2. What does NAT do?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-It lets many devices with private IPs share one public IP by rewriting addresses and ports as traffic passes through the router.
+It lets many privately addressed devices share one public IP by rewriting addresses and ports as traffic passes through.
 </details>
 
-3. Why might packets arrive out of order?
-<details><summary>Answer</summary>
+3. Why can packets arrive out of order?
+<details><summary>Reveal Answer</summary>
 
-Each packet is routed independently and may take a different path or be delayed or retransmitted.
+Each packet is routed independently and may take a different path, be delayed, or be retransmitted.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "How would you lay out the network for a web app in the cloud?"**
+**Q. "Lay out the network for a web app in the cloud. Then: can a single server hold more than 65,535 connections?"**
 <details><summary>Model answer</summary>
 
-- A **VPC** with **public subnets** (only the load balancer and a bastion/NAT gateway) and **private subnets** (app servers, databases, caches).
-- **Security groups/firewalls:** LB accepts 443 from the internet. App servers accept traffic only from the LB. The DB accepts only from app servers.
-- Spread subnets across **multiple availability zones** for redundancy.
-- Outbound internet from private subnets goes via a **NAT gateway**.
-- **Likely follow-up:** "How do engineers SSH in?" → bastion host or a zero-trust access tool. Never expose SSH publicly.
+- **Layout:**
+  - A **VPC** with **public subnets** (only the load balancer and a NAT gateway) and **private subnets** (app servers, databases, caches), each spread across **≥ 2 availability zones**.
+  - **Security groups:** the LB accepts 443 from `0.0.0.0/0`, app servers accept only from the LB's security group, and the DB accepts only from the app security group on 5432.
+  - Private instances reach the internet outbound through the **NAT gateway**.
+  - Engineers get in through a bastion host or zero-trust proxy. **SSH is never public.**
+- **65,535 connections?** **Yes**, on the server side. A connection is the full 5-tuple, so one listening port (443) can accept connections from millions of distinct client IP:port pairs. The real limits are **memory per socket, file descriptors (`ulimit -n`), and TLS CPU**.
+- **Where 65k does bite:** the **client** side. One source IP talking to one destination IP:port has only ~64k ephemeral ports. That's the classic problem for a proxy hammering one backend. Fix it with **connection pooling/keep-alive** or **more source IPs**.
+- **Likely follow-up:** "How do you tune a box for 1M connections?" → raise fd limits, shrink per-connection buffers, use epoll/event-driven servers, and terminate TLS efficiently.
 </details>
 
-**Q2. "Can a single server handle more than 65,535 connections?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- **Yes.** A connection is identified by the 5-tuple. A server listening on port 443 can accept connections from many different client IP:port pairs, so the limit is memory and file descriptors, not ports (servers handle millions with tuning).
-- The 65k limit bites on the **client side**: one client IP talking to one server IP:port can open at most about 64k connections (e.g., a proxy talking to a backend). Fix it with more source IPs or connection pooling.
-- **Likely follow-up:** "What limits a server with many connections?" → memory per connection, file descriptor limits, CPU for TLS, kernel tuning.
-</details>
-
-> 📖 *The messages arrive, but should they travel like a phone call or like a postcard? I'll explain next.*
+> 📖 *The packets arrive, but some of Pantry's data must arrive perfectly and some just needs to arrive fast, and Maya has to choose between a phone call and a postcard.*
 
 ---
 
