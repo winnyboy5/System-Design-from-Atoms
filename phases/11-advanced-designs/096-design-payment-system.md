@@ -10,185 +10,162 @@
 
 ## 📖 Story
 
-Pantry now processed payments and payouts for millions of cooks in thirty countries. A single double-charge makes the news, and a single lost payout loses a cook's trust forever. I've never been more careful than when designing payments, and I'll share every habit I taught Maya.
+Pantry now moves **real money**: pay-ins from millions of customers, pay-outs to **millions of cooks** in **thirty countries**, refunds, fees, and currency conversions, all day long, every day.
+
+The stakes are brutal and asymmetric. **One double-charge** ends up in a viral post with a screenshot of a bank statement. **One lost payout** is a cook who can't pay rent this month, and who will never trust Pantry again. A single bug multiplied across millions of transactions isn't an incident. It's a headline.
+
+And every external system is unreliable: payment providers time out, webhooks arrive twice (or never), banks settle days later.
+
+I've never been more careful than when designing payments. Every habit I taught Maya came from a mistake someone, somewhere, paid for. I'll share them all.
 
 ## 🎯 One-sentence idea
 
-**A payment system moves money correctly, exactly once, even when networks fail. It does this with idempotency keys on every request, a double-entry ledger as the source of truth, a state machine for each payment, asynchronous integration with external processors, and daily reconciliation to catch anything that slipped through.**
+**A payment system moves money correctly and exactly once despite failing networks, using idempotency keys on every hop, a double-entry ledger as the source of truth, a state machine per payment, asynchronous integration with external processors, and reconciliation to catch anything that slips through.**
 
 ## 🧸 Analogy
 
-A careful **accountant with a rubber stamp and a two-column ledger**:
+A meticulous **accountant with a rubber stamp and a two-column ledger**:
 
-- Every request comes with a **unique reference number**. If the same reference shows up twice, the accountant says "**already done, here's the receipt**" (idempotency).
-- Every money movement is written in **two columns**: debit one account, credit another. **They must always balance** (double-entry).
-- Nothing is ever erased. Mistakes are fixed with **new correcting entries** (an append-only ledger).
-- At the end of each day, the accountant **compares their books with the bank statement** line by line (reconciliation).
+- Every request carries a **unique reference number**. The same reference again? "**Already done, here's your receipt.**"
+- Every movement is written in **two columns**: debit one account, credit another. **They must always balance.**
+- **Nothing is erased.** Mistakes get **new correcting entries**.
+- Each evening, the books are **compared line by line with the bank statement** (reconciliation).
 
 ## 🖼️ Visual
+
+*Diagram brief:* checkout calls the payment service with an idempotency key. The service's state machine persists every transition, talks to the PSP with its own key, receives deduped webhooks, and emits events through an outbox to the ledger, wallets, and notifications. A nightly reconciler compares the ledger with the PSP settlement files.
 
 ```mermaid
 flowchart LR
     C["🛒 Checkout"] -->|"POST /payments<br/>Idempotency-Key"| PAY["💳 Payment service<br/>state machine"]
-    PAY --> PDB[("🗄️ Payments DB<br/>+ idempotency table<br/>+ outbox")]
-    PAY -->|"authorize / capture<br/>(with idempotency key)"| PSP["🏦 PSP<br/>Stripe / Adyen / card networks"]
-    PSP -->|"webhook: succeeded/failed"| PAY
-    PAY -->|"events via outbox"| K(["📬 Kafka"])
-    K --> LED["📒 Ledger service<br/>double-entry, append-only"]
-    K --> WAL["👛 Wallet / balances"]
+    PAY --> PDB[("🗄️ Payments DB<br/>+ idempotency table + outbox")]
+    PAY -->|"authorize / capture<br/>(key = payment_id)"| PSP["🏦 PSP<br/>Stripe / Adyen"]
+    PSP -->|"webhook (dedupe by event_id)"| PAY
+    PAY -->|"outbox → Kafka"| K(["📬 Kafka"])
+    K --> LED["📒 Ledger<br/>double-entry, append-only"]
+    K --> WAL["👛 Cook wallets"]
     K --> NOTIF["🔔 Notifications"]
-    REC["🔍 Reconciliation job<br/>(daily)"] --> LED
+    REC["🔍 Reconciliation (daily)"] --> LED
     REC --> SETT[("🏦 PSP settlement files")]
 ```
 
 ## 🔬 How it works
 
-### 1️⃣ Requirements
-- **Functional:** pay-in (charge customers via a payment service provider, PSP), pay-out (pay sellers or drivers), refunds, wallet balances, and payment history.
-- **Non-functional:** **correctness above everything**: never double-charge, never lose money, and full auditability. **Strong consistency** for balances. High availability (but it's better to fail safely than to be wrong). Security (PCI-DSS). Throughput is modest (thousands of TPS, not millions).
-
-### 2️⃣ Payment state machine
-```
-CREATED → AUTHORIZING → AUTHORIZED → CAPTURING → CAPTURED → (REFUNDING → REFUNDED)
-                ↘ FAILED        ↘ VOIDED          ↘ FAILED
-```
-Every transition is persisted **before and after** the external calls. Unknown outcomes (timeouts) go to `PENDING_CONFIRMATION` and are resolved by querying the PSP or waiting for its webhook, **never by blindly retrying a charge**.
-
-### 3️⃣ Idempotency end to end (the core deep dive)
-- The client → payment service call carries an **Idempotency-Key** (per checkout attempt). The server stores key → result (lesson 055).
-- The payment service → PSP call passes **its own idempotency key** (e.g., payment_id), so PSP retries are safe too.
-- Webhooks are delivered at-least-once, so dedupe by **event ID**.
-- Ledger postings have a **unique (payment_id, entry_type)** constraint.
-
-### 4️⃣ Double-entry ledger
-- Each transaction = **balanced entries**: the sum of debits = the sum of credits.
-- **Append-only, immutable**, with corrections as reversing entries. Balances are derived (or maintained transactionally with the entries).
-- Accounts: customer, merchant, platform fees, PSP clearing, and so on.
-
-### 5️⃣ Reliability patterns
-- **Outbox** (lesson 062): payment state + event in one DB transaction → reliably published.
-- **Sagas** (lesson 088) for multi-step flows (charge → reserve order → capture, with a void or refund as compensation).
-- **Retries with backoff** only for safe operations. **Circuit breakers** per PSP, and **failover to a secondary PSP** for new payments.
-- **Timeouts are ambiguous**: always reconcile the state with the PSP.
-
-### 6️⃣ Reconciliation
-- Daily (or continuous) comparison of the **internal ledger** vs the **PSP settlement reports** vs the **bank statements**.
-- Mismatches → automated fixes or manual review queues. It's the final safety net, catching bugs, missed webhooks, and fraud.
-
-### 7️⃣ Security & compliance
-- **Never store raw card numbers**: use PSP **tokenization** (keeps you mostly out of PCI scope).
-- Encryption, strict access control, audit logs, fraud scoring (rules + ML) before authorization.
+- **Requirements:** pay-in via a **PSP**, pay-out to cooks, refunds, wallets, and history. **Correctness above everything** (no double charges, no lost money, a full audit trail), **strong consistency** for balances, and **fail safe rather than be wrong**. PCI-DSS. Modest throughput (thousands of TPS).
+- **A state machine per payment:** `CREATED → AUTHORIZING → AUTHORIZED → CAPTURING → CAPTURED → (REFUNDING → REFUNDED)`, with `FAILED`/`VOIDED` branches. **Persist every transition before and after external calls.** A **timeout means unknown, not failed**: move to `PENDING_CONFIRMATION` and resolve it by **retrying with the same key**, **querying the PSP**, or **awaiting the webhook**. Never re-charge blindly.
+- **Idempotency on every hop, the core deep dive:** client → service (`Idempotency-Key` per checkout attempt, lesson 055), service → PSP (**key = `payment_id`**), webhooks (at-least-once, so **dedupe by `event_id`**), and ledger postings (**`UNIQUE (txn_id, account, direction)`**).
+- **The double-entry ledger:** every transaction is a set of **balanced entries** (Σ debits = Σ credits) across accounts (customer clearing, merchant payable, platform fees, PSP clearing). **Append-only and immutable**, with corrections as **reversing entries**, and balances derived or maintained in the same transaction.
+- **Reliability and the safety net:** the **outbox** for state + events (lesson 062), **sagas** for multi-step flows (authorize → reserve order → capture, with void or refund as compensations, lesson 088), **breakers per PSP** with **failover to a secondary PSP** for *new* payments, and **daily reconciliation** of the ledger vs PSP settlements vs bank statements, with automated fixes and review queues.
+- **Security:** **never store raw card numbers**. Use **PSP tokenization** (keeping you mostly out of PCI scope), plus encryption, least privilege, audit logs, and **fraud scoring before authorization**.
 
 ## 🧩 Worked example
 
-**A double-entry posting for a $100 purchase with a $3 platform fee:**
+**A £100 order with a £3 platform fee:**
 
 | Account | Debit | Credit |
 |---|---|---|
-| Customer (card via PSP clearing) | $100 | |
-| Merchant payable | | $97 |
-| Platform fee revenue | | $3 |
-| **Totals** | **$100** | **$100** ✅ balanced |
+| PSP clearing (customer card) | £100 | |
+| Cook payable | | £97 |
+| Platform fee revenue | | £3 |
+| **Totals** | **£100** | **£100** ✅ balanced |
 
-**Handling a timeout safely:**
+**A timeout, handled safely:**
 
 ```
-1. Payment p_1 state = AUTHORIZING (persisted)
-2. Call PSP authorize(idempotency_key = "p_1") → ⏱ timeout (unknown outcome!)
-3. State → PENDING_CONFIRMATION (don't retry with a new key!)
-4. Retry the SAME call with the SAME key → the PSP returns the original result (authorized) ✅
-   or wait for the webhook, or poll GET /payments/p_1 at the PSP
-5. State → AUTHORIZED → outbox event → ledger posting (unique on p_1 + AUTH)
+1. p_1 → AUTHORIZING (persisted)
+2. PSP.authorize(key="p_1") → ⏱ timeout: UNKNOWN outcome
+3. p_1 → PENDING_CONFIRMATION                     (never mint a new key!)
+4. Retry with the SAME key "p_1" → the PSP returns the ORIGINAL result: authorized ✅
+   (or webhook arrives / poll GET /payments/p_1)
+5. p_1 → AUTHORIZED → outbox event → ledger posting (unique on p_1 + AUTH)
 ```
-
-**The ledger table (sketch):**
 
 ```sql
 CREATE TABLE ledger_entries (
   entry_id     bigint PRIMARY KEY,
-  txn_id       text NOT NULL,           -- groups the balanced entries
-  account_id   text NOT NULL,
-  direction    text CHECK (direction IN ('debit','credit')),
-  amount_cents bigint CHECK (amount_cents > 0),
+  txn_id       text   NOT NULL,                    -- groups balanced entries
+  account_id   text   NOT NULL,
+  direction    text   CHECK (direction IN ('debit','credit')),
+  amount_minor bigint CHECK (amount_minor > 0),    -- integer minor units, never floats
   currency     char(3) NOT NULL,
   created_at   timestamptz DEFAULT now(),
   UNIQUE (txn_id, account_id, direction)            -- idempotent postings
 );
--- invariant check per txn: SUM(debits) = SUM(credits)
+-- invariant per txn_id: SUM(debits) = SUM(credits)
 ```
 
 ## ⚖️ Trade-offs
 
-| Decision | Choice | Why |
+| Decision | Maya's choice | Why |
 |---|---|---|
-| Consistency | Strong (a relational DB with ACID) | Money. Correctness beats latency. |
-| Integration with the PSP | Async + webhooks + polling fallback | PSPs are slow and flaky, and outcomes can be delayed |
-| Ledger | Append-only double-entry | Auditability, and no lost updates |
-| Retries | Same idempotency key, only with known-safe semantics | Avoid double charges |
+| Consistency | Strong, ACID relational | Money: correctness beats latency |
+| PSP integration | Async + webhooks + polling fallback | PSPs are slow and flaky, and outcomes arrive late |
+| Ledger | Append-only double-entry | Auditability, no lost updates |
+| Retries | Same key only | No double charges |
 | Safety net | Daily reconciliation | Catches what everything else missed |
 
 ## 🌍 Real world
 
-- **Stripe** popularized idempotency keys and publishes a lot about ledger design and reliability.
-- **Uber, Airbnb, Square** have written about their payment platforms: double-entry ledgers, idempotency, and reconciliation at the core.
-- **Card networks** (Visa/Mastercard) use authorize → capture → settle cycles, and settlement happens later in batches.
+- **Stripe** popularized idempotency keys and writes extensively about ledger design.
+- **Uber, Airbnb, and Square** describe platforms built on **double-entry ledgers, idempotency, and reconciliation**.
+- **Card networks** run **authorize → capture → settle** cycles, with settlement in batches days later.
 
 ## 📌 Cheat card
 
-> - **Idempotency everywhere:** client → service → PSP → webhooks → ledger.
+> - **Idempotency on every hop:** client → service → PSP → webhooks → ledger.
 > - **Double-entry, append-only ledger.** Debits = credits. Fix with reversals.
-> - **A payment state machine.** Timeouts → **PENDING**, then **query or reconcile**, never re-charge blindly.
-> - **Outbox + saga** for reliable multi-step flows.
-> - **Reconcile daily** against PSP and bank reports. **Tokenize cards** (PCI).
+> - **State machine.** Timeout → **PENDING**, then **same-key retry / query / webhook**.
+> - **Outbox + sagas.** **Breakers + secondary PSP.**
+> - **Reconcile daily. Tokenize cards. Integer minor units, never floats.**
 
 ## 🧪 Feynman check
 
-Explain the accountant with the reference numbers and two columns, and why a phone line cutting out mid-call (a timeout) must never lead to charging the customer again.
+Explain the accountant's reference numbers and two columns, and why a phone line cutting out mid-call (a timeout) must never lead to charging the customer a second time.
 
-⚠️ **Common confusion:** "Retry on timeout." A timeout means **unknown**, not **failed**. The charge may have succeeded. Retry only with the **same idempotency key**, or confirm the status first.
+⚠️ **Common confusion:** "Retry on timeout." A timeout means **unknown**, not **failed**: the charge may have **succeeded**. Retry only with the **same idempotency key**, or confirm the status first. A new key on retry is how double charges are born.
 
 ## ⚡ Quick recall
 
 1. What's the core invariant of double-entry accounting?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 For every transaction, total debits equal total credits.
 </details>
 
 2. How should a payment timeout be handled?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Treat it as an unknown outcome: mark it pending, and retry with the same idempotency key or query the PSP / wait for the webhook to learn the real result.
+As an unknown outcome: mark it pending, and retry with the same idempotency key or query the PSP / await the webhook to learn the real result.
 </details>
 
-3. What's reconciliation?
-<details><summary>Answer</summary>
+3. What is reconciliation?
+<details><summary>Reveal Answer</summary>
 
-Comparing internal records (the ledger) with external records (PSP settlements, bank statements) to detect and fix discrepancies.
+Comparing internal records (the ledger) with external ones (PSP settlements, bank statements) to detect and fix discrepancies.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Design the pay-out system that pays 1M drivers weekly."**
+**Q. "Design the weekly pay-out to 1M cooks, then scale the ledger to 50k transactions/s."**
 <details><summary>Model answer</summary>
 
-- Compute the earnings from the **ledger** (a batch job at the week's cutoff) → create **payout instructions** (idempotent by driver + period).
-- Queue the payouts and send them to the payout provider or bank rails with **rate limits**, retries (with the same idempotency key), and a state machine per payout.
-- Handle failures (invalid bank details → notify the driver, and hold the funds in the wallet).
-- Post the ledger entries (driver payable → cash) on confirmation, and reconcile with the bank reports.
-- **Likely follow-up:** "What if the job runs twice?" → the unique (driver_id, period) payout record makes a second run a no-op.
+- **Weekly pay-outs:**
+  1. At the cutoff, a batch job computes each cook's **payable balance from the ledger** (not a mutable counter).
+  2. Create **payout instructions, idempotent by `(cook_id, period)`** with a unique constraint, so a re-run is a no-op.
+  3. Queue them to the payout provider or bank rails with **rate limits**, **same-key retries**, and a **state machine per payout** (`CREATED → SENT → CONFIRMED / FAILED`).
+  4. **Failures** (invalid bank details) → notify the cook and keep the funds in their wallet.
+  5. On confirmation, post the **ledger entries** (cook payable → cash), and **reconcile** with the bank reports.
+- **Ledger at 50k TPS:**
+  - **Shard by account** so each account's entries and balance stay local. Cross-shard transfers go through a **saga via a clearing account**, or use a **distributed SQL** database (Spanner/CockroachDB).
+  - **Hot accounts** (platform fees receive millions of credits): split them into **N sub-accounts** summed on read, or **post aggregated batches** every second, which removes row contention.
+  - **Append-only inserts** (fast), with balances via **materialized aggregates + periodic snapshots**.
+- **Guardrails:** invariant checks (Σ debits = Σ credits per `txn_id`) in CI and in production audits, plus alerting on any unbalanced transaction.
+- **Likely follow-up:** "Multi-currency?" → store amounts in **integer minor units** with a currency code, post FX as explicit conversion entries through FX accounts, and never mix currencies inside one balanced set.
 </details>
 
-**Q2. "How do you scale the ledger to 50k transactions/s?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- **Shard by account** (entries for one account stay together, and balances stay local). Transfers between shards use a saga with a clearing account, or a distributed SQL database with transactions (Spanner/CockroachDB).
-- **Batch/aggregate hot accounts** (e.g., the platform fee account gets millions of credits) by using sub-accounts or periodic roll-ups to avoid contention.
-- Keep append-only writes (fast inserts), and derive balances via materialized aggregates with snapshots.
-- **Likely follow-up:** "Hot account contention?" → split the hot account into N sub-accounts and sum them, or post in batches every second.
-</details>
-
-> 📖 *Next, millions of reminders and payouts must run at exactly the right moment.*
+> 📖 *Money moves exactly once now, and next comes time itself: millions of payouts, reminders, and "your meal is ready" pings that must each fire at precisely the right moment, never twice and never forgotten.*
 
 ---
 

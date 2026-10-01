@@ -10,7 +10,7 @@
 
 ## 📖 Story
 
-3–5 sentences in the first person, the author telling the reader Maya's story ("I remember when Maya…"): Maya hits exactly the problem this lesson solves at Pantry. Keep it under ~80 words, with no jargon the lesson hasn't defined yet.
+A cinematic, first-person narration by the author. Maya (the only character) hits exactly the problem this lesson solves at Pantry, with a precise, painful metric (e.g., "p99 jumped from 80 ms to 4 s"). Short, active sentences and vivid physical metaphors. End with the author promising to show the infrastructure fix, never a vague "magic" one.
 
 ## 🎯 One-sentence idea
 
@@ -22,6 +22,8 @@ An everyday picture (a restaurant, a post office, a library…) that makes the i
 
 ## 🖼️ Visual
 
+*Diagram brief:* one or two sentences describing what the diagram shows.
+
 ```mermaid
 flowchart LR
     A["Thing A"] --> B["Thing B"]
@@ -29,13 +31,15 @@ flowchart LR
 
 ## 🔬 How it works
 
-- **Keyword** — short explanation.
-- **Keyword** — short explanation.
-- **Keyword** — short explanation.
+3–6 dense bullets, no more.
+
+- **Keyword:** short explanation.
+- **Keyword:** short explanation.
+- **Keyword:** short explanation.
 
 ## 🧩 Worked example
 
-A concrete, small example with real numbers, a tiny code/SQL/curl snippet, or pseudo-code.
+A concrete, small example with real numbers, a tiny code/SQL/curl snippet, or pseudo-code. Where it fits, replay the Story's incident with the fix in place, and give before/after metrics.
 
 ## ⚖️ Trade-offs
 
@@ -61,15 +65,31 @@ Explain it to a friend in **3 sentences**, without jargon. If you get stuck, tha
 
 ## ⚡ Quick recall
 
+Exactly three questions.
+
 1. Question?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
+
+Answer.
+</details>
+
+2. Question?
+<details><summary>Reveal Answer</summary>
+
+Answer.
+</details>
+
+3. Question?
+<details><summary>Reveal Answer</summary>
 
 Answer.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. Interview-style question?**
+Exactly one FAANG-style question.
+
+**Q. Interview-style question?**
 <details><summary>Model answer</summary>
 
 - Key points a strong answer mentions
@@ -77,7 +97,9 @@ Answer.
 - **Likely follow-up:** …
 </details>
 
-> 📖 *Next, a one-line teaser in the author's voice for the next lesson's problem.*
+## 📖 Teaser
+
+> 📖 *A single-line cliffhanger in the author's voice, leading into the next lesson's problem.*
 
 ---
 

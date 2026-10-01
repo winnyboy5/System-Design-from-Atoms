@@ -11,7 +11,7 @@ Let me tell you a story.
 
 I've watched a lot of engineers learn system design. Most of them learned it the hard way: something broke, and they had to figure out why. I was one of them. So instead of handing you a textbook, I'm going to tell you about someone I know well.
 
-It begins in a small apartment kitchen, with a laptop, a big idea, and a lot of optimism. **Leo** wanted to build **Pantry**, a website where neighbours sell home-cooked meals to each other. He hired **Maya**, a junior engineer who had built websites before but had never designed a *system*.
+It begins in a small apartment kitchen, with a laptop, a big idea, and a lot of optimism. **Pantry** was born there: a website where neighbours sell home-cooked meals to each other. Its first engineer was **Maya**, a junior who had built websites before but had never designed a *system*.
 
 Over the next hundred lessons, I'll show you how Pantry grew from one laptop into a global service feeding millions. Every time it grew, something broke: a slow page, a crashed server, a double charge, a stampede of fans. And every time, Maya had to learn one new idea (one *atom*) to fix it. I'll teach you each one at exactly the moment she needed it.
 
@@ -24,9 +24,6 @@ That's my trick in this guide. **You never learn a concept before you need it.**
 | Character | Who they are | Where they appear |
 |---|---|---|
 | **Maya** | Our hero. She starts as a curious junior engineer and becomes the person who leads design reviews. She asks the questions you'd ask. | Everywhere |
-| **Leo** | Pantry's founder. Endlessly enthusiastic, always has a new feature idea, and occasionally causes outages by running reports at lunchtime. | Everywhere |
-| **Priya** | Pantry's on-call engineer, whose pager goes off at the worst moments. She teaches Maya that everything fails eventually. | From Chapter 8 |
-| **Grandma Rosa** | A home cook whose lasagna is so popular it causes a race condition. | Chapter 5 |
 | **Me, your author** | The narrator. I've made most of Maya's mistakes myself, and I'll tell you so. I talk to you directly throughout. | The whole way |
 | **You** | The reader. In the final chapter, I hand you the pen. | The whole way |
 

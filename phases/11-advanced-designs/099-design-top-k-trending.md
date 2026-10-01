@@ -10,73 +10,60 @@
 
 ## 📖 Story
 
-Leo wanted a live "Trending now" board on the home page: the top dishes of the last hour, for every city, updated every few seconds, from a million events per second. Counting everything exactly, everywhere, is impossible. I told Maya that, and she designed it anyway. Here's how.
+The homepage gets a new strip: **"🔥 Trending now in your city."** The top dishes of the last hour, for **4,000 cities**, refreshed every few seconds, from **one million order, view, and search events per second**.
+
+Maya's first version is honest and doomed. Every event does `UPDATE dish_counts SET n = n + 1`, and every page load runs `ORDER BY n DESC LIMIT 10`. Within an hour, **the same twelve hot rows** absorb thousands of increments a second, lock waits climb past **2 seconds**, and the "live" board shows **yesterday's lunch** at dinnertime.
+
+Her second version is worse in a quieter way. Each of twenty servers keeps its own top 10 and she merges them. A new **birria taco** is the **#11 dish on every server**, which makes it **#1 overall**, and it never appears on the board at all.
+
+I told Maya that counting everything, exactly, in one place, is impossible at this scale. You don't need to. You need to **count in the right place, approximately, and merge correctly**. Let me show you.
 
 ## 🎯 One-sentence idea
 
-**Finding the top K most frequent items (songs, hashtags, products) over a sliding time window at huge scale means you can't count everything exactly in one place. Partition the stream, keep approximate counts (a count-min sketch) plus a small heap of candidates per partition, merge the partial top-K lists, and serve the result from a cache.**
+**Finding the top K most frequent items over a sliding window at huge scale means partitioning the stream by item, keeping fixed-memory approximate counts (a count-min sketch) plus a small heap of candidates per partition, merging the disjoint partial top-K lists, and serving the result from a cache.**
 
 ## 🧸 Analogy
 
-Finding the **most popular songs in a country right now**:
+The **national music chart**:
 
-- Each **city radio station** keeps a quick tally of the songs requested in the **last hour** (a partition-local count).
+- Each **city radio station** tallies the songs requested in the **last hour** (partition-local counts).
 - Each station sends its **top 20** to the **national chart office** (the aggregator).
-- The office **merges** the lists into the national **top 10**, updated every minute, and **publishes the chart** (a cache). Nobody reads every single request.
-- Tallies are a bit approximate (some songs share a tally box), but the **hits clearly stand out**.
+- The office **merges** them into the national **top 10** every minute and **pins it on the wall** (the cache). Nobody re-reads every request.
+- The tallies are slightly approximate (some songs share a tally box), but **the hits stand out** anyway.
 
 ## 🖼️ Visual
 
+*Diagram brief:* a firehose of events enters Kafka keyed by item, each stream worker keeps windowed sketch counts and a tiny heap, an aggregator merges the partial lists into a Redis sorted set per window and city, and the API reads only that cache. A side channel feeds the lake for exact nightly charts.
+
 ```mermaid
 flowchart LR
-    EV["🎵 Play / post events<br/>1M/s"] --> K(["📬 Kafka<br/>partitioned by item_id"])
+    EV["🍲 Order / view events<br/>1M/s"] --> K(["📬 Kafka<br/>keyed by dish_id"])
     K --> P1["⚙️ Stream worker 1<br/>window counts (CMS)<br/>+ local top-K heap"]
     K --> P2["⚙️ Stream worker 2"]
     K --> P3["⚙️ Stream worker N"]
     P1 -->|"partial top-K"| AG["🧮 Aggregator<br/>merge → global top-K"]
     P2 --> AG
     P3 --> AG
-    AG --> C[("⚡ Redis cache<br/>top-K per window/region")]
+    AG --> C[("⚡ Redis<br/>top-K per window/city")]
     API["📱 GET /trending"] --> C
-    K --> LAKE[("🪣 Data lake<br/>batch recompute exact<br/>daily/weekly charts")]
+    K --> LAKE[("🪣 Data lake<br/>exact daily/weekly charts")]
 ```
 
 ## 🔬 How it works
 
-### 1️⃣ Requirements
-- Top K (e.g., 10–100) items by count over a **sliding window** (last 5 min / 1 h / 24 h), optionally per region or category. Results refresh every few seconds to a minute. **Approximate is OK** for real-time, and exact for official charts (batch).
-
-### 2️⃣ Estimates
-```
-1M events/s · 100M distinct items · K = 100
-Exact counts in one hashmap: 100M × ~50 B = 5 GB per window → too much churn, and a single-node bottleneck
-```
-
-### 3️⃣ Partition by item (the core deep dive)
-- **Key the stream by item_id**, so **each item's counts live in exactly one partition**. The partition-local top-K lists are then **disjoint**, and merging them gives the **exact global top-K** of the counted values.
-- (If the stream were partitioned randomly, each item would be split across partitions, and the local top-Ks would miss items that are moderately popular everywhere. You'd need a second aggregation stage keyed by item.)
-- **Hot items** (one viral song) → pre-aggregate on the producers (local counts per second) before sending, to reduce the per-partition load.
-
-### 4️⃣ Counting in a window
-- **Exact** per-partition hashmap counts per window (fine if each partition's distinct items fit in memory).
-- **Count-min sketch** (lesson 090) when the distinct items are too many: fixed memory with slight overcounting, plus a **min-heap of size K** of the current candidates (the heavy-hitters algorithm).
-- **Sliding windows:** keep counts in **small buckets** (e.g., 1-minute buckets for a 1-hour window), add the new bucket and subtract the expired one, or use the stream engine's sliding windows (Flink).
-- **Time decay** alternative for "trending": weight recent events more (an exponential decay score). Trending = high **velocity** vs the baseline, not just the raw count.
-
-### 5️⃣ Merging and serving
-- Each partition emits its top-K every few seconds → the aggregator merges them (a heap of N×K entries) → writes the global top-K to **Redis** (a sorted set or JSON) per window and region.
-- The API reads from the cache. It's O(1), and CDN-cacheable for a few seconds.
-
-### 6️⃣ Batch correction (Lambda-style)
-- Nightly **batch jobs** over the data lake compute **exact** daily and weekly charts (the official ones), correcting the streaming approximations.
+- **Requirements and estimates:** top K (10–100) over **sliding windows** (5 min / 1 h / 24 h), per city or category, refreshed every few seconds. **Approximate is fine live**, and official charts are exact (batch). **1M events/s, 100M distinct items**: one exact hashmap ≈ 100M × 50 B = **5 GB per window** on one node, a churning single bottleneck.
+- **Partition by item, the core deep dive:** **key the stream by `dish_id`**, so each item's full count lives in **exactly one partition**. The local top-K lists are then **disjoint**, and merging them is **correct**. Random partitioning splits each item's count, and a dish at #11 everywhere vanishes (the birria taco). **Hot items** → **pre-aggregate on producers** (per-second local counts) before sending.
+- **Counting in a window:** an exact per-partition hashmap if the distinct items fit, otherwise a **count-min sketch** (lesson 090: fixed memory, slight overcount) plus a **min-heap of size K** (the heavy-hitters pattern). Sliding windows = **small time buckets** (60 × 1-minute for 1 hour): add the newest, subtract the evicted, or let Flink's sliding windows do it.
+- **Trending ≠ top:** trending is **velocity vs a baseline** (`last_hour / avg_hour_last_week`, or an exponential-decay score), so an always-popular pizza doesn't drown out a sudden surge.
+- **Merge, serve, correct:** partitions emit their top-K every ~5 s → the aggregator merges N×K entries in a heap → writes a **Redis sorted set** per window/city. The API is an O(1) read, **CDN-cacheable for a few seconds**. Nightly **batch** over the lake computes **exact** official charts (Lambda-style).
 
 ## 🧩 Worked example
 
 **Heavy hitters with count-min + heap (per partition, per window):**
 
 ```python
-cms = CountMinSketch(width=2**16, depth=5)
-heap = MinHeap(capacity=K)           # (estimated_count, item)
+cms = CountMinSketch(width=2**16, depth=5)   # ~1.3 MB of counters, fixed
+heap = MinHeap(capacity=K)                   # (estimated_count, item)
 
 def on_event(item):
     cms.add(item)
@@ -86,97 +73,99 @@ def on_event(item):
     elif len(heap) < K or est > heap.min():
         heap.push_or_replace_min(item, est)
 
-def emit():                          # every 5 s
-    return heap.sorted_desc()        # this partition's top-K → aggregator
+def emit():                                  # every 5 s
+    return heap.sorted_desc()                # this partition's top-K → aggregator
 ```
 
 **Sliding 1-hour window with 1-minute buckets:**
 
 ```
-counts_by_minute[12:00] … counts_by_minute[12:59]
-At 13:00: window_total += counts[13:00], window_total −= counts[12:00] (evict)
-Memory: 60 buckets × distinct items per minute (or 60 small sketches)
+counts[12:00] … counts[12:59]
+At 13:00: window += counts[13:00]; window −= counts[12:00]   (evict)
+Memory: 60 small sketches per partition, not one giant map
 ```
 
 **"Trending" vs "top":**
 
 ```
-Top (1 h):      song A 2.0M plays (always popular), song B 900k
-Trending score: plays_last_hour / avg_hourly_plays_last_week
-                song A: 2.0M / 1.9M = 1.05   song B: 900k / 30k = 30 ← trending 🔥
+Top (1 h):  margherita pizza 2.0M orders, birria tacos 900k
+Trending:   orders_last_hour / avg_hourly_last_week
+            pizza: 2.0M / 1.9M = 1.05      birria: 900k / 30k = 30 ← trending 🔥
 ```
+
+**The homepage, replayed:** zero database rows are touched per event. Twenty Flink workers hold **~30 MB of sketches each**, the board refreshes **every 5 s**, `GET /trending` answers in **~2 ms** from Redis, and the birria taco tops the board **four minutes** after the surge starts.
 
 ## ⚖️ Trade-offs
 
-| Decision | Choice | Trade-off |
+| Decision | Maya's choice | Trade-off |
 |---|---|---|
-| Partitioning | By item_id | Exact merge of local top-Ks, but hot items → hot partitions (pre-aggregate) |
-| Counting | Hashmap vs count-min sketch | Exact but memory-heavy vs fixed memory but approximate |
-| Windows | Buckets / sliding windows | Accuracy vs memory and CPU |
-| Freshness | Emit every few seconds | Fresher costs more aggregator load |
-| Accuracy | Streaming approximate + batch exact | Two pipelines (Lambda-style) |
+| Partitioning | By `dish_id` | Correct merge, and hot items need producer pre-aggregation |
+| Counting | Count-min sketch + heap | Fixed memory, slight overcount |
+| Windows | 1-minute buckets | Accuracy vs memory and CPU |
+| Freshness | Emit every 5 s | Fresher costs more aggregator load |
+| Accuracy | Stream approximate + batch exact | Two pipelines to run (Lambda-style) |
 
 ## 🌍 Real world
 
-- **Twitter/X trends**, **YouTube trending**, **Spotify charts**, and **Amazon best sellers** combine streaming counts with velocity-based scoring and batch-computed official rankings.
-- **Redis Stack's TopK** (HeavyKeeper) and **count-min** modules, and **Apache DataSketches** (Yahoo) for production sketches.
-- **Flink/Kafka Streams** windowed aggregations are the standard streaming building blocks.
+- **X trends, YouTube trending, Spotify charts, and Amazon best sellers** blend streaming counts, velocity scoring, and batch-computed official rankings.
+- **Redis Stack's TopK** (HeavyKeeper) and count-min modules, and **Apache DataSketches**, ship production-grade sketches.
+- **Flink and Kafka Streams** windowed aggregations are the standard building blocks.
 
 ## 📌 Cheat card
 
-> - **Partition by item → local top-K are disjoint → merging = the global top-K.**
+> - **Partition by item → local top-Ks are disjoint → merge = global top-K.**
 > - **Count-min sketch + min-heap of K** = heavy hitters in fixed memory.
-> - **Sliding windows via time buckets.** **Trending = velocity vs baseline**, not the raw count.
-> - **Serve from a cache** (Redis sorted set), refreshed every few seconds.
+> - **Sliding windows via time buckets.** **Trending = velocity vs baseline.**
+> - **Serve from Redis**, refreshed every few seconds.
 > - **Batch recompute** for exact official charts.
 
 ## 🧪 Feynman check
 
-Explain the radio stations and the national chart office, and why it matters that each song is only counted at one station (partition by item).
+Explain the radio stations and the chart office, and why it matters that each song is counted at only one station.
 
-⚠️ **Common confusion:** "Merge each server's top-K and you're done." If items are **spread across servers randomly**, an item that's #11 everywhere could be #1 overall, and you'd miss it. Partition by item first (or aggregate per item in a second stage).
+⚠️ **Common confusion:** "Merge each server's top-K and you're done." If items are spread **randomly** across servers, a dish that's **#11 everywhere** can be **#1 overall**, and the merge misses it. Partition by item first, or add a second aggregation stage keyed by item.
 
 ## ⚡ Quick recall
 
 1. Why partition the event stream by item ID?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-So each item's full count lives in one partition, making partition-local top-K lists disjoint and their merge correct.
+So each item's full count lives in one partition, making the partition-local top-K lists disjoint and their merge correct.
 </details>
 
 2. What does the min-heap of size K hold?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-The current top-K candidates, with the smallest at the root, so a new item replaces the minimum if its count is higher.
+The current top-K candidates, smallest at the root, so a new item replaces the minimum whenever its estimated count is higher.
 </details>
 
 3. How is "trending" different from "top"?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Trending measures the growth or velocity relative to a baseline, while top measures the absolute count.
+Trending measures growth or velocity relative to a baseline. Top measures the absolute count.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Design 'top 10 most-viewed products in the last hour' for an e-commerce site with 500k views/s."**
+**Q. "Design 'top 10 most-viewed products in the last hour' at 500k views/s, then count 10 billion distinct items a day with limited memory."**
 <details><summary>Model answer</summary>
 
-- View events → Kafka, keyed by product_id → Flink with **sliding windows** (1 h, sliding every 1 min) → per-partition counts + a local top-K heap → an aggregator merges them into the global top 10 per category and region → Redis sorted sets → the API/CDN.
-- Pre-aggregate on the producers for viral products. Dedupe bot views upstream.
-- The nightly batch computes exact figures for reporting.
-- **Likely follow-up:** "Top 10 per each of 5,000 categories?" → the same pipeline, keyed by (category, product). Emit a top-K per category, and store each category's list separately.
+- **Top 10 in the last hour:**
+  - View events → **Kafka keyed by `product_id`** → Flink **sliding windows** (1 h, sliding every minute) → per-partition counts + a local top-K heap.
+  - An **aggregator** merges them into the global top 10 per category and region → **Redis sorted sets** → API + a few seconds of CDN caching.
+  - **Pre-aggregate on producers** for viral products, and **dedupe bot views** upstream.
+  - **Nightly batch** produces exact figures for reporting.
+  - **5,000 categories?** Key by `(category, product)` and keep one top-K list per category.
+- **10B distinct items, little memory:**
+  - A **count-min sketch per window** (a few MB) + a **heavy-hitters heap**, plus **HyperLogLog** if distinct counts are needed too.
+  - Accept a bounded overcount: estimate ≤ true + **ε·N** with probability **1−δ**, where **width = e/ε** and **depth = ln(1/δ)**.
+  - Need exact numbers for the winners? A **second pass** counts only the heap's candidate set exactly.
+- **Likely follow-up:** "Why not a Redis sorted set with `ZINCRBY` per event?" → fine at thousands per second, but at 1M/s it's one hot key per city, and memory grows with every distinct item. Sketches stay fixed-size.
 </details>
 
-**Q2. "Memory is limited: 10 billion distinct items per day. How do you count?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- A **count-min sketch** per window (e.g., a few MB) for approximate frequencies + a **heavy-hitters heap** for the candidates, plus **HyperLogLog** if distinct counts are also needed.
-- Accept a bounded overcount error (ε·N with probability 1−δ), tuned by the sketch width and depth.
-- For exact results on only the top items, do a second pass: exact counting for the candidate set from the heap (a much smaller key set).
-- **Likely follow-up:** "What's the error bound?" → estimate ≤ true + ε·N, with width = e/ε and depth = ln(1/δ).
-</details>
-
-> 📖 *Next is the final chapter of this story, and it belongs to you.*
+> 📖 *Every atom is in place now, and Maya faces the blank whiteboard one last time: design all of Pantry, end to end, from the first tap to the last delivery.*
 
 ---
 
