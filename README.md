@@ -82,6 +82,14 @@ flowchart TD
 
 ---
 
+## 📕 Book 2 · Mastering System Design for the AI Era
+
+The sequel: **50 lessons** in the same format, with Maya turning Pantry into an AI-native company. You'll learn tokens and GPU napkin math, model serving, RAG with permissions, agents, evals, guardrails, prompt injection, cost engineering, and five AI case studies (ChatGPT-style chat, enterprise document Q&A, coding agents, recommendations, voice).
+
+👉 **[Start Book 2](book-2-ai-era/README.md)** (best after Part A of this book).
+
+---
+
 ## 📌 Cheatsheets (keep these open while you study)
 
 | Sheet | Use it for |

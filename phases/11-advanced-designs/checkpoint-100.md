@@ -118,8 +118,10 @@ You started with atoms: a request, a byte, a cache hit. You now see how they com
 
 Now go **create**. 🚀
 
+> 📕 **Ready for the sequel?** Maya's story continues in [**Book 2 · Mastering System Design for the AI Era**](../../book-2-ai-era/README.md): tokens, GPUs, RAG, agents, evals, and guardrails, built on every atom you just learned.
+
 ---
 
-⬅️ [100 · Capstone](100-capstone.md) · 🗺️ [Phase map](README.md) · 🏠 [Home](../../README.md)
+⬅️ [100 · Capstone](100-capstone.md) · 🗺️ [Phase map](README.md) · 🏠 [Home](../../README.md) · ➡️ [📕 Book 2: AI Era](../../book-2-ai-era/README.md)
 
 ✅ Tick **🎓 Checkpoint 100%** in [PROGRESS.md](../../PROGRESS.md). 🎓🎉🏆
