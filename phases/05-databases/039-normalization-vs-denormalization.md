@@ -8,159 +8,152 @@
 
 ## 📖 Story
 
-The recipe feed showed each recipe with the cook's name, photo, like count, and comment count, and building it took six joins. Maya was tempted to copy some of that data straight onto each recipe row. I've been tempted too! But ask yourself the question I asked her: what happens when a cook changes their photo?
+Pantry's recipe feed shows twenty cards. Each card needs the **dish**, the **cook's name**, the **cook's photo**, the **like count**, and the **comment count**.
+
+Building one page takes **six joins** and two `COUNT(*)` subqueries over tables with hundreds of millions of rows. At dinner time it runs **3,000 times a second**. The feed p99 climbs past **900 ms**, and the database's CPU graph looks like a city skyline on fire.
+
+Maya has an idea that feels like cheating: *just copy the cook's name, photo, and counts straight onto every recipe row.* One table, one read, done.
+
+I've been tempted by exactly that. It's often the right move. But first, ask yourself the question I asked her:
+
+*When a cook changes her profile photo, how many rows do you now have to find and fix?*
 
 ## 🎯 One-sentence idea
 
-**Normalization stores each fact exactly once (easy, safe updates, but reads need joins). Denormalization copies facts where they're read (fast reads, but every copy must be updated). Normalize by default, and denormalize deliberately for hot read paths.**
+**Normalization stores each fact exactly once (safe updates, but reads need joins), while denormalization copies or precomputes facts where they're read (fast reads, but every copy must be maintained), so you normalize the source of truth and denormalize deliberately for hot read paths.**
 
 ## 🧸 Analogy
 
-Your friend **changes their phone number**:
+A friend **changes their phone number**:
 
-- 📒 **Normalized:** the number lives in **one address book**. Everyone who needs it **looks it up** there. You update one place, but everyone has to look it up (a join).
-- 📋 **Denormalized:** you've **written the number on 20 sticky notes** (fridge, car, wallet…). Reading is instant because it's right there. But now you must find and update **all 20 notes**, and you'll probably miss one.
+- 📒 **Normalized:** it's in **one address book**, and everyone looks it up there. One update, but every read is a lookup (a join).
+- 📋 **Denormalized:** it's written on **20 sticky notes** around the house. Reading is instant, but now you must update all 20, and you'll miss one.
 
 ## 🖼️ Visual
+
+*Diagram brief:* on the left, a posts table with an arrow pointing to the users table (a join on every read). On the right, one wide posts row carrying copied author fields and counters, with dotted "sync" arrows feeding it from events.
 
 ```mermaid
 flowchart LR
     subgraph N["📒 Normalized"]
-        P["posts<br/>id · author_id · text"] -->|"author_id"| U["users<br/>id · name · avatar"]
+        P["recipes<br/>id · cook_id · title"] -->|"cook_id join"| U["cooks<br/>id · name · photo"]
+        P -->|"COUNT(*)"| L["likes"]
     end
-    subgraph D["📋 Denormalized"]
-        P2["posts<br/>id · text · author_name · author_avatar<br/>like_count · comment_count"]
+    subgraph D["📋 Denormalized read model"]
+        P2["recipe_cards<br/>id · title · cook_name · cook_photo<br/>like_count · comment_count"]
     end
+    N -. "events / CDC keep it in sync" .-> D
 ```
 
 ## 🔬 How it works
 
-- **Normalization** (1NF → 2NF → 3NF, in short: *every fact in one place, and every column depends on the key, the whole key, and nothing but the key*):
-  - ✅ No duplicate data → **no update anomalies** (the same fact with two different values).
-  - ✅ Smaller storage, and simpler writes.
-  - ❌ Reads need **joins**, which get expensive at scale or across shards.
-- **Denormalization:** duplicate or precompute data for reads.
-  - **Copied fields:** `author_name` stored on each post.
-  - **Precomputed aggregates:** `like_count` column instead of `COUNT(*)` each time.
-  - **Materialized views / read models:** a table shaped exactly for one screen.
-  - ✅ Fast, simple reads (one row / one partition). Essential in NoSQL and sharded systems.
-  - ❌ **Writes must update all copies.** There's a risk of inconsistency, and more storage.
-- **How to keep copies in sync:**
-  - In the **same transaction** (when in one DB).
-  - **Asynchronously** via events or CDC (eventually consistent, lesson 062).
-  - **Materialized views** refreshed by the DB.
-  - Sometimes **don't sync on purpose**: an invoice should keep the price *at the time of purchase*.
-- **Rule of thumb:** normalize the **source of truth**, and denormalize into **caches, read models, and search indexes** derived from it.
+- **Normalization (≈3NF)** means every fact lives in one place: "every column depends on the key, the whole key, and nothing but the key." There are **no update anomalies** and writes are small, but **joins** get expensive at scale and impossible across shards.
+- **Denormalization comes in three flavours:** **copied fields** (`cook_name` on the recipe), **precomputed aggregates** (`like_count` instead of `COUNT(*)`), and **read models / materialized views** shaped for one screen.
+- **Keeping copies honest:** update them in the **same transaction** (one DB), **asynchronously via events/CDC** (eventually consistent, lesson 062), or with a DB **materialized view**.
+- **Some copies must never sync:** an order's **price and address are snapshots**, a historical truth that must not change when the menu does.
+- **The rule:** **normalize the source of truth, and denormalize the derived read paths** (caches, counters, read models, search indexes). Denormalize **stable** data, and **look up** volatile shared data.
 
 ## 🧩 Worked example
 
-**Feed page: show 20 posts with author name, avatar, like count, and comment count.**
+**Before:** six joins + counts, 900 ms p99.
 
-Normalized (correct, but heavy at scale):
-
-```sql
-SELECT p.id, p.text, u.name, u.avatar,
-       (SELECT count(*) FROM likes    l WHERE l.post_id = p.id) AS likes,
-       (SELECT count(*) FROM comments c WHERE c.post_id = p.id) AS comments
-FROM posts p JOIN users u ON u.id = p.author_id
-WHERE p.id IN (...20 ids...);
-```
-
-Denormalized counters (fast):
+**After:**
 
 ```sql
--- On like (same transaction):
-INSERT INTO likes(post_id, user_id) VALUES (?, ?);
-UPDATE posts SET like_count = like_count + 1 WHERE id = ?;
+-- Counters: maintained in the same transaction as the like
+BEGIN;
+  INSERT INTO likes(recipe_id, user_id) VALUES (?, ?) ON CONFLICT DO NOTHING;
+  UPDATE recipes SET like_count = like_count + 1 WHERE id = ?;
+COMMIT;
 
--- Feed read: one simple query
-SELECT id, text, author_id, like_count, comment_count FROM posts WHERE id IN (...);
+-- Feed: one indexed query for 20 cards
+SELECT id, title, cook_id, like_count, comment_count FROM recipes WHERE id = ANY(:ids);
+
+-- Cook name/photo: NOT copied (a cook may have 5,000 recipes)
+-- → batch-fetch the ≤20 distinct cooks with WHERE id = ANY(...), served from a Redis cache
 ```
 
-Author name/avatar: **don't copy it** into posts (it changes, and a user may have 100k posts). Instead, batch-fetch the users (`WHERE id IN (...)`) and cache them. This is a **selective** denormalization decision.
-
-**Decision guide:**
+**Result:** feed p99 **900 ms → 18 ms**. A cook changing her photo touches **one row + one cache key**, not 5,000 rows.
 
 | Data | Denormalize? | Why |
 |---|---|---|
-| Like/comment counts | ✅ counters | Read constantly, and updates are simple increments |
-| Author display name on posts | ❌ fetch + cache | Changes, and has many copies |
-| Price on order line items | ✅ snapshot | Historical truth, **must not** change later |
-| Shipping address on orders | ✅ snapshot | Same reason |
-| Product category name | ⚠️ in search index only | Derived, and rebuilt via events |
+| Like/comment counts | ✅ counters | Read constantly, simple increments |
+| Cook name/photo on recipes | ❌ fetch + cache | Changes, and has many copies |
+| Price on an order line | ✅ snapshot | Historical truth |
+| Category name in the search index | ✅ derived | Rebuilt from events |
 
 ## ⚖️ Trade-offs
 
 | | Normalized | Denormalized |
 |---|---|---|
-| Reads | Joins (slower at scale) | Fast, single lookups |
+| Reads | Joins (slower at scale) | Single lookups |
 | Writes | One place | Many places |
 | Consistency | Automatic | Must be maintained |
 | Storage | Minimal | More |
-| Fits | OLTP source of truth, write-heavy | Read-heavy, NoSQL, sharded, analytics |
+| Fits | OLTP source of truth | Read-heavy, NoSQL, sharded, analytics |
 
 ## 🌍 Real world
 
-- **Instagram/Twitter** store counters denormalized (and often in a separate counter service).
-- **NoSQL design (DynamoDB single-table design, Cassandra)** is denormalization by default: one table per query.
-- **Data warehouses** use **star schemas**: a big fact table + denormalized dimension tables (lesson 041).
+- **Instagram and X** store denormalized counters, often in dedicated counter services.
+- **DynamoDB single-table design** and **Cassandra** are denormalization by default: one table per query.
+- **Data warehouses** use **star schemas**, which are denormalized dimensions around fact tables (lesson 041).
 
 ## 📌 Cheat card
 
 > - **Normalize = one address book. Denormalize = sticky notes everywhere.**
-> - **Normalize the source of truth, and denormalize the read paths** (caches, counters, read models, search).
-> - Keep copies in sync via a **transaction**, **events/CDC**, or **materialized views**.
-> - **Snapshots are denormalization on purpose** (prices on invoices).
-> - Denormalize **stable** data, and look up **frequently changing** shared data.
+> - **Normalize the source of truth. Denormalize the read paths.**
+> - Sync via **transaction · events/CDC · materialized views**.
+> - **Snapshots on purpose:** prices and addresses on orders.
+> - Copy **stable** data, look up **volatile shared** data.
 
 ## 🧪 Feynman check
 
-Explain the phone-number sticky-note analogy, and when it's actually *correct* for a copy to never update (think invoices).
+Explain the sticky notes, and when it's actually *correct* for a copy to never update.
 
-⚠️ **Common confusion:** "Denormalization is bad design." It's a **deliberate performance trade-off**. Every high-scale system does it. The skill is choosing *what* to duplicate and *how* to keep it consistent.
+⚠️ **Common confusion:** "Denormalization is bad design." It's a **deliberate performance trade-off** that every high-scale system makes. The skill is choosing **what** to duplicate and **how** you'll keep it consistent, and writing both decisions down.
 
 ## ⚡ Quick recall
 
 1. What's an update anomaly?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-When the same fact is stored in several places, and an update changes some copies but not others, leaving contradictory data.
+The same fact is stored in several places, and an update changes some copies but not others, leaving contradictory data.
 </details>
 
-2. Give an example of denormalization that should never be "synced."
-<details><summary>Answer</summary>
+2. Give an example of denormalized data that should never be synced.
+<details><summary>Reveal Answer</summary>
 
-The price or address stored on a past order or invoice. It must reflect the value at the time of purchase.
+The price or address on a past order or invoice. It must reflect the value at purchase time.
 </details>
 
 3. How can denormalized copies be kept in sync across services?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Publish change events (outbox/CDC) that consumers use to update their copies (eventual consistency).
+Publish change events (outbox or CDC) that consumers apply to their copies, which is eventually consistent.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Our product listing page does 6 joins and takes 800 ms. What do you do?"**
+**Q. "Posts get up to 100k likes per minute, and the listing page joins six tables in 800 ms. Fix both."**
 <details><summary>Model answer</summary>
 
-- First: `EXPLAIN` it, and add the missing indexes (lesson 037).
-- Then: build a **read model**: a denormalized `product_listing` table, materialized view, or search index containing exactly the fields the page needs, updated on change (events/CDC or triggers).
-- **Cache** the rendered result (Redis/CDN) with invalidation.
-- Keep the normalized tables as the source of truth.
-- **Likely follow-up:** "How fresh is the read model?" → it's eventual (ms to s). Show "last updated", or read the source for critical fields like stock at checkout.
+- **The listing page:**
+  1. **`EXPLAIN ANALYZE`** first and add missing indexes (lesson 037). Sometimes that alone fixes it.
+  2. Build a **read model**: a denormalized `post_cards` table or materialized view holding exactly the page's fields, maintained by **CDC/events**, with the normalized tables as the source of truth.
+  3. Batch-fetch volatile shared data (author profiles) by ID and **cache** it.
+  4. Cache the rendered page fragment with invalidation.
+  5. Freshness is eventual (ms–s). Critical fields (stock at checkout) are read from the source.
+- **100k likes/min on one post:**
+  - A single `UPDATE posts SET like_count = like_count + 1` row gets **lock contention**: every like queues on one row lock.
+  - Use **sharded counters** (N rows or keys per post, sum on read), or **Redis `INCR` + periodic flush** (write-back, lesson 029), or **stream aggregation** (Kafka → windowed sums → upsert).
+  - The **`likes` table** (who liked what, unique per user) stays the source of truth. Reconcile counters periodically.
+  - Display counts are allowed to be approximate for seconds.
+- **Likely follow-up:** "Why not copy the author name onto each post?" → an author with 100k posts turns a rename into 100k writes and a long inconsistency window. Look it up and cache it instead.
 </details>
 
-**Q2. "How would you store like counts for posts that get 100k likes per minute?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- A denormalized counter, but not one DB row updated 100k times/min (that's row lock contention).
-- **Sharded counters** (N rows or keys per post, summed on read) or **Redis INCR + periodic flush** (write-back, lesson 029), or stream aggregation (Kafka → windowed counts).
-- Keep the `likes` table (who liked what) as the source of truth, and reconcile counters periodically.
-- **Likely follow-up:** "Does the count need to be exact in real time?" → usually no. Approximate counts are fine for display.
-</details>
-
-> 📖 *Next, a profiling tool reveals that one innocent-looking page makes 101 database queries.*
+> 📖 *The feed flies now, until a profiling tool shows that one innocent-looking page is quietly firing 101 separate database queries.*
 
 ---
 

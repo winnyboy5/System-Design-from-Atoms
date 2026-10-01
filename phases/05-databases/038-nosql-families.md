@@ -8,22 +8,32 @@
 
 ## 📖 Story
 
-Pantry's chat now stored two billion messages, recipes came in every shape imaginable, and Leo wanted "people you may know." Maya asked me which NoSQL database to use. I had to explain that "NoSQL" isn't one thing at all. It's four very different tools wearing one name. Let me introduce you to each of them.
+Three monsters are now prowling Pantry's single Postgres box at the same time.
+
+**Monster one:** chat has hit **two billion messages**, gaining 40 million a day, an endless conveyor belt of tiny writes that bloats indexes and starves everything else of IOPS.
+
+**Monster two:** recipes arrive in every imaginable shape: some with 3 fields, some with 300, nested ingredient trees, video chapters, translations. The schema migration file is longer than a novel.
+
+**Monster three:** Maya wants a "cooks your friends love" feature: friends of friends of friends. In SQL, that's a self-join of a self-join of a self-join, and the query planner gives up and goes home.
+
+Maya types into a search bar: *"best NoSQL database."* I had to explain that "NoSQL" isn't one thing at all. It's **four very different tools wearing one name**. Let me introduce you to each.
 
 ## 🎯 One-sentence idea
 
-**"NoSQL" is four very different families: key-value (a giant dictionary), document (self-contained JSON records), wide-column (rows partitioned and sorted for massive writes), and graph (nodes and relationships). Each is great at one access pattern.**
+**"NoSQL" is four families, key-value (a giant dictionary), document (self-contained JSON records), wide-column (rows partitioned and sorted for massive writes), and graph (nodes and relationships), and each one excels at exactly one access pattern.**
 
 ## 🧸 Analogy
 
 Four ways to organize a **school's information**:
 
-- 🔑 **Key-value = a coat check.** Give a ticket number, get the coat. Blazing fast, but you can't ask "show me all red coats."
-- 📄 **Document = a student file folder.** Everything about one student in one folder: grades, contacts, clubs. Easy to grab it all at once.
-- 🧱 **Wide-column = a giant attendance ledger** split into books by class, with each page sorted by date. Perfect for "all attendance for class 7B in October" and for writing millions of entries.
-- 🕸️ **Graph = a friendship map** with strings between students. Perfect for "friends of friends who play chess."
+- 🔑 **Key-value = a coat check.** Ticket in, coat out. You can't ask "show me all red coats."
+- 📄 **Document = a student folder.** Everything about one student in one place.
+- 🧱 **Wide-column = attendance ledgers**, one book per class, each page sorted by date.
+- 🕸️ **Graph = a friendship map** with strings between students.
 
 ## 🖼️ Visual
+
+*Diagram brief:* four panels side by side. A ticket → coat lookup. A fat nested folder. A partition "book" with rows sorted by time. A web of labelled arrows between people.
 
 ```mermaid
 flowchart LR
@@ -31,144 +41,127 @@ flowchart LR
         K1["session:abc"] --> V1["{user:42, exp:...}"]
     end
     subgraph DOC["📄 Document"]
-        D1["{ _id: 42, name: 'Ada',<br/>addresses: [...], prefs: {...} }"]
+        D1["{ _id: 9, title: 'Lasagna',<br/>ingredients: [...], steps: [...] }"]
     end
     subgraph WC["🧱 Wide-column"]
-        P["Partition key: chat_42"] --> R1["msg @ 10:01"]
-        P --> R2["msg @ 10:02"]
-        P --> R3["msg @ 10:03 …sorted"]
+        P["Partition: chat_42 / 2026-10"] --> R1["msg @ 19:01"]
+        P --> R2["msg @ 19:02"]
+        P --> R3["msg @ 19:03 … sorted"]
     end
     subgraph G["🕸️ Graph"]
-        A((Ada)) -- FOLLOWS --> B((Bob))
-        B -- FOLLOWS --> C((Cy))
-        A -- LIKES --> P1((Post 9))
+        A((Maya)) -- FRIEND --> B((Friend))
+        B -- LOVES --> C((Cook 7))
     end
 ```
 
 ## 🔬 How it works
 
-- **🔑 Key-value** (Redis, DynamoDB, Riak, etcd):
-  - `get(key)`, `put(key, value)`. The value is opaque (or lightly structured).
-  - ✅ Fastest and simplest, easy to shard by key. ❌ No queries by value (unless the database adds secondary indexes).
-  - Use for: sessions, caches, carts, feature flags, counters, rate limits.
-- **📄 Document** (MongoDB, Couchbase, Firestore):
-  - JSON/BSON documents in collections. Nested objects and arrays. Secondary indexes on fields.
-  - ✅ Flexible schema, and you fetch a whole aggregate in one read. ❌ Joins are weak, and duplicated data must be kept in sync.
-  - Use for: catalogs, CMS content, user profiles, event data with varying shapes.
-- **🧱 Wide-column** (Cassandra, ScyllaDB, HBase, Bigtable):
-  - Data is grouped by a **partition key** (which decides the node), and **sorted within the partition by a clustering key**.
-  - Optimized for **huge write throughput** (LSM trees, lesson 081) and **queries by partition + range**.
-  - ✅ Linear scaling, multi-datacenter replication, tunable consistency. ❌ You must design one table **per query**. No joins, limited ad-hoc queries.
-  - Use for: messages, activity feeds, IoT and time series, logs.
-- **🕸️ Graph** (Neo4j, Amazon Neptune, JanusGraph):
-  - **Nodes** + **edges** with properties. Traversals follow pointers instead of doing joins.
-  - ✅ Multi-hop queries ("friends of friends", "fraud rings") are fast. ❌ Harder to shard, and it's niche.
-  - Use for: social graphs, recommendations, fraud detection, knowledge graphs, access-control graphs.
+- **🔑 Key-value** (Redis, DynamoDB, etcd): `get`/`put` by key, sharded by key. It's the fastest and simplest, but you can't query by value unless the database adds secondary indexes. Use it for sessions, carts, flags, counters, and rate limits.
+- **📄 Document** (MongoDB, Couchbase, Firestore): JSON/BSON with nesting, arrays, and secondary indexes. **Embed what you read together** and fetch a whole aggregate in one read. Joins are weak, and duplicated data must be synced. Use it for catalogues, CMS content, profiles, and variable-shape records.
+- **🧱 Wide-column** (Cassandra, ScyllaDB, HBase, Bigtable): the **partition key picks the replicas**, and the **clustering key sorts rows inside the partition**. LSM storage (lesson 081) handles **massive write throughput** with linear scaling and multi-DC replication. You get **one table per query**, no joins, and no ad-hoc queries.
+- **🕸️ Graph** (Neo4j, Neptune, JanusGraph): nodes + edges with properties. Traversals **follow pointers** (index-free adjacency) instead of joining, so 3–4 hop queries take milliseconds. It's harder to shard and more niche.
+- **Common rule:** list the **access patterns first**, then pick the family whose native operation *is* your hottest query.
 
 ## 🧩 Worked example
 
-**Chat messages in Cassandra: design the table for the query.**
-
-Query: *"Get the latest 50 messages in chat X."*
+**Chat in Cassandra, with the table designed for "latest 50 messages in chat X":**
 
 ```sql
 CREATE TABLE messages_by_chat (
-  chat_id    uuid,
-  bucket     text,        -- e.g., '2026-10' to keep partitions bounded
-  sent_at    timeuuid,
-  sender_id  uuid,
-  body       text,
+  chat_id   uuid,
+  bucket    text,          -- '2026-10' keeps partitions bounded (≲100 MB)
+  sent_at   timeuuid,
+  sender_id uuid,
+  body      text,
   PRIMARY KEY ((chat_id, bucket), sent_at)
 ) WITH CLUSTERING ORDER BY (sent_at DESC);
 
 SELECT * FROM messages_by_chat WHERE chat_id = ? AND bucket = '2026-10' LIMIT 50;
+-- one partition, one sequential read, ~2–5 ms at any table size
 ```
 
-- `(chat_id, bucket)` = **partition key** → all of a chat's messages for a month live together on the same replicas.
-- `sent_at` = **clustering key** → already sorted, so "latest 50" is one sequential read.
-- Need "messages by user"? → create **another table** `messages_by_user`, written at the same time (denormalization).
+Need "messages by sender"? → a **second table**, `messages_by_sender`, written alongside the first.
 
-**Graph query (Cypher): "friends of my friends I don't follow yet."**
+**"Cooks my friends love" (Cypher):**
 
 ```cypher
-MATCH (me:User {id: 42})-[:FOLLOWS]->(f)-[:FOLLOWS]->(fof)
-WHERE NOT (me)-[:FOLLOWS]->(fof) AND fof <> me
-RETURN fof, count(*) AS mutual ORDER BY mutual DESC LIMIT 10;
+MATCH (me:User {id: 42})-[:FRIEND]->(f)-[:LOVES]->(c:Cook)
+WHERE NOT (me)-[:LOVES]->(c)
+RETURN c, count(f) AS friends ORDER BY friends DESC LIMIT 10;
 ```
 
 ## ⚖️ Trade-offs
 
 | Family | Best at | Worst at | Scale |
 |---|---|---|---|
-| Key-value | Get/put by key | Anything else | 🚀 Huge |
-| Document | Whole-aggregate reads, flexible shapes | Cross-document joins | High |
+| Key-value | Get/put by key | Everything else | 🚀 Huge |
+| Document | Whole-aggregate reads, variable shapes | Cross-document joins | High |
 | Wide-column | Massive writes, partition + range reads | Ad-hoc queries, joins | 🚀 Huge |
 | Graph | Multi-hop relationships | Bulk scans, sharding | Moderate |
 
 ## 🌍 Real world
 
-- **DynamoDB** (key-value/document) runs Amazon.com's carts and many AWS services.
-- **Cassandra** at Apple, Netflix, and Instagram. **ScyllaDB** at Discord (trillions of messages).
-- **MongoDB** is common in startups and content platforms. **Neo4j** is used for fraud detection at banks.
-- **Google Bigtable** (wide-column) underpins Search indexing, Maps, and Gmail historically.
+- **DynamoDB** runs Amazon's carts and many AWS control planes.
+- **Cassandra** at Apple, Netflix, and Instagram. **ScyllaDB** holds Discord's trillions of messages.
+- **Google Bigtable** underpins Search indexing and Maps.
+- **Neo4j** powers fraud-ring detection at banks.
 
 ## 📌 Cheat card
 
-> - **KV = coat check · Document = folder · Wide-column = sorted ledgers per partition · Graph = string map.**
-> - Wide-column: **PRIMARY KEY ((partition), clustering)**. **One table per query.** Keep partitions bounded (time buckets).
-> - Document: **embed what you read together**, reference what's shared and changes often.
-> - Graph: pick it when **relationships are the query**.
-> - All of them: **start from the access patterns.**
+> - **KV = coat check · Document = folder · Wide-column = sorted ledgers · Graph = string map.**
+> - Wide-column: **PRIMARY KEY ((partition), clustering)**, **one table per query**, **time-bucket** the partitions.
+> - Document: **embed what's read together**, reference what's shared and changes often.
+> - Graph when **relationships are the query**.
+> - **Access patterns first, always.**
 
 ## 🧪 Feynman check
 
-Using the school analogy, explain which family you'd use for (a) login sessions, (b) a product catalog, (c) chat history, and (d) "people you may know".
+Using the school analogy, pick a family for (a) login sessions, (b) a recipe catalogue, (c) chat history, and (d) "cooks your friends love", and justify each in one sentence.
 
-⚠️ **Common confusion:** "Cassandra is like SQL because it has CQL." CQL *looks* like SQL, but there are no joins, and queries must follow the primary key design. Unplanned queries either fail or need full scans.
+⚠️ **Common confusion:** "Cassandra is basically SQL, because it has CQL." CQL *looks* like SQL, but there are no joins, and a query that doesn't follow the primary key either fails or needs `ALLOW FILTERING`, a full-cluster scan that can melt production.
 
 ## ⚡ Quick recall
 
 1. In a wide-column store, what do the partition key and the clustering key do?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-The partition key decides which node(s) store the data (and groups rows together). The clustering key sorts rows within that partition.
+The partition key decides which nodes store the data and groups rows together. The clustering key sorts rows within that partition.
 </details>
 
 2. When is a graph database the right choice?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-When queries traverse many relationship hops: social networks, recommendations, fraud rings, dependency graphs.
+When queries traverse many relationship hops: social graphs, recommendations, fraud rings, dependency graphs.
 </details>
 
 3. Why do document databases encourage embedding?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-So data that's read together lives in one document, giving a single fast read without joins.
+So data that's read together lives in one document and comes back in a single read, with no joins.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Design the data model for storing billions of IoT sensor readings, queried by device and time range."**
+**Q. "Model billions of IoT sensor readings queried by device and time range. Then: MongoDB or Postgres for a product catalogue with wildly varying attributes?"**
 <details><summary>Model answer</summary>
 
-- **Wide-column** (Cassandra/Bigtable) or a **time-series DB** (lesson 044).
-- Partition key `(device_id, day)` to bound the partition size. Clustering key `timestamp DESC`.
-- Query: `WHERE device_id=? AND day IN (...) AND ts BETWEEN ? AND ?`.
-- Writes are append-only and very fast (LSM). Use a TTL for retention, and downsample old data into rollup tables.
-- **Likely follow-up:** "Queries across all devices (the average temperature per city)?" → stream the data to an OLAP store or warehouse (lesson 041). Don't scan the wide-column store.
+- **IoT readings:**
+  - **Wide-column** (Cassandra/Bigtable) or a **time-series DB** (lesson 044).
+  - Partition key `(device_id, day)` to bound partition size, clustering key `ts DESC`.
+  - Query `WHERE device_id=? AND day IN (…) AND ts BETWEEN ? AND ?` → a few partitions, sequential reads.
+  - Writes are append-only into an LSM (fast). **TTL** for retention, and **downsampled rollups** (1-min, 1-hour tables) for long ranges.
+  - **Fleet-wide analytics** (the average temperature per city) → stream into an **OLAP** store (lesson 041). Never scan the wide-column store.
+- **Catalogue:**
+  - Varied attributes favour a document shape, but orders, inventory, and payments next door need **transactions and relations**.
+  - Pragmatic pick: **Postgres + a JSONB `attributes` column with a GIN index**. One database, flexible where needed, ACID where it matters.
+  - Choose MongoDB if the domain is truly document-centric and cross-entity transactions are rare.
+  - **Faceted search** (brand, size, price filters) goes to **Elasticsearch/OpenSearch** either way (lesson 043).
+- **Likely follow-up:** "Why time-bucket the partitions?" → an unbounded partition grows without limit, becomes a hotspot, and slows compaction and repair. Buckets cap the size (~100 MB guideline).
 </details>
 
-**Q2. "MongoDB or Postgres for an e-commerce product catalog?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- Products have **varied attributes** (shirts have size and colour, TVs have resolution and ports), which fits a document model.
-- But orders, inventory, and payments need transactions and relations.
-- A pragmatic choice: **Postgres with a JSONB `attributes` column** (GIN-indexed) for the catalog, plus relational tables for orders. One database, and flexibility where it's needed.
-- Choose MongoDB if the team and workload are document-centric and cross-entity transactions are rare. Search goes to Elasticsearch either way.
-- **Likely follow-up:** "How would you support faceted search (filter by brand, size, price)?" → a search engine with facets/aggregations (lesson 043).
-</details>
-
-> 📖 *Next, the recipe feed page needs six joins, and it's crawling.*
+> 📖 *Chat has its new home, but Pantry's recipe feed now needs six joins to draw one card, and Maya is tempted to start copying data everywhere.*
 
 ---
 

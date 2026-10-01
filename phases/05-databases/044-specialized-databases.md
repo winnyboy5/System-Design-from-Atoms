@@ -8,157 +8,153 @@
 
 ## 📖 Story
 
-Pantry's partner kitchens now had smart fridges reporting temperatures every second, couriers sent their locations constantly, and Leo wanted "dishes similar to this one." Maya asked me if one database could do it all. I told her there are specialist databases shaped for exactly these jobs, and I'll introduce you to them here.
+Three new firehoses have just been connected to Pantry, all at once.
+
+**Firehose one:** 2,000 partner kitchens now have **smart fridges**, each reporting its temperature **every second**. That's 172 million rows a day, and Postgres's disk usage climbs a gigabyte an hour.
+
+**Firehose two:** couriers stream **GPS coordinates** every 3 seconds, and the dispatch screen needs *"every courier within 2 km of this kitchen, right now."* A `WHERE` clause with trigonometry over every courier row takes 800 ms.
+
+**Firehose three:** Maya wants a "**dishes like this one**" carousel. Not "same tags", but *similar in spirit*: a creamy mushroom risotto should suggest a truffle orzo.
+
+Maya asks if one database can handle it all. A general-purpose database *can*, the way a Swiss-army knife *can* cut down a tree.
+
+There are specialist databases shaped for exactly these jobs. Let me introduce them.
 
 ## 🎯 One-sentence idea
 
-**Some data has such a distinctive shape (metrics over time, locations, vectors, immutable ledgers) that purpose-built databases handle it 10–100× better than a general-purpose one. Know they exist, and know when to reach for them.**
+**Some data has such a distinctive shape (metrics over time, locations, embeddings, immutable history, tiny critical config) that purpose-built stores handle it 10–100× better than a general-purpose database, so know they exist and know when to reach for them.**
 
 ## 🧸 Analogy
 
-A **toolbox**. A general-purpose database is a **Swiss-army knife**: it does everything decently. But if you're cutting 10,000 planks a day, you buy a **table saw** (a time-series DB). For screws, a **power drill** (a geo index). The knife still has a place, but specialists win at their one job.
+A **toolbox**: a general-purpose database is a **Swiss-army knife**. Cutting 10,000 planks a day? Buy a **table saw** (a time-series DB). Driving screws? A **power drill** (a geo index). The knife still has its place, but specialists win at their one job.
 
 ## 🖼️ Visual
+
+*Diagram brief:* a decision fork that starts from "what's special about this data?" and ends at five labelled specialist tools.
 
 ```mermaid
 flowchart TD
     Q{"What's special<br/>about the data?"} -->|"Timestamped metrics,<br/>append-only"| TS["📈 Time-series<br/>Prometheus, InfluxDB,<br/>TimescaleDB"]
-    Q -->|"Locations,<br/>'what's nearby?'"| GEO["🗺️ Geospatial<br/>PostGIS, Redis GEO,<br/>Elasticsearch geo"]
-    Q -->|"Meaning / similarity<br/>(embeddings)"| VEC["🧭 Vector DB<br/>pgvector, Pinecone,<br/>Milvus, Weaviate"]
-    Q -->|"Tamper-evident<br/>history"| LED["📜 Ledger / append-only<br/>QLDB-style, event store"]
-    Q -->|"Config, leader election,<br/>small critical state"| CO["🔐 Coordination store<br/>etcd, ZooKeeper, Consul"]
+    Q -->|"'What's nearby?'"| GEO["🗺️ Geospatial<br/>PostGIS, Redis GEO,<br/>H3 / S2"]
+    Q -->|"Similar meaning<br/>(embeddings)"| VEC["🧭 Vector<br/>pgvector, Milvus,<br/>OpenSearch k-NN"]
+    Q -->|"Tamper-evident<br/>history"| LED["📜 Ledger / event store"]
+    Q -->|"Config, locks,<br/>leader election"| CO["🔐 etcd, ZooKeeper, Consul"]
 ```
 
 ## 🔬 How it works
 
-- **📈 Time-series databases (TSDB):**
-  - Data = (metric name, **tags/labels**, timestamp, value). Extremely **write-heavy, append-only**, mostly queried by **time range** and aggregated.
-  - Tricks: **columnar + delta/Gorilla compression** (10×+), time partitioning, **downsampling/rollups** (1 s → 1 min → 1 h), **retention policies** (drop old raw data).
-  - ⚠️ **High cardinality** (too many unique tag combinations, like a `user_id` tag) explodes memory.
-  - Examples: **Prometheus** (monitoring, pull-based), **InfluxDB**, **TimescaleDB** (Postgres extension), **VictoriaMetrics**.
-- **🗺️ Geospatial:**
-  - Indexes like **R-trees**, **geohash**, **quadtrees**, **S2 cells** answer "within 2 km of me" fast (lesson 095).
-  - Examples: **PostGIS**, **Redis `GEOADD`/`GEOSEARCH`**, MongoDB 2dsphere, Elasticsearch geo_point.
-- **🧭 Vector databases:**
-  - Store **embeddings** (arrays of numbers representing meaning, from ML models) and find **nearest neighbours** using approximate indexes (**HNSW**, IVF).
-  - Used for semantic search, recommendations, and **RAG** for LLM apps.
-  - Examples: **pgvector**, Pinecone, Milvus, Weaviate, Qdrant, and vector support in Elasticsearch/OpenSearch.
-- **📜 Ledger / append-only stores:** immutable, cryptographically verifiable history (hash chains), and event stores for event sourcing (lesson 089).
-- **🔐 Coordination stores:** tiny, **strongly consistent** (Raft/ZAB) key-value stores for configuration, service discovery, locks, and leader election (lessons 071, 085, 086). **Not** for bulk data.
-- **Rule:** start with Postgres + extensions (TimescaleDB, PostGIS, pgvector) and move to dedicated systems when scale or features demand it.
+- **📈 Time-series DBs:** `(metric, labels, timestamp, value)` arrives append-only and is queried by **time range + aggregation**. They use **columnar + delta-of-delta/XOR (Gorilla) compression** (~1–2 bytes/sample), time partitioning, **downsampling** (1 s → 1 min → 1 h), and **retention** policies. The killer is **cardinality**: every unique label combination is a new series held in memory.
+- **🗺️ Geospatial:** **R-trees, geohash, quadtrees, S2/H3 cells** turn "within 2 km" into a few index range lookups instead of a full scan (lesson 095). Options include PostGIS, Redis `GEOSEARCH`, and Elasticsearch `geo_point`.
+- **🧭 Vector search:** ML **embeddings** (e.g. 768 floats) capture meaning, and **approximate nearest neighbour** indexes (**HNSW**, IVF) return the closest vectors in milliseconds, trading a little recall for huge speed. It powers semantic search, recommendations, and **RAG**.
+- **📜 Ledgers / event stores:** immutable, append-only history, often hash-chained for tamper evidence. They're the backbone of event sourcing (lesson 089).
+- **🔐 Coordination stores:** tiny, **strongly consistent** (Raft/ZAB) KV stores for config, discovery, locks, and leader election (lessons 071, 085, 086). Every write goes through **consensus**, so they're never for bulk data. **Default to Postgres + extensions** (TimescaleDB, PostGIS, pgvector) and graduate to dedicated systems when scale demands it.
 
 ## 🧩 Worked example
 
-**Prometheus metric + query:**
+**Fridge alerts (PromQL):** the share of kitchens running warm.
 
 ```
-http_requests_total{service="checkout", status="500", region="eu"}  → counter
-
-# Error rate per service over 5 min
-sum by (service) (rate(http_requests_total{status=~"5.."}[5m]))
-  /
-sum by (service) (rate(http_requests_total[5m]))
+avg_over_time(fridge_temp_celsius{kitchen=~".+"}[5m]) > 5
 ```
 
-**Redis geo: drivers near a rider:**
+**Couriers near a kitchen (Redis GEO, sub-millisecond):**
 
 ```bash
-GEOADD drivers -122.4194 37.7749 "driver:17"
-GEOSEARCH drivers FROMLONLAT -122.42 37.78 BYRADIUS 2 km ASC COUNT 10
+GEOADD couriers -0.1278 51.5074 "courier:17"
+GEOSEARCH couriers FROMLONLAT -0.13 51.51 BYRADIUS 2 km ASC COUNT 10
 ```
 
-**pgvector semantic search:**
+**"Dishes like this one" (pgvector):**
 
 ```sql
 CREATE EXTENSION vector;
-CREATE TABLE docs (id bigserial, body text, embedding vector(768));
-CREATE INDEX ON docs USING hnsw (embedding vector_cosine_ops);
+CREATE TABLE dish_vecs (dish_id bigint PRIMARY KEY, embedding vector(768));
+CREATE INDEX ON dish_vecs USING hnsw (embedding vector_cosine_ops);
 
-SELECT id, body FROM docs
-ORDER BY embedding <=> :query_embedding     -- cosine distance
-LIMIT 5;
+SELECT dish_id FROM dish_vecs
+ORDER BY embedding <=> (SELECT embedding FROM dish_vecs WHERE dish_id = 42)
+LIMIT 8;                                        -- ~5 ms over 2M dishes
 ```
 
-**Cardinality trap:**
+**The cardinality trap:**
 
 ```
-Labels: service (20) × endpoint (50) × status (10) × region (5) = 50,000 series ✅
-Add user_id (10M users) → 500 BILLION series 💥 → never label metrics with unbounded IDs
+kitchen (2,000) × sensor (3) × region (10) = 60,000 series ✅
+add order_id as a label (millions) → billions of series 💥  Never label metrics with unbounded IDs.
 ```
 
 ## ⚖️ Trade-offs
 
-| Store | Gain | Cost |
+| Maya's choice | What she gains | What she pays |
 |---|---|---|
-| Postgres + extension | One system, SQL, transactions | Less scale than dedicated systems |
-| Dedicated TSDB | Compression, fast time queries, retention | Another system, limited query model |
-| Vector DB | Fast semantic similarity | Approximate results, embedding pipeline |
-| Coordination store | Strong consistency for tiny critical state | Low throughput, small data only |
+| Postgres + extensions | One system, SQL, transactions | Lower ceiling than dedicated systems |
+| A dedicated TSDB | 10×+ compression, fast range queries, retention | Another system, a narrower query model |
+| A vector index | Semantic similarity in ms | Approximate results, an embedding pipeline |
+| A coordination store | Linearizable tiny state | Low throughput, small data only |
 
 ## 🌍 Real world
 
 - **Prometheus + Grafana** is the default open-source monitoring stack.
-- **Uber** built H3 (hexagonal geo indexing). **Lyft/Uber** geo-index millions of driver updates.
-- **Kubernetes** stores all cluster state in **etcd**.
-- **RAG** apps (chatbots over your docs) use vector search, often pgvector or managed vector DBs.
+- **Uber** open-sourced **H3** hexagonal geo indexing. **Google** uses **S2** cells.
+- **Kubernetes** keeps all cluster state in **etcd**.
+- **RAG chatbots** retrieve context with vector search, often through pgvector or managed vector DBs.
 
 ## 📌 Cheat card
 
-> - **Metrics → TSDB** (compression, downsampling, retention). Watch **cardinality**.
+> - **Metrics → TSDB** (compression, rollups, retention). **Guard cardinality.**
 > - **Nearby → geo index** (geohash, R-tree, S2, H3).
 > - **Similar meaning → vector index** (HNSW).
-> - **Tiny critical config and locks → etcd/ZooKeeper.**
-> - **Start with Postgres extensions**, and specialize when needed.
+> - **Tiny critical state → etcd/ZooKeeper.**
+> - **Start with Postgres extensions.** Specialize when needed.
 
 ## 🧪 Feynman check
 
-Explain the toolbox analogy, and give one example of data that deserves a specialist tool and why.
+Explain the toolbox, and give one example of data that deserves a specialist tool and exactly why the Swiss-army knife struggles with it.
 
-⚠️ **Common confusion:** "etcd/ZooKeeper is a fast key-value database." They're built for **consistency**, not throughput or size, and every write goes through consensus. Keep them for small coordination data.
+⚠️ **Common confusion:** "etcd/ZooKeeper is a fast key-value database." It's built for **consistency**, not throughput or size. Every write is a consensus round, and etcd's default storage quota is just a few GB. Use it for coordination, never as a data store.
 
 ## ⚡ Quick recall
 
 1. Why do TSDBs compress so well?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 Consecutive timestamps and values change little, so delta and XOR encoding plus columnar storage shrink them dramatically.
 </details>
 
-2. What is metric cardinality and why does it matter?
-<details><summary>Answer</summary>
+2. What is metric cardinality, and why does it matter?
+<details><summary>Reveal Answer</summary>
 
-The number of unique label combinations (series). High cardinality (e.g., per-user labels) explodes memory and slows queries.
+The number of unique label combinations (series). High cardinality (e.g. per-user labels) explodes memory and slows queries.
 </details>
 
 3. What does a vector database do?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-It stores embeddings and quickly finds the most similar vectors (approximate nearest neighbours) for semantic search and recommendations.
+It stores embeddings and quickly finds the most similar ones (approximate nearest neighbours) for semantic search and recommendations.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Design storage for monitoring metrics from 10,000 servers, each emitting 500 metrics every 10 s."**
+**Q. "Design metrics storage for 10,000 servers × 500 metrics every 10 s. Then add semantic search to an existing keyword product search."**
 <details><summary>Model answer</summary>
 
-- Ingest = 10,000 × 500 / 10 = **500k samples/s**.
-- A **TSDB** (Prometheus with remote storage like Thanos/Cortex/Mimir, or VictoriaMetrics), sharded by series, replicated.
-- ~1–2 bytes/sample compressed → ~1 MB/s → ~86 GB/day raw. Retain raw data for 15 days, and downsample to 5 min/1 h rollups for a year.
-- Control cardinality (no per-request IDs in labels).
-- **Likely follow-up:** "Pull vs push?" → Prometheus pulls (easy health detection, and the server controls load). Push suits short-lived jobs and IoT (via a gateway).
+- **Metrics:**
+  - Ingest = 10,000 × 500 ÷ 10 = **500k samples/s**.
+  - A **TSDB**: Prometheus scrapers with remote-write into a horizontally scalable backend (Mimir/Thanos/VictoriaMetrics), **sharded by series** and replicated.
+  - At ~1.5 bytes/sample: **~750 KB/s ≈ 65 GB/day**. Keep raw data 15 days, then **downsample** to 5 min/1 h rollups kept for a year in object storage.
+  - **Cardinality budget per team**, with no request or user IDs in labels.
+  - **Pull vs push:** pull gives free up/down detection and server-controlled load. Push (via a gateway) suits short-lived jobs and IoT.
+- **Semantic search:**
+  - **Embed** products offline (and on update), and embed queries at request time (cache hot query embeddings).
+  - Store vectors in an **HNSW** index (pgvector, OpenSearch k-NN, or a vector DB).
+  - **Hybrid ranking:** fuse BM25 and vector scores (e.g. **reciprocal rank fusion**), and keep **filters** (price, stock) as hard constraints.
+  - Evaluate offline (NDCG on judged queries) and online (CTR, conversion) with an A/B test.
+- **Likely follow-up:** "Why not vectors only?" → exact matches (SKUs, brand names, "size 10") and strict filters are where keyword search wins. Hybrid gets both.
 </details>
 
-**Q2. "How would you add 'semantic search' to an existing product search?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- Generate **embeddings** for products (an offline batch job, plus on update) and for queries (at request time).
-- Store them in a **vector index** (pgvector, OpenSearch k-NN, or a vector DB) using **HNSW**.
-- **Hybrid ranking:** combine BM25 keyword scores and vector similarity (e.g., reciprocal rank fusion), and still apply filters (price, stock).
-- Evaluate with click-through and relevance judgments, and cache embeddings for popular queries.
-- **Likely follow-up:** "Why not vectors only?" → exact matches (SKUs, brand names) and filters work better with keyword search, so hybrid gets both.
-</details>
-
-> 📖 *Next, Maya's architecture diagram has six databases. Were they all the right choice?*
+> 📖 *Pantry now runs six different kinds of database, and a sharp-eyed reviewer asks Maya to justify every single one of them.*
 
 ---
 
