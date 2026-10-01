@@ -8,138 +8,135 @@
 
 ## 📖 Story
 
-Leo's whiteboard was covered in dreams: chat with cooks, live courier maps, recipe videos, cooking classes. Maya itched to start drawing boxes and arrows. I understand that itch. But you and she have already learned one thing from me: don't draw a system before you know what it's *for*. So she sat Leo down and asked questions first.
+The whiteboard looks like a crime-scene wall. Sticky notes everywhere, connected by frantic marker lines: **chat with cooks**, **live courier map**, **recipe videos**, **cooking classes**, **loyalty points**, **AI meal planner**.
+
+Maya's fingers twitch toward the marker. She wants to draw boxes. Servers. Databases. Arrows. The fun part.
+
+She stops herself with the cap still on.
+
+Last month she would have drawn for three hours and built the wrong thing. Now she knows the most expensive line of code is the one that solves a problem nobody had. So she turns her back on the wall, opens a blank page, and writes two headings: **WHAT** and **HOW WELL**.
+
+You and she have already learned this from me: don't draw a system before you know what it's for.
 
 ## 🎯 One-sentence idea
 
-**Functional requirements say *what* the system does (features). Non-functional requirements say *how well* it does it (scale, speed, uptime, consistency). You must pin both down before drawing a single box.**
+**Functional requirements say *what* the system does, non-functional requirements say *how well* it must do it (scale, speed, uptime, consistency), and you pin down both before drawing a single box.**
 
 ## 🧸 Analogy
 
 Building a **house**:
 
-- 🏠 **Functional:** 3 bedrooms, a kitchen, a garage. *What rooms exist.*
-- 🧱 **Non-functional:** survives earthquakes, heats up in 10 minutes, costs < $300k, lasts 50 years. *How good it is.*
+- 🏠 **Functional:** 3 bedrooms, a kitchen, a garage. *Which rooms exist.*
+- 🧱 **Non-functional:** survives an earthquake, heats up in 10 minutes, costs < $300k, lasts 50 years. *How good it is.*
 
-Two houses can have the same rooms but be built completely differently because of the non-functionals. **Non-functionals shape the architecture.**
+Two houses with identical rooms can be built completely differently. **Non-functionals shape the architecture.**
 
 ## 🖼️ Visual
+
+*Diagram brief:* a tree that splits "Requirements" into two branches. The left branch (WHAT) holds feature verbs. The right branch (HOW WELL) holds measurable targets with numbers.
 
 ```mermaid
 flowchart TD
     R["📋 Requirements"] --> F["⚙️ Functional<br/>WHAT it does"]
     R --> N["📐 Non-functional<br/>HOW WELL"]
-    F --> F1["Post a photo"]
-    F --> F2["Follow users"]
-    F --> F3["View feed"]
-    N --> N1["Scale: 100M DAU"]
-    N --> N2["Latency: feed p99 < 300 ms"]
-    N --> N3["Availability: 99.99%"]
-    N --> N4["Consistency: eventual OK for feed"]
-    N --> N5["Durability: never lose photos"]
+    F --> F1["Place an order"]
+    F --> F2["Browse dishes nearby"]
+    F --> F3["Track the order"]
+    N --> N1["Scale: 1M DAU, 2k orders/min peak"]
+    N --> N2["Latency: browse p99 < 300 ms"]
+    N --> N3["Availability: 99.95% checkout"]
+    N --> N4["Consistency: never double-charge"]
+    N --> N5["Durability: never lose an order"]
 ```
 
 ## 🔬 How it works
 
-- **Functional** = verbs the user can do: *upload, search, pay, message, follow*. In interviews, **pick the top 3** and say what's **out of scope**.
-- **Non-functional** = qualities. The usual list:
-  - **Scale:** users, QPS, data size, growth
-  - **Performance:** latency targets (p99)
-  - **Availability:** how many nines
-  - **Consistency:** strong vs eventual (lesson 053)
-  - **Durability:** can we ever lose data?
-  - **Security & privacy**, **cost**, **maintainability**, **compliance**
-- **Non-functionals drive the design:** "must never double-charge" → transactions/idempotency. "Global users, < 100 ms" → CDN + multi-region. "Eventual is fine" → caches and async replication are allowed.
-- **Read/write ratio** and **access patterns** are the most useful questions to ask early.
-- **Write assumptions down.** They're your contract with the interviewer or stakeholder.
+- **Functional = verbs** (*order, browse, pay, message, track*). In an interview, pick the **top 3** and state what's explicitly **out of scope**.
+- **Non-functional = measurable adjectives:** scale (users, QPS, data size), latency (p99), availability (nines), consistency (strong vs eventual, lesson 053), durability, security, cost, compliance.
+- **Non-functionals choose the architecture, and functionals choose the APIs.** "Never double-charge" → transactions + idempotency. "Global, < 100 ms" → CDN + multi-region. "Eventual is fine" → caches and async replication are allowed.
+- **The two most useful early questions** are the **read/write ratio** and the **access pattern** (by key? by range? by location? full-text?).
+- **Write assumptions down and get a nod.** They're your contract with the interviewer or stakeholder.
 
 ## 🧩 Worked example
 
-**Prompt:** "Design Instagram."
-
-✅ **Clarified requirements:**
+**Maya's page for Pantry v2:**
 
 | Type | Requirement |
 |---|---|
-| Functional (in) | Upload photo with caption · Follow users · Home feed of followed users' photos |
-| Functional (out) | Stories, DMs, video, ads, search. *Out of scope for now.* |
-| Scale | 500M DAU, 100M photo uploads/day, feed views ≈ 100× uploads |
-| Latency | Feed loads p99 < 500 ms. Upload may take a few seconds. |
-| Availability | 99.99% for viewing. Uploads can degrade briefly. |
-| Consistency | **Eventual** for feeds (a few seconds' delay is fine). **Strong** for "my own upload shows in my profile" (read-your-writes). |
-| Durability | Photos must never be lost. |
+| Functional (in) | Browse dishes near me · Place and pay for an order · Track order status |
+| Functional (out) | Chat, video, classes, loyalty, AI planner. *Later.* |
+| Scale | 1M DAU, browse:order ≈ 100:1, peak **2,000 orders/min** at 7 p.m. |
+| Latency | Browse p99 < 300 ms. Checkout p99 < 1 s. |
+| Availability | 99.95% for checkout. Browse may serve stale data during incidents. |
+| Consistency | **Strong** for payment and dish stock. **Eventual** for ratings and "popular now". |
+| Durability | A confirmed order must never be lost. |
 
-**Design consequences, already visible:** read-heavy → caching + precomputed feeds; media → object storage + CDN; eventual consistency → async fan-out via queues.
+**Design consequences that are already visible:** read-heavy browsing → cache + CDN. Strong payments → transactions + idempotency keys. Order tracking → a status store plus push updates.
 
 ## ⚖️ Trade-offs
 
-| You gain | You pay | Use it when |
+| Maya's choice | What she gains | What she pays |
 |---|---|---|
-| Narrow scope | Might miss what the interviewer wanted | Always. Confirm it with them. |
-| Stricter non-functionals | Much more complex/expensive design | The business truly needs it |
-| Relaxed consistency | Users may briefly see stale data | Social, analytics, counters |
+| Narrow scope | Ships fast, stays focused | Risk of missing what the stakeholder wanted, so confirm it |
+| Strict non-functionals | Strong guarantees | Far more complex and expensive design |
+| Relaxed consistency | Speed, availability, low cost | Users may briefly see stale data |
 
 ## 🌍 Real world
 
-- Real design docs at big tech companies start with **Goals / Non-goals** and **Requirements** sections, exactly like this.
-- Most failed projects didn't fail on tech. They built the wrong thing or ignored a non-functional (e.g., compliance).
+- Design docs at **Google, Amazon, and Meta** open with **Goals / Non-goals** and **Requirements** sections, exactly like this.
+- Amazon's **"working backwards"** process starts from the customer press release and FAQ, which are requirements written before any code.
 
 ## 📌 Cheat card
 
-> - **Functional = verbs. Non-functional = adjectives.**
-> - Must-ask questions: **Who uses it? How many? Read- or write-heavy? Consistency or availability? Latency target? Can data be lost?**
+> - **Functional = verbs. Non-functional = measurable adjectives.**
+> - Must-ask: **Who uses it? How many? Read- or write-heavy? Consistency or availability? Latency target? Can data ever be lost?**
 > - **Top 3 features + explicit out-of-scope.**
-> - **Non-functionals choose the architecture.** Functionals choose the APIs.
+> - Spend **≤ 5 minutes** on requirements in an interview, then move on.
 
 ## 🧪 Feynman check
 
-Pick an app you use daily (e.g., WhatsApp). Say out loud: 3 functional requirements, 3 non-functional ones, and which non-functional would be hardest to meet.
+Pick an app you use daily. Say out loud 3 functional requirements, 3 *measurable* non-functional ones, and which non-functional would be hardest to meet.
 
-⚠️ **Common confusion:** Listing "scalable" or "fast" without numbers. A non-functional requirement is only useful when it's **measurable**: "p99 < 200 ms at 50k QPS".
+⚠️ **Common confusion:** Writing "scalable" or "fast" with no number. A non-functional requirement only counts when it's **measurable**: "p99 < 200 ms at 50k QPS." "Highly available" is a wish, and "99.95% over 30 days" is a requirement.
 
 ## ⚡ Quick recall
 
 1. Is "users can reset their password" functional or non-functional?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Functional (it's a feature/verb).
+Functional. It's a feature (a verb).
 </details>
 
 2. Is "99.95% availability" functional or non-functional?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Non-functional (a quality).
+Non-functional. It's a quality.
 </details>
 
 3. Why state out-of-scope features?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-To keep the design focused, to show prioritization, and to agree with the interviewer or stakeholder on what you're solving.
+To keep the design focused, show prioritization, and agree on exactly what problem you're solving.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Design a ride-sharing app." What questions do you ask before designing?**
+**Q. "Design a ride-sharing app." What do you ask in the first five minutes, and which answer changes the architecture most?**
 <details><summary>Model answer</summary>
 
-- **Features:** request a ride, match with a driver, live location tracking, pricing, payments? Which are in scope?
-- **Scale:** how many riders and drivers, and how many concurrent trips? Which cities or countries?
-- **Latency:** how fast must matching be (a few seconds)? How often do locations update (every 3–5 s)?
-- **Consistency:** a driver must never be double-assigned (strong for matching). Location can be eventual.
-- **Availability:** matching must be highly available. Payments can be async.
-- **Likely follow-up:** "Which requirement drives the design most?" → high-frequency location updates plus nearby search → geo-indexing (lesson 095).
+- **Features:** request a ride, match with a driver, live tracking, pricing, payments. Confirm which 3 are in scope. Ratings, pooling, and scheduling are out.
+- **Scale:** riders, drivers, concurrent trips, and cities. E.g. 20M riders, 2M drivers, 500k concurrent trips.
+- **Update frequency:** drivers send GPS every **3–5 s**. 1M active drivers ÷ 4 s ≈ **250k location writes/s**.
+- **Latency:** match within a few seconds. Map updates feel live (< 1 s).
+- **Consistency:** a driver must **never be double-assigned** (strong, per driver). Location can be **eventual**.
+- **Availability:** matching must be highly available. Payments can settle asynchronously.
+- **The one that changes the architecture:** **250k location writes/s plus "drivers near me" queries**. That forces an in-memory **geo-index** (geohash/S2/H3 cells, lesson 095) rather than a SQL table, and pushes trip state onto a separate, strongly consistent path.
+- **Likely follow-up:** "What if the interviewer says 'you decide'?" → propose explicit numbers, get a quick OK, and move on in under 5 minutes.
 </details>
 
-**Q2. "The interviewer says 'you decide the requirements.' What do you do?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- Propose a **reasonable, explicit set**: top 3 features, realistic scale (e.g., 10M DAU), latency and availability targets, consistency needs.
-- Say them out loud and **ask for a quick OK**. Then move on. Don't spend more than about 5 minutes.
-- Choose requirements that let you show interesting trade-offs (e.g., read-heavy with a hot-key problem).
-- **Likely follow-up:** "What if scale were 100× bigger?" → explain what would change (sharding, caching tiers, multi-region).
-</details>
-
-> 📖 *Chapter 2 is next. Pantry's first customers are about to arrive from far away, and I'll follow them across the internet.*
+> 📖 *Chapter 2 is next. Pantry's first customers are about to arrive from far away, and Maya's packets are about to cross the internet without her.*
 
 ---
 
