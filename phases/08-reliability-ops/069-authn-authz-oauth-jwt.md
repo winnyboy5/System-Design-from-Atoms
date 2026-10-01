@@ -8,160 +8,162 @@
 
 ## 📖 Story
 
-A security researcher reported that changing `/orders/1234` to `/orders/1235` in the address bar showed *someone else's* order, home address and all. Pantry checked *who you are*, but never *what you're allowed to see*. This one keeps me up at night, and I want it to stick with you. Let's dive into identity, tokens, and permissions.
+The email arrives at 11:48 p.m. from a security researcher, and it's three lines long:
+
+> *Log in to Pantry. Open `/orders/1234`. Change it to `/orders/1235`.*
+
+Maya tries it, and her blood runs cold. **Someone else's order** fills the screen: their name, their **home address**, their phone number, what they ate for dinner. She changes it to `1236`. Another stranger. `1237`. Another.
+
+Pantry checks **who you are**. It never asks **what you're allowed to see**. Every logged-in customer holds a skeleton key to every order in the building.
+
+Somewhere out there, someone might already have scraped them all.
+
+This one keeps me up at night, and I want it to stick with you. Let's dive into **identity, tokens, and permissions**.
 
 ## 🎯 One-sentence idea
 
-**Authentication (AuthN) proves *who you are*, and authorization (AuthZ) decides *what you may do*. Sessions or tokens (often JWTs) carry that identity between requests, and OAuth 2.0 / OpenID Connect let users log in with another provider or grant apps limited access without sharing passwords.**
+**Authentication proves who you are and authorization decides what you may do, sessions or tokens (often JWTs) carry that identity between requests, and OAuth 2.0 / OpenID Connect let users log in through another provider or grant apps limited access without sharing passwords.**
 
 ## 🧸 Analogy
 
 A **music festival**:
 
-- 🪪 **Authentication:** at the gate, you show your **ID + ticket**, and they confirm it's really you.
-- 🎟️ **Token:** they give you a **wristband**. You don't show your ID at every stage. The wristband proves you were checked (a session cookie or JWT).
-- 🚪 **Authorization:** a **VIP wristband** gets you backstage, and a regular one doesn't. Same person, different **permissions**.
-- 🔑 **OAuth:** you give a friend a **valet key** for your car. It can drive and park, but **can't open the trunk**, and you can **cancel it any time**, all without handing over your house keys (your password).
+- 🪪 **Authentication:** at the gate you show **ID + ticket**.
+- 🎟️ **Token:** you get a **wristband**, so there's no ID check at every stage.
+- 🚪 **Authorization:** the **VIP** wristband gets you backstage, and the regular one doesn't.
+- 🔑 **OAuth:** a **valet key** that drives and parks the car but **can't open the trunk**, and can be **cancelled any time**, without handing over your house keys.
 
 ## 🖼️ Visual
+
+*Diagram brief:* the "Log in with Google" dance. The app never sees the password, gets a one-time code, swaps it for tokens, then calls the API with a bearer token that the API verifies before checking ownership.
 
 ```mermaid
 sequenceDiagram
     participant U as 🧑 User
-    participant App as 📱 App (client)
-    participant IdP as 🔐 Auth server (Google / Auth0 / your IdP)
-    participant API as 🖥️ API (resource server)
-    U->>App: "Log in with Google"
-    App->>IdP: redirect: authorize?client_id&scope&PKCE challenge
-    U->>IdP: enters password + MFA (never seen by the App)
-    IdP-->>App: redirect back with a one-time authorization code
-    App->>IdP: exchange code + PKCE verifier for tokens
-    IdP-->>App: access token (JWT, 15 min) + refresh token + ID token
-    App->>API: GET /orders  Authorization: Bearer (access token)
-    API->>API: verify signature, expiry, audience, scopes → authorize
-    API-->>App: 200 orders
+    participant App as 📱 Pantry app
+    participant IdP as 🔐 Identity provider
+    participant API as 🖥️ Orders API
+    U->>App: "Log in"
+    App->>IdP: redirect /authorize?client_id&scope&PKCE challenge
+    U->>IdP: password + MFA (or passkey), never seen by the app
+    IdP-->>App: one-time authorization code
+    App->>IdP: exchange code + PKCE verifier
+    IdP-->>App: access token (JWT, 10 min) + refresh token + ID token
+    App->>API: GET /orders/1235  Authorization: Bearer …
+    API->>API: verify signature, exp, aud, scope → AND order.owner == sub?
+    API-->>App: 403 Forbidden ✅ (not your order)
 ```
 
 ## 🔬 How it works
 
-- **Authentication methods:** passwords (hashed with **bcrypt/argon2**, never plain or fast hashes), **MFA** (TOTP, SMS, push), **passkeys/WebAuthn** (phishing-resistant), SSO via **OIDC/SAML**, and API keys or **mTLS** for machines.
-- **Sessions vs tokens:**
-  - **Server-side session:** a random session ID in a secure **cookie**, with the state in Redis/DB. ✅ Easy revocation. ❌ A lookup per request (cheap with Redis).
-  - **JWT (JSON Web Token):** a **signed**, self-contained token `header.payload.signature` with claims (`sub`, `exp`, `scope`, `aud`). ✅ Any service can verify it **without a lookup** (using the public key). ❌ **Hard to revoke before expiry**, so keep access tokens short-lived (5–15 min) + **refresh tokens** (revocable, stored server-side).
-  - JWTs are **signed, not encrypted** (by default), so **don't put secrets in them**.
-- **OAuth 2.0:** a framework for **delegated authorization** ("let this app read my calendar"). Key flows:
-  - **Authorization Code + PKCE:** for web and mobile apps (the recommended default).
-  - **Client Credentials:** service-to-service (no user).
-  - **Device Code:** TVs and CLIs.
-  - (Implicit and password grants are **deprecated**.)
-- **OpenID Connect (OIDC):** an identity layer on top of OAuth 2.0 that adds an **ID token** ("who logged in"). It's what "Log in with Google" uses.
-- **Authorization models:**
-  - **RBAC:** roles → permissions (admin, editor, viewer).
-  - **ABAC / policy-based:** rules over attributes ("managers can approve expenses < $5k in their department"). Tools: OPA, Cedar.
-  - **ReBAC:** relationship-based ("can view if they're a member of the folder's team"). Google **Zanzibar**-style (SpiceDB, OpenFGA).
-  - Always check **object-level** access ("does user 42 own order 99?"). Missing this = the #1 API vulnerability (BOLA/IDOR).
-- **Where to enforce:** validate tokens at the **gateway** (lesson 022), and do fine-grained authorization **in each service** (it knows its data).
+- **Authenticate well:** passwords hashed with **argon2/bcrypt** (never fast hashes), **MFA**, and ideally **passkeys/WebAuthn** (phishing-resistant). **SSO** via OIDC/SAML for staff, and **mTLS** or client credentials for machines.
+- **Sessions vs JWTs:** a **server-side session** (a random ID in an httpOnly cookie, with state in Redis) is **instantly revocable**. A **JWT** (`header.payload.signature`, with claims like `sub`, `exp`, `aud`, `scope`) is verified **without a lookup** using the issuer's public key, so it's **hard to revoke**. Keep access tokens **short (5–15 min)** with **rotating refresh tokens**. JWTs are **signed, not encrypted**, so keep secrets out of them.
+- **OAuth 2.0 = delegated authorization:** use **Authorization Code + PKCE** for web and mobile, **Client Credentials** for service-to-service, and **Device Code** for TVs and CLIs. Implicit and password grants are deprecated. **OIDC** adds the **ID token**: that's *login*.
+- **Authorization models:** **RBAC** (roles), **ABAC / policy engines** (OPA, Cedar rules over attributes), and **ReBAC** (Zanzibar-style relationships: SpiceDB, OpenFGA).
+- **Object-level checks everywhere:** *"does user 42 own order 1235?"* Missing them is **BOLA/IDOR**, **#1 on the OWASP API Top 10**, and exactly Maya's bug. Validate tokens at the **gateway**, and authorize objects **in the service** that owns the data.
 
 ## 🧩 Worked example
-
-**A decoded JWT access token:**
 
 ```json
 // header
 { "alg": "RS256", "kid": "key-2026-09" }
 // payload
-{ "iss": "https://auth.shop.com", "sub": "user_42", "aud": "orders-api",
-  "scope": "orders:read orders:write", "exp": 1790000000, "iat": 1789999100 }
-// signature = RS256(base64(header) + "." + base64(payload), private_key)
+{ "iss": "https://auth.pantry.app", "sub": "user_42", "aud": "orders-api",
+  "scope": "orders:read", "exp": 1790000000, "iat": 1789999400, "jti": "t_8f2…" }
 ```
-
-**API verification checklist:**
 
 ```python
-claims = jwt.decode(token, jwks.get_key(kid),       # public key from the IdP's JWKS endpoint (cached)
-                    algorithms=["RS256"],             # never accept "none"!
-                    audience="orders-api", issuer="https://auth.shop.com")
-require("orders:read" in claims["scope"])
+claims = jwt.decode(token, jwks.key_for(kid),          # cached public keys from the IdP
+                    algorithms=["RS256"],              # never accept "none"
+                    audience="orders-api", issuer="https://auth.pantry.app")
+require("orders:read" in claims["scope"].split())
 order = db.get_order(order_id)
-require(order.user_id == claims["sub"])             # object-level authorization (prevents IDOR)
+if order.user_id != claims["sub"]:                     # object-level authorization
+    raise Forbidden()                                  # → 403 (or 404 to avoid leaking existence)
 ```
 
-**Revocation strategy:** access token = 10 min + refresh token (rotated on each use, stored hashed in the DB). Logout or compromise → revoke the refresh token. Emergency → a short denylist of token IDs (`jti`) at the gateway, or rotate the signing keys.
+**Maya's fix, in order:**
+
+1. Add the ownership check everywhere (an audit found **14 endpoints** missing it).
+2. Switch to **non-sequential IDs** (defence in depth, not a substitute).
+3. **Rate-limit and alert** on enumeration patterns.
+4. Review the access logs for past scraping, and **notify affected users** if needed.
+
+**Revocation:** access tokens live 10 min, and refresh tokens **rotate** on each use (stored hashed). Logout → revoke the refresh token. Emergency → a short **`jti` denylist** at the gateway, or **rotate the signing keys**.
 
 ## ⚖️ Trade-offs
 
-| Choice | Gain | Cost | Use when |
-|---|---|---|---|
-| Session cookie + Redis | Easy revocation, small cookie | A lookup per request | Classic web apps |
-| JWT access tokens | Stateless verification across services | Hard to revoke, bigger headers | Microservices, mobile, third-party APIs |
-| Short JWT + refresh token | Balance of both | More moving parts | Most modern systems |
-| RBAC | Simple | Role explosion | Small to medium permission models |
-| ReBAC (Zanzibar) | Fine-grained sharing | Infrastructure complexity | Docs and files sharing (Drive-like) |
+| Maya's choice | What she gains | What she pays |
+|---|---|---|
+| Session cookie + Redis | Instant revocation | A lookup per request |
+| JWT access tokens | Stateless verification across services | Hard to revoke, larger headers |
+| Short JWT + refresh token | The best of both | More moving parts |
+| RBAC | Simple | Role explosion |
+| ReBAC (Zanzibar) | Fine-grained sharing | Infrastructure complexity |
 
 ## 🌍 Real world
 
-- **Auth0/Okta, AWS Cognito, Keycloak, Firebase Auth** are common identity providers.
-- **Google Zanzibar** powers permissions for Drive, YouTube, and Cloud. **SpiceDB / OpenFGA** are open-source equivalents.
+- **Auth0/Okta, AWS Cognito, Keycloak, and Firebase Auth** are common identity providers.
+- **Google Zanzibar** runs permissions for Drive and YouTube. **SpiceDB/OpenFGA** are the open-source descendants.
 - **OWASP API Security Top 10:** #1 is **Broken Object Level Authorization**.
 
 ## 📌 Cheat card
 
-> - **AuthN = who you are (ID check). AuthZ = what you may do (VIP wristband).**
-> - Passwords: **argon2/bcrypt + MFA**, and ideally **passkeys**.
-> - **JWT = signed (not encrypted), stateless, hard to revoke** → **short-lived + refresh tokens**.
-> - **OAuth 2.0 = delegated access** (the valet key). **OIDC = login** (ID token). Use **Auth Code + PKCE**.
-> - **Always check object ownership** in the service (prevents IDOR).
+> - **AuthN = who you are. AuthZ = what you may do.**
+> - **argon2/bcrypt + MFA**, ideally **passkeys**.
+> - **JWT = signed, not encrypted, hard to revoke** → **short-lived + rotating refresh tokens**.
+> - **OAuth = delegated access. OIDC = login.** Use **Auth Code + PKCE**.
+> - **Check object ownership on every request.**
 
 ## 🧪 Feynman check
 
-Explain the festival wristband and the valet key, and why a wristband that can't be taken back (a JWT) should expire quickly.
+Explain the wristband and the valet key, and why a wristband that can't be taken back (a JWT) should expire quickly.
 
-⚠️ **Common confusion:** "OAuth is for authentication." OAuth 2.0 is for **authorization** (delegated access). **OpenID Connect** adds authentication on top. Using a bare OAuth access token as proof of identity has led to real security bugs.
+⚠️ **Common confusion:** "OAuth is for authentication." OAuth 2.0 is **authorization** (delegated access). **OpenID Connect** adds authentication. Treating a bare OAuth access token as proof of *who* someone is has caused real account-takeover bugs.
 
 ## ⚡ Quick recall
 
-1. AuthN vs AuthZ?
-<details><summary>Answer</summary>
+1. What's the difference between AuthN and AuthZ?
+<details><summary>Reveal Answer</summary>
 
 Authentication verifies identity. Authorization decides what that identity is allowed to do.
 </details>
 
 2. Why are JWTs hard to revoke, and what's the usual mitigation?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-They're validated without a server lookup, so a stolen token works until it expires. Mitigate with short expiry + revocable refresh tokens (and a denylist for emergencies).
+They're validated without a server lookup, so a stolen token works until it expires. Mitigate with short expiry, revocable rotating refresh tokens, and a denylist for emergencies.
 </details>
 
 3. Which OAuth flow should a mobile app use?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 Authorization Code with PKCE.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Design authentication for a platform with a web app, mobile apps, and 20 microservices."**
+**Q. "Design authentication and authorization for a platform with a web app, mobile apps, and 20 microservices, including Google-Drive-style sharing."**
 <details><summary>Model answer</summary>
 
-- A central **identity provider** (OIDC): login with passwords + MFA or passkeys, and social login.
-- Clients use **Auth Code + PKCE** → get a **short-lived JWT access token** + a **refresh token** (rotated, revocable).
-- The **API gateway** validates JWTs (cached JWKS), rejects invalid ones, and forwards verified claims.
-- Services do **fine-grained authorization** (RBAC/ReBAC via a policy service) and **object ownership checks**.
-- Service-to-service: **mTLS** (a service mesh) or client-credentials tokens.
-- Web: tokens in **httpOnly, Secure, SameSite cookies** (a BFF pattern) to reduce XSS token theft.
-- **Likely follow-up:** "How do you log a user out everywhere?" → revoke their refresh tokens, and access tokens expire within minutes (or use the denylist for urgent cases).
+- **Identity:** a central **OIDC provider** with passwords (argon2) + MFA or passkeys, social login, and SSO for staff.
+- **Clients:**
+  - **Auth Code + PKCE** → a **10-minute JWT access token** + a **rotating refresh token**.
+  - On the web, a **BFF** holds tokens in **httpOnly, Secure, SameSite** cookies to reduce XSS token theft.
+- **The gateway:** verifies JWTs against cached **JWKS** (`alg`, `iss`, `aud`, `exp`), rejects early, forwards verified claims, and **strips** any client-supplied identity headers.
+- **Service-to-service:** **mTLS** via a mesh (identity per workload) or client-credentials tokens.
+- **Authorization inside services:**
+  - **Object-level checks** on every read and write.
+  - Coarse **RBAC** for admin features.
+  - For sharing, **ReBAC (Zanzibar-style)**: tuples like `doc:123#viewer@user:42`, `doc:123#parent@folder:9`, `folder:9#editor@group:eng#member`.
+  - A dedicated authz service answers `check`/`list`, with **consistency tokens** so a revocation can't be bypassed by a stale cache.
+- **Logout everywhere:** revoke all of the user's refresh tokens. Access tokens die within minutes, and a `jti` denylist covers emergencies.
+- **Likely follow-up:** "How do you list every doc a user can see?" → reverse indexes or materialized permission views. It's genuinely hard at scale, so cache aggressively and paginate.
 </details>
 
-**Q2. "How would you design permissions for a Google Drive–like sharing model?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- **ReBAC (Zanzibar-style):** store relationship tuples like `doc:123#viewer@user:42`, `folder:9#editor@group:eng#member`, `doc:123#parent@folder:9`.
-- Permission checks traverse the relations (inherited from folders and groups), and the results are cached with consistency tokens ("zookies") to avoid a stale ACL allowing access after revocation.
-- It's a dedicated authorization service, with the `check`, `expand`, and `list objects` APIs.
-- **Likely follow-up:** "How do you list all docs a user can see?" → reverse indexes or materialized permission views. That's hard at scale.
-</details>
-
-> 📖 *Next, the security audit that follows finds many more gaps.*
+> 📖 *The order leak is sealed, so Maya commissions a full security audit, and the report that comes back is long enough to ruin her week.*
 
 ---
 

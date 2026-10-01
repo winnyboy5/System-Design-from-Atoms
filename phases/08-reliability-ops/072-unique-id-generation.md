@@ -8,63 +8,65 @@
 
 ## 📖 Story
 
-Two database shards both created order #558201. Receipts got mixed up, and one customer received someone else's refund. With data spread across many machines, "just count upwards" no longer works. I showed Maya a trick from Twitter's engineers that I still admire: IDs that are unique everywhere, with no central bottleneck.
+Shard 3 creates **order #558201** at 7:14:02 p.m. Shard 7, counting upward on its own, creates **order #558201** at 7:14:05 p.m.
+
+Two different customers. Two different dinners. **One order number.**
+
+The payments system matches by order number. The refund meant for one customer lands in the other's account. The receipt emails cross in the night like mixed-up letters. Support spends a day untangling it by hand.
+
+Each shard had its own `AUTO_INCREMENT`, a counter that only knew about its **own** little world. In the sharded universe, that's like 16 ticket booths each starting their raffle at #1.
+
+And the obvious fix, **one central counter for everything**, would put a single machine in the path of every single write in Pantry: a bottleneck and a single point of failure.
+
+I showed Maya a trick from Twitter's engineers that I still admire: **IDs that are unique everywhere, with no central bottleneck at all.**
 
 ## 🎯 One-sentence idea
 
-**When many machines create records at once, a single auto-increment counter becomes a bottleneck and a single point of failure. Use IDs that each machine can generate independently, like UUIDs (random) or Snowflake-style IDs (timestamp + machine ID + sequence), which are unique, compact, and sortable by time.**
+**When many machines create records at once, a single auto-increment counter becomes a bottleneck and a single point of failure, so use IDs each machine can generate independently, like UUIDs (random) or Snowflake-style IDs (timestamp + machine ID + sequence), which are unique, compact, and time-sortable.**
 
 ## 🧸 Analogy
 
-Numbering **tickets at a huge festival** with 100 entrances:
+Numbering tickets at a festival with **100 gates**:
 
-- 🎫 **One central ticket machine:** every entrance radios the office for the next number. It's slow, and if the office radio dies, **no one gets in**. (Auto-increment in one DB.)
-- 🎲 **Random codes (UUID):** each entrance prints a **long random code**. Duplicates are practically impossible, but the codes are long and **don't tell you who came first**.
-- ⏱️ **Snowflake:** each entrance prints **time + entrance number + a counter**: `10:03:05.123 · gate 17 · #004`. It's unique (no two gates share a number), **sorted by time**, and short.
+- 🎫 **One central machine:** every gate radios the office for the next number. It's slow, and when the radio dies, **nobody gets in**.
+- 🎲 **Random codes (UUID):** each gate prints a long random code. It's practically unique, but it's long and **doesn't say who came first**.
+- ⏱️ **Snowflake:** each gate prints **time · gate number · counter**: unique, **sorted by time**, and short.
 
 ## 🖼️ Visual
+
+*Diagram brief:* a 64-bit bar sliced into three coloured segments (timestamp, machine, sequence) with their bit widths. Below, a decision fork for choosing an ID scheme.
 
 ```
 Snowflake ID (64 bits)
 ┌─┬─────────────────────────────────────────┬────────────┬──────────────┐
-│0│ 41 bits: milliseconds since custom epoch │ 10 bits:   │ 12 bits:     │
-│ │ (~69 years)                              │ machine ID │ sequence     │
-│ │                                          │ (1,024)    │ (4,096/ms)   │
+│0│ 41 bits: ms since custom epoch (~69 yrs) │ 10 bits:   │ 12 bits:     │
+│ │                                          │ worker ID  │ sequence     │
+│ │                                          │ (1,024)    │ (4,096 / ms) │
 └─┴─────────────────────────────────────────┴────────────┴──────────────┘
- sign
 ```
 
 ```mermaid
 flowchart TD
-    Q{"Need?"} -->|"Simple, no coordination,<br/>don't care about order"| U4["UUIDv4 (random, 128-bit)"]
-    Q -->|"Time-sortable, DB-index friendly,<br/>no coordination"| U7["UUIDv7 / ULID (128-bit)"]
-    Q -->|"Compact 64-bit, sortable,<br/>very high throughput"| SF["Snowflake-style"]
-    Q -->|"Short, human-friendly codes<br/>(URL shortener)"| KGS["Counter/range allocation + base62"]
+    Q{"Need?"} -->|"No coordination, order irrelevant"| U4["UUIDv4 (random, 128-bit)"]
+    Q -->|"Time-sortable, index-friendly, no coordination"| U7["UUIDv7 / ULID (128-bit)"]
+    Q -->|"Compact 64-bit, sortable, huge throughput"| SF["Snowflake-style"]
+    Q -->|"Short human-friendly codes"| KGS["Range allocation + base62"]
 ```
 
 ## 🔬 How it works
 
-- **Requirements to clarify:** unique across the whole system? sortable by time? 64-bit or 128-bit? guessable or not (security)? how many per second?
-- **Auto-increment (single DB):** simple and compact. ❌ A write bottleneck and a SPOF, awkward across shards, and it **leaks business volume** (order #1000 → #1050 = 50 orders today).
-  - Variants: **multi-master with offsets** (server 1: 1, 3, 5… / server 2: 2, 4, 6…) are hard to expand.
-- **UUIDv4 (random 122 bits):** generate anywhere, and the collision risk is negligible. ❌ 128 bits, not sortable, **random inserts hurt B-tree indexes** (lesson 037).
-- **UUIDv7 / ULID:** a timestamp prefix + randomness → **roughly time-ordered**, index-friendly, and generated anywhere. A great modern default.
-- **Snowflake (Twitter):** `timestamp (41) | machine/worker ID (10) | sequence (12)`.
-  - Each worker can make **4,096 IDs per millisecond** (~4M/s per worker) with no coordination.
-  - Sortable by time, and fits in a 64-bit integer (a `BIGINT` column).
-  - ⚠️ Needs **unique worker IDs** (assigned via config, ZooKeeper/etcd, or a lease).
-  - ⚠️ **Clock going backwards** (NTP adjustments) could create duplicates, so detect it and wait or refuse.
-- **Range/ticket allocation:** a central service hands out **blocks** of IDs (e.g., 1–10,000 to server A). It's rarely contacted, and sequential and compact. Used for short URL codes (lesson 074).
-- **Instagram's variant:** 41 bits of time + 13 bits of **logical shard ID** + 10 bits of a per-shard sequence (generated inside Postgres), which **encodes the shard in the ID** for routing.
+- **Clarify first:** unique system-wide? time-sortable? 64- or 128-bit? **publicly guessable**? how many per second?
+- **Auto-increment:** compact and simple, but a **write bottleneck + SPOF**, collisions across shards (offset tricks like 1, 3, 5… / 2, 4, 6… are hard to grow), the ID only exists **after** the insert, and it **leaks business volume** (#1000 → #1050 = 50 orders today) while inviting enumeration.
+- **UUIDv4** (122 random bits): generate anywhere, with negligible collision risk. But it's 128 bits, unsortable, and **random inserts thrash B-tree indexes** (lesson 037). **UUIDv7 / ULID** put a **timestamp prefix** first, so they're roughly time-ordered, index-friendly, and still coordination-free. A great modern default (**RFC 9562**).
+- **Snowflake:** `41 bits time | 10 bits worker | 12 bits sequence` → **4,096 IDs/ms per worker**, ~**69 years** of range, k-sorted, in a `BIGINT`. You need **unique worker IDs** (etcd/ZooKeeper leases, pod ordinals) and must **refuse or wait when the clock moves backwards**.
+- **Range allocation:** a central allocator hands out **blocks** (1–10,000 to server A), so it's rarely contacted and yields short sequential IDs, perfect for **base62 short codes** (lesson 074). **Instagram's variant** embeds the **shard ID** inside the ID for instant routing.
 
 ## 🧩 Worked example
-
-**Snowflake generator (Python sketch):**
 
 ```python
 import time, threading
 
-EPOCH = 1704067200000          # custom epoch (2024-01-01) in ms → more years of range
+EPOCH = 1704067200000                       # 2024-01-01 in ms: a custom epoch buys more years
 class Snowflake:
     def __init__(self, worker_id):
         assert 0 <= worker_id < 1024
@@ -75,10 +77,10 @@ class Snowflake:
         with self.lock:
             now = int(time.time() * 1000)
             if now < self.last:
-                raise RuntimeError("clock moved backwards")        # or wait until it catches up
+                raise RuntimeError("clock moved backwards")       # or sleep until it catches up
             if now == self.last:
-                self.seq = (self.seq + 1) & 0xFFF                   # 12 bits
-                if self.seq == 0:                                   # 4,096 used this ms → wait for the next ms
+                self.seq = (self.seq + 1) & 0xFFF                  # 12 bits
+                if self.seq == 0:                                  # 4,096 used this ms → next ms
                     while now <= self.last: now = int(time.time() * 1000)
             else:
                 self.seq = 0
@@ -86,98 +88,95 @@ class Snowflake:
             return ((now - EPOCH) << 22) | (self.worker << 12) | self.seq
 ```
 
-**Capacity math:**
+**Capacity:** 2⁴¹ ms ≈ **69.7 years** · 1,024 workers × 4,096,000 IDs/s ≈ **4.2 billion IDs/s** total.
 
-```
-41 bits of ms ≈ 2^41 ms ≈ 69.7 years from the custom epoch
-10 bits → 1,024 workers · 12 bits → 4,096 IDs/ms/worker
-Total ≈ 1,024 × 4,096,000 ≈ 4.2 billion IDs/s. Plenty.
-```
-
-**Comparison of formats:**
+**Maya's fix:** order IDs become Snowflake-style with the **logical shard in the worker bits**, so `order_id → shard` is a bit shift, with no lookup. Customers see a separate **random public order code** (`PNTRY-7KQ2-X9M4`), so nobody can count Pantry's daily volume.
 
 | Format | Size | Sortable | Coordination | Guessable? |
 |---|---|---|---|---|
-| Auto-increment | 64-bit | ✅ | Central DB | ✅ Very (enumeration risk) |
+| Auto-increment | 64-bit | ✅ | Central DB | ✅ very |
 | UUIDv4 | 128-bit | ❌ | None | ❌ |
-| UUIDv7 / ULID | 128-bit | ✅ (ms) | None | Partly (the time part) |
-| Snowflake | 64-bit | ✅ | Worker ID assignment | Partly |
+| UUIDv7 / ULID | 128-bit | ✅ (ms) | None | Partly |
+| Snowflake | 64-bit | ✅ (k-sorted) | Worker IDs | Partly |
 | Range blocks | 64-bit | ~✅ | Occasional | ✅ |
 
 ## ⚖️ Trade-offs
 
-| Choice | Gain | Cost |
+| Maya's choice | What she gains | What she pays |
 |---|---|---|
-| Auto-increment | Simplest, compact | Bottleneck, SPOF, leaks volume, cross-shard pain |
+| Auto-increment | Simplest, compact | Bottleneck, SPOF, leaks volume, shard collisions |
 | UUIDv4 | Zero coordination | Big, unordered → index churn |
-| UUIDv7 / ULID | No coordination + time-ordered | 128 bits |
-| Snowflake | Compact + ordered + fast | Worker IDs, clock skew handling |
-| Don't expose raw IDs | Prevents enumeration | Needs public IDs or authZ checks anyway |
+| UUIDv7 / ULID | No coordination + time order | 128 bits |
+| Snowflake | Compact + ordered + fast | Worker ID management, clock-skew handling |
+| Separate public IDs | No enumeration or volume leaks | One more identifier to map |
 
 ## 🌍 Real world
 
-- **Twitter Snowflake** (2010) → **Discord**, **Instagram** (shard-embedded variant), **Sony Sonyflake**, **Baidu UidGenerator**.
-- **UUIDv7** was standardized in **RFC 9562** (2024), with growing database support.
-- **MongoDB ObjectId:** 4-byte timestamp + a 5-byte random value + a 3-byte counter (also roughly sortable).
+- **Twitter Snowflake** (2010) inspired **Discord's** IDs, **Sony's Sonyflake**, and **Baidu's UidGenerator**.
+- **Instagram** embeds a 13-bit logical shard ID in IDs generated inside Postgres.
+- **MongoDB ObjectId** = timestamp + random value + counter, also roughly sortable.
 
 ## 📌 Cheat card
 
-> - **Snowflake = 41 time | 10 machine | 12 sequence** ("**41-10-12**") → 4,096 IDs/ms/worker, ~69 years.
-> - **UUIDv7/ULID** = time-ordered 128-bit IDs with no coordination (a great default).
-> - **UUIDv4** = random, which hurts B-tree insert locality.
-> - Watch out: **unique worker IDs**, **clock going backwards**, **don't leak volume** with sequential public IDs.
-> - Need short codes? **Range allocation + base62** (lesson 074).
+> - **Snowflake = 41 time | 10 worker | 12 sequence** ("**41-10-12**") → 4,096/ms/worker, ~69 years.
+> - **UUIDv7/ULID** = time-ordered 128-bit, no coordination (a great default).
+> - **UUIDv4** hurts B-tree insert locality.
+> - Watch **unique worker IDs**, **backwards clocks**, and **don't expose sequential IDs**.
+> - Short codes → **range allocation + base62**.
 
 ## 🧪 Feynman check
 
-Explain the festival-ticket analogy, and why "time + gate number + counter" can never collide even without calling the office.
+Explain the festival gates, and why "time + gate number + counter" can never collide even without ever calling the office.
 
-⚠️ **Common confusion:** "Snowflake IDs are strictly ordered." They're **roughly** ordered (k-sorted). IDs from different machines in the same millisecond, or with slight clock skew, may be out of order. Don't use them as a perfect global sequence.
+⚠️ **Common confusion:** "Snowflake IDs are strictly ordered." They're only **k-sorted** (roughly ordered). Two machines in the same millisecond, or with slightly skewed clocks, can produce IDs out of real-time order. Never treat them as a perfect global sequence.
 
 ## ⚡ Quick recall
 
 1. What are the three parts of a Snowflake ID?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Timestamp (41 bits), machine/worker ID (10 bits), per-millisecond sequence (12 bits).
+Timestamp (41 bits), worker/machine ID (10 bits), and a per-millisecond sequence (12 bits).
 </details>
 
-2. Why are random UUIDv4 primary keys bad for B-tree write performance?
-<details><summary>Answer</summary>
+2. Why are random UUIDv4 primary keys bad for B-tree writes?
+<details><summary>Reveal Answer</summary>
 
 Inserts land at random positions in the index, causing page splits, poor cache locality, and more I/O.
 </details>
 
 3. What happens if a Snowflake generator's clock moves backwards?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 It could reuse timestamps and generate duplicates, so it must detect this and wait or refuse until the clock catches up.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Design a unique ID generator for a distributed system creating 1M IDs/s."**
+**Q. "Design a unique ID generator producing 1M IDs per second across many services. And why not just use the database's auto-increment?"**
 <details><summary>Model answer</summary>
 
-- Clarify: 64-bit? sortable? exposed publicly?
-- A **Snowflake-style** generator embedded as a library in each service instance (no network hop): a custom epoch, a 10-bit worker ID assigned from etcd/ZooKeeper leases (or pod ordinal), and a 12-bit sequence.
-- Capacity: 4,096/ms per worker × 1,000 = 4M/s per worker, so 1M/s is easy.
-- Handle clock skew (NTP monitoring, refuse on backwards jumps), and worker ID reuse after crashes (lease expiry).
-- Alternative: **UUIDv7** if 128 bits is acceptable, since there are no worker IDs to manage.
-- **Likely follow-up:** "How do you avoid exposing volume?" → use opaque public IDs (a random slug or an encrypted ID) separate from internal IDs.
+- **Clarify:** 64-bit or 128-bit? time-sortable? exposed publicly?
+- **Design:**
+  - A **Snowflake-style library** embedded in each service instance, so there's **no network hop** per ID.
+  - A **custom epoch**, 10-bit **worker IDs** leased from etcd/ZooKeeper (or derived from StatefulSet ordinals), and a 12-bit sequence.
+  - **Capacity:** 4,096/ms ≈ 4M/s per worker, so 1M/s needs just a handful of workers.
+- **Hazards:**
+  - **Clock skew:** monitor NTP, **refuse or wait** on backward jumps, and alert.
+  - **Worker ID reuse:** leases expire before an ID can be reassigned, so two live processes never share one.
+- **Alternative:** **UUIDv7**, if 128 bits is acceptable. No worker IDs to manage at all.
+- **Public exposure:** keep internal IDs internal, and show customers an **opaque public ID** (a random slug or an encrypted ID) to prevent enumeration and volume leaks.
+- **Why not auto-increment:**
+  - One sequence = a **write bottleneck and SPOF**.
+  - **Shards collide** without offsets or a central allocator.
+  - The ID exists only **after** the insert, which is awkward when you need it beforehand for events, idempotency keys, or outbox rows.
+  - Sequential public IDs leak metrics and invite scraping.
+  - It's **fine** for a single primary with modest write rates and internal-only IDs.
+- **Likely follow-up:** "Can the ID encode routing?" → yes, put the logical shard in the worker bits (Instagram-style), so the service routes by bit-shifting, with no lookup.
 </details>
 
-**Q2. "Why not just use the database's auto-increment?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- A single sequence = a **write bottleneck and SPOF**. Across **shards**, the sequences collide unless you use offsets or a central allocator.
-- IDs are generated only **after the insert** (a round trip), which is awkward for event-driven flows where you need the ID before writing.
-- Sequential public IDs leak business metrics and invite enumeration.
-- It's fine for small, single-DB systems, and it's simple.
-- **Likely follow-up:** "When is auto-increment fine?" → a single primary with moderate write rates, and internal IDs only.
-</details>
-
-> 📖 *Chapter 9 is next. Pantry's big features, designed properly from scratch.*
+> 📖 *Chapter 9 is next. Pantry has every building block it needs, and Maya's year of big features begins with a blank whiteboard and a framework for designing anything.*
 
 ---
 

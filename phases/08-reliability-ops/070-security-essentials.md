@@ -8,160 +8,160 @@
 
 ## 📖 Story
 
-After the incident, Leo hired a security auditor. The report was long: database passwords in the code repository, unencrypted backups, an admin panel open to the whole internet… Maya read it with her head in her hands. I told her what I'll tell you: security isn't one big lock. It's layers.
+The security audit arrives as a 41-page PDF. Maya opens it, and every page feels like a door she forgot to lock:
+
+- **Page 3:** the production database password sits in a **public-by-mistake git repo**, in a config file, in plain text.
+- **Page 9:** nightly backups are **unencrypted** in an object storage bucket.
+- **Page 14:** the admin panel is reachable from **the entire internet**, protected by a password and nothing else.
+- **Page 22:** the "dish preview" feature fetches **any URL a user types**, from *inside* Pantry's network.
+- **Page 30:** one service's cloud role can **read every bucket** in the account.
+
+None of these is a single catastrophe. Each one is a **stepping stone**. Chain three together and an attacker walks from the internet to the vault.
+
+Maya reads it with her head in her hands. I told her what I'll tell you: **security isn't one big lock. It's layers.**
 
 ## 🎯 One-sentence idea
 
-**Secure systems use layers of defense: encrypt data in transit and at rest, keep secrets out of code, give every component the least privilege it needs, validate all input, protect the edge from abuse and DDoS, and collect and keep only the personal data you need.**
+**Secure systems use defence in depth: encrypt data in transit and at rest, keep secrets out of code, grant every component least privilege, validate all input, shield the edge from abuse and DDoS, and collect and keep only the personal data you truly need.**
 
 ## 🧸 Analogy
 
 A **bank building**:
 
-- 🧱 **Defense in depth:** a fence, locked doors, guards, cameras, *and* a vault. Breaking one layer doesn't give you the money.
-- 🔐 **Encryption:** cash moves in **armored trucks** (in transit) and sits in a **locked vault** (at rest).
-- 🗝️ **Secrets management:** vault codes are kept in a **safe**, not written on a sticky note by the door (not in source code).
-- 👮 **Least privilege:** the cleaner's key opens the offices, **not the vault**.
-- 🛂 **Input validation:** the teller checks every form, and doesn't blindly do whatever a note says.
-- 🚧 **DDoS protection:** crowd barriers stop a mob from blocking the entrance for real customers.
+- 🧱 **Defence in depth:** fence, locked doors, guards, cameras, *and* a vault.
+- 🔐 **Encryption:** armoured trucks (in transit) and a vault (at rest).
+- 🗝️ **Secrets:** vault codes in a safe, **not on a sticky note by the door**.
+- 👮 **Least privilege:** the cleaner's key opens offices, **not the vault**.
+- 🛂 **Validation:** the teller checks every form instead of obeying whatever a note says.
+- 🚧 **DDoS protection:** barriers keep a mob from blocking real customers.
 
 ## 🖼️ Visual
+
+*Diagram brief:* concentric rings around the data core: edge (WAF, DDoS), gateway (TLS, authN, limits), services (authZ, validation, least-privilege IAM), and data (encryption, KMS, audit). A secrets vault and network segmentation sit beside the rings.
 
 ```mermaid
 flowchart LR
     U["🌍 Internet"] --> EDGE["🛡️ Edge: CDN + WAF +<br/>DDoS scrubbing + rate limits"]
-    EDGE --> GW["🚪 Gateway: TLS, authN,<br/>input size limits"]
+    EDGE --> GW["🚪 Gateway: TLS, authN,<br/>request size limits"]
     GW --> SVC["⚙️ Services: authZ,<br/>input validation,<br/>least-privilege IAM"]
     SVC --> DATA[("🔒 Data: encrypted at rest,<br/>KMS keys, audit logs")]
     SEC["🗝️ Secrets manager<br/>(Vault / KMS)"] -.-> SVC
-    NET["🧱 Private subnets,<br/>security groups, mTLS"] -.-> SVC
+    NET["🧱 Private subnets, security groups, mTLS"] -.-> SVC
 ```
 
 ## 🔬 How it works
 
-- **Encryption in transit:** TLS everywhere (lesson 013), including internal traffic in zero-trust setups (mTLS).
-- **Encryption at rest:** disk and database encryption (AES-256), with keys in a **KMS**. **Envelope encryption:** data keys encrypt the data, and a master key in the KMS encrypts the data keys. Field-level encryption for the most sensitive fields (SSN, card data).
-- **Secrets management:** API keys, DB passwords, and signing keys live in **Vault / AWS Secrets Manager / KMS**, never in git or images. **Rotate** them regularly, prefer short-lived credentials (IAM roles, workload identity), and scan repos for leaked secrets.
-- **Least privilege & zero trust:** every service gets only the permissions it needs (IAM policies). The network is segmented (private subnets, security groups). Nothing is trusted just because it's "inside the network". Every call is authenticated and authorized.
-- **Input handling (OWASP basics):**
-  - **SQL injection** → parameterized queries, never string concatenation.
-  - **XSS** → output encoding, Content Security Policy.
-  - **CSRF** → SameSite cookies, CSRF tokens.
-  - **SSRF** → don't fetch arbitrary user-provided URLs from inside your network, or allow-list them.
-  - **Broken object-level authorization** → check ownership on every object (lesson 069).
-  - Limit request sizes, validate types and ranges, and reject unexpected fields.
-- **Edge protection:** **WAF** (blocks common attack patterns), **DDoS protection** (CDN/Anycast absorbs volumetric floods: Cloudflare, AWS Shield), **rate limiting** and **bot detection** (lesson 024).
-- **Privacy & compliance:** **data minimization** (don't collect what you don't need), **PII** classification, retention limits, the **right to deletion** (GDPR), **data residency**, **tokenization** of card data (PCI-DSS, so card numbers never touch your servers), and **audit logs** (who accessed what).
-- **Supply chain:** pin dependencies, scan for vulnerabilities, sign build artifacts, and use minimal container images.
-- **Assume breach:** detection (anomaly alerts), blast-radius limits, and an incident response plan.
+- **Encrypt in transit and at rest:** TLS everywhere, including **mTLS** internally for zero-trust (lesson 013). AES-256 at rest with keys in a **KMS** via **envelope encryption**, plus **field-level** encryption or **tokenization** for the crown jewels (card data, national IDs).
+- **Secrets never live in code:** use Vault / Secrets Manager, **short-lived credentials** (IAM roles, workload identity), **rotation**, and secret scanning in CI. Assume anything committed to git is already leaked.
+- **Least privilege + zero trust:** narrowly scoped IAM per service, private subnets, security groups, **no public admin surfaces** (SSO + VPN/zero-trust proxy), and authenticate and authorize **every** call, because "inside the network" is not a credential.
+- **Input is hostile (OWASP):** **parameterized SQL** (injection), output encoding + CSP (XSS), SameSite cookies / CSRF tokens, **SSRF defences** (egress proxy, block private and metadata IPs *after* DNS resolution), **object-level authZ** (lesson 069), and strict size and type limits.
+- **Edge, privacy, supply chain:** WAF + **Anycast DDoS scrubbing** + rate limits and bot detection (lesson 024). **Data minimization**, retention, deletion rights, and residency (GDPR). Pinned and scanned dependencies, signed artifacts, minimal images. **Assume breach**: audit logs, anomaly alerts, and an incident runbook.
 
 ## 🧩 Worked example
 
-**SQL injection vs parameterized query:**
-
 ```python
-# ❌ Vulnerable: name = "x'; DROP TABLE users; --"
+# ❌ Injectable: name = "x'; DROP TABLE users; --"
 db.execute(f"SELECT * FROM users WHERE name = '{name}'")
-
-# ✅ Safe: the driver sends data separately from the SQL
+# ✅ Parameterized: data travels separately from the SQL
 db.execute("SELECT * FROM users WHERE name = %s", (name,))
 ```
 
-**Envelope encryption:**
+**Envelope encryption for backups:**
 
 ```
-1. App asks KMS: "generate a data key" → gets {plaintext_key, encrypted_key}
-2. App encrypts the file with plaintext_key (AES-256-GCM), then discards plaintext_key
-3. Stores: encrypted_file + encrypted_key
-4. To read: ask KMS to decrypt encrypted_key (access is audited and policy-checked), then decrypt the file
-→ The master key never leaves the KMS. Rotating it doesn't require re-encrypting all data.
+1. Ask KMS for a data key → {plaintext_key, encrypted_key}
+2. Encrypt the backup with plaintext_key (AES-256-GCM), then wipe plaintext_key from memory
+3. Store encrypted_backup + encrypted_key
+4. Restore: KMS decrypts encrypted_key (IAM-checked, audited) → decrypt the backup
+→ The master key never leaves the KMS; rotating it doesn't mean re-encrypting terabytes.
 ```
 
-**Security review checklist for any design:**
+**Maya's remediation map:**
 
-| Layer | Question |
+| Audit page | Fix |
 |---|---|
-| Edge | WAF? DDoS? Rate limits? TLS 1.2+? |
-| Identity | MFA? Short-lived tokens? Service identity (mTLS)? |
-| AuthZ | Object-level checks? Least-privilege IAM? |
-| Data | Encrypted at rest? PII minimized? Retention? Backups encrypted? |
-| Secrets | In a vault? Rotated? None in code or logs? |
-| Monitoring | Audit logs? Anomaly alerts? Incident runbook? |
+| 3: DB password in git | Rotate it **now**, move to Secrets Manager, IAM DB auth, secret scanning in CI |
+| 9: unencrypted backups | KMS envelope encryption, a separate backup account, object lock |
+| 14: public admin panel | Behind SSO + a zero-trust proxy, MFA, IP allow-list |
+| 22: URL preview (SSRF) | Isolated egress proxy, block RFC1918 and `169.254.169.254`, IMDSv2 |
+| 30: over-broad role | Per-service least-privilege policies, access analyzer |
 
 ## ⚖️ Trade-offs
 
-| Control | Gain | Cost |
+| Maya's choice | What she gains | What she pays |
 |---|---|---|
-| mTLS everywhere | Zero-trust service identity | Certificate management (use a mesh) |
-| Field-level encryption | Protects the most sensitive data even from DB admins | Can't easily query or index encrypted fields |
-| Strict WAF rules | Blocks attacks | False positives block real users |
-| Data minimization | Less to breach, easier compliance | Less data for analytics or ML |
-| Tokenization (card vault) | Out of PCI scope | Dependency on the vault provider |
+| mTLS everywhere | Zero-trust service identity | Certificate machinery (use a mesh) |
+| Field-level encryption | Protects data even from DB admins | Hard to query or index those fields |
+| Strict WAF rules | Blocks attacks | False positives hit real users |
+| Data minimization | Less to breach, easier compliance | Less data for analytics and ML |
+| Card tokenization | Out of most PCI scope | Dependency on the vault provider |
 
 ## 🌍 Real world
 
-- **Equifax 2017:** an unpatched web framework led to 147M people's data leaked. Patching and segmentation matter.
-- **Capital One 2019:** an SSRF + an overly permissive IAM role led to 100M records. Least privilege matters.
-- **Stripe Elements / tokenization** keeps card numbers off merchants' servers.
-- **Google BeyondCorp** pioneered zero-trust networking.
+- **Equifax 2017:** an unpatched framework exposed **147M** people's data. Patch and segment.
+- **Capital One 2019:** **SSRF + an over-permissive IAM role** exposed **~100M** records. Least privilege matters.
+- **Google BeyondCorp** pioneered zero-trust networking. **Stripe Elements** keeps card numbers off merchants' servers.
 
 ## 📌 Cheat card
 
-> - **Defense in depth**: edge → gateway → service → data.
-> - **TLS in transit + AES at rest (KMS, envelope encryption).**
+> - **Defence in depth:** edge → gateway → service → data.
+> - **TLS in transit · AES at rest · KMS envelope encryption.**
 > - **Secrets in a vault**, rotated, short-lived. Never in git or logs.
-> - **Least privilege + zero trust** (authenticate every call).
-> - OWASP basics: **parameterized SQL, output encoding, CSRF tokens, SSRF allow-lists, object-level authZ**.
-> - **Collect less PII**, set retention, and support deletion.
+> - **Least privilege + zero trust.**
+> - **OWASP:** parameterized SQL, output encoding, CSRF tokens, SSRF egress controls, object-level authZ.
+> - **Collect less PII**, with retention and deletion.
 
 ## 🧪 Feynman check
 
-Explain the bank-building layers, and why "the cleaner's key doesn't open the vault" matters when a hacker steals the cleaner's key.
+Explain the bank's layers, and why "the cleaner's key doesn't open the vault" matters on the day an attacker steals the cleaner's key.
 
-⚠️ **Common confusion:** "We're behind a firewall/VPN, so internal traffic is safe." Attackers who get in (phishing, a compromised dependency) move laterally. **Zero trust** assumes the network is hostile.
+⚠️ **Common confusion:** "We're behind a firewall/VPN, so internal traffic is safe." Phishing, a compromised dependency, or one leaked credential puts an attacker **inside**, where flat networks let them move laterally to anything. **Zero trust** assumes the network is already hostile.
 
 ## ⚡ Quick recall
 
 1. What is envelope encryption?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Data is encrypted with a data key, and that data key is itself encrypted with a master key held in a KMS, so the master key never leaves the KMS.
+Data is encrypted with a data key, and that data key is encrypted by a master key held in a KMS, so the master key never leaves the KMS.
 </details>
 
 2. How do you prevent SQL injection?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Parameterized queries or prepared statements (never concatenate user input into SQL), plus input validation and a least-privilege DB user.
+Parameterized queries or prepared statements (never concatenate input into SQL), plus validation and a least-privilege DB user.
 </details>
 
 3. What does "least privilege" mean?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Each user or component gets only the minimum permissions required to do its job.
+Each user or component gets only the minimum permissions required for its job.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "How would you secure a healthcare app storing patient records?"**
+**Q. "Your service fetches previews of user-supplied URLs. What's the risk, and how do you secure a healthcare app's patient records in the same platform?"**
 <details><summary>Model answer</summary>
 
-- **Encryption:** TLS everywhere, encryption at rest with KMS-managed keys, and field-level encryption for especially sensitive fields.
-- **Access control:** strong AuthN (MFA/SSO for staff), fine-grained AuthZ (patients see their own records, clinicians see their patients'), and **audit logs of every access**, with alerts on anomalies.
-- **Network:** private subnets, no public DB endpoints, mTLS between services.
-- **Compliance:** HIPAA (BAAs with vendors), data minimization, retention policies, backups encrypted and tested.
-- **Ops:** secrets in a vault, patch management, and an incident response plan.
-- **Likely follow-up:** "How do you let analysts use the data?" → de-identified or pseudonymized datasets in a separate environment, with strict access.
+- **The URL preview risk: SSRF.**
+  - Attackers make your server fetch **internal** targets: the cloud metadata endpoint `169.254.169.254` (stealing role credentials), admin APIs, internal databases.
+  - **Mitigations:**
+    - Run fetches through an **isolated egress proxy** in a sandboxed network.
+    - Allow only http/https.
+    - **Block private, loopback, and link-local ranges *after* DNS resolution**, re-check on **every redirect**, and **pin the resolved IP** (to defeat DNS rebinding).
+    - Size and time limits, and **IMDSv2** on AWS.
+- **Patient records:**
+  - **Encryption:** TLS + mTLS internally, KMS-backed encryption at rest, **field-level encryption** for the most sensitive attributes, and encrypted backups in a separate account.
+  - **Access:** MFA/SSO for staff, **fine-grained authZ** (patients see their own records, clinicians see their patients'), **break-glass** access with justification, and **audit logs for every read**, with anomaly alerts.
+  - **Network:** private subnets, no public DB endpoints, least-privilege IAM per service.
+  - **Compliance:** HIPAA (BAAs with vendors), data minimization, and retention and deletion policies.
+  - **Analytics:** **de-identified or pseudonymized** datasets in a separate environment.
+  - **Operations:** secrets in a vault, patch SLAs, dependency scanning, and an incident response plan with breach-notification steps.
+- **Likely follow-up:** "What's DNS rebinding?" → a hostname resolves to a public IP at check time and a private IP at fetch time. Pinning the IP you validated closes the gap.
 </details>
 
-**Q2. "Your service accepts a URL from users and fetches a preview. What's the risk?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- **SSRF:** attackers make your server fetch internal endpoints (the cloud metadata service `169.254.169.254`, internal admin APIs) and exfiltrate credentials.
-- Mitigate: fetch from an **isolated egress proxy** in a sandboxed network, **block private/link-local IP ranges** (checked *after* DNS resolution, and re-checked on redirects), allow only http/https, set size and time limits, and use IMDSv2 in AWS.
-- **Likely follow-up:** "What's DNS rebinding?" → a hostname resolves to a public IP at check time and a private IP at fetch time, so pin the resolved IP for the request.
-</details>
-
-> 📖 *Next, with 60 services, nobody knows which address is where anymore.*
+> 📖 *Pantry is locked down, but it now runs 60 services whose addresses change every few minutes, and nobody knows anymore where anything actually lives.*
 
 ---
 

@@ -8,59 +8,57 @@
 
 ## 📖 Story
 
-The last three outages all started with a deploy. One broke checkout for every customer at once, and rolling it back took forty minutes. I confessed to Maya that most outages I've ever caused were changes I made myself. I'll teach you what I taught her: ship gradually, and be able to undo instantly.
+Friday, 4:47 p.m. A new checkout release ships to **all 120 servers at once**. Green build. Green tests. Weekend vibes.
+
+At 4:52 p.m. the payment success rate drops from **98% to 61%**. A tiny change in how currency rounding works has made a third of all card authorizations fail, and **every single customer** is on the new code.
+
+Rolling back means rebuilding the old version, redeploying 120 servers, and waiting for health checks. **Forty minutes.** At the start of the Friday dinner rush.
+
+Maya pulls up the incident history and feels a chill. **The last three outages all started with a deploy.** Not a disk failure, not a region outage. *Pantry's own changes.*
+
+I confessed to her what I'll confess to you: most outages I've ever caused were changes I made myself. I'll teach you what I taught her: **ship gradually, and be able to undo instantly.**
 
 ## 🎯 One-sentence idea
 
-**Most outages are caused by changes, so ship them gradually and reversibly. Rolling updates replace servers bit by bit, blue-green switches all traffic between two environments at once, canaries expose a small percentage first, and feature flags separate "deploying code" from "turning features on".**
+**Most outages come from changes, so ship them gradually and reversibly: rolling updates replace servers bit by bit, blue-green flips all traffic between two environments, canaries expose a small percentage first, and feature flags separate "deploying code" from "turning features on."**
 
 ## 🧸 Analogy
 
 A **restaurant changing its menu**:
 
-- 🔄 **Rolling:** swap the menus **table by table** through the evening.
-- 🔵🟢 **Blue-green:** set up a **second identical dining room** with the new menu. When it's ready, **redirect all guests** to it at once. Problem? **Send everyone back** to the old room instantly.
-- 🐤 **Canary:** give the new dish to **5% of tables first**. If no one gets sick, roll it out to everyone. (Miners took canaries into mines as early warning.)
-- 🎚️ **Feature flags:** the new dish is **already in the kitchen**, and a switch on the manager's panel decides who gets offered it, with no kitchen rebuild needed.
+- 🔄 **Rolling:** swap menus **table by table** through the evening.
+- 🔵🟢 **Blue-green:** prepare a **second identical dining room**, move every guest at once, and move them back instantly if needed.
+- 🐤 **Canary:** serve the new dish to **5% of tables** first. (Miners carried canaries as early warning.)
+- 🎚️ **Feature flags:** the dish is **already in the kitchen**, and a switch on the manager's panel decides who gets offered it.
 
 ## 🖼️ Visual
+
+*Diagram brief:* on the left, a load balancer pointing at blue with a dotted "flip" arrow to green. On the right, a thin 5% stream to a canary feeding a metrics gate that either widens the stream or snaps it back.
 
 ```mermaid
 flowchart LR
     subgraph BG["🔵🟢 Blue-green"]
         LB1["LB"] -->|"100%"| BLUE["Blue v1"]
-        LB1 -.->|"switch"| GREEN["Green v2 (ready)"]
+        LB1 -.->|"flip"| GREEN["Green v2 (warmed, tested)"]
     end
     subgraph CAN["🐤 Canary"]
         LB2["LB"] -->|"95%"| V1["v1 fleet"]
         LB2 -->|"5%"| V2["v2 canary"]
-        V2 --> MON{"Errors / latency OK?"}
+        V2 --> MON{"Payment success, errors,<br/>p99 vs baseline OK?"}
         MON -->|"yes"| PROMOTE["25% → 50% → 100%"]
-        MON -->|"no"| ROLLBACK["Auto-rollback"]
+        MON -->|"no"| ROLLBACK["Auto-rollback in seconds"]
     end
 ```
 
 ## 🔬 How it works
 
-- **Rolling update:** replace instances in batches (e.g., 10% at a time), gated by readiness checks.
-  - ✅ No extra capacity needed, and it's the Kubernetes default. ❌ Mixed versions run at once, and rollback is also a rolling process (slower).
-- **Blue-green:** two full environments. Deploy to the idle one (green), test it, then **flip traffic** (LB/DNS).
-  - ✅ **Instant rollback** (flip back), and you test in a production-like environment. ❌ 2× capacity during the switch, and the database is shared (schema changes must suit both).
-- **Canary:** send a small slice of real traffic (1% → 5% → 25% → 100%) to the new version. **Automatically compare** error rate and latency against the baseline, and promote or roll back.
-  - ✅ Catches problems with minimal blast radius, using real traffic. ❌ Needs good metrics and traffic splitting, and it's slower.
-- **Feature flags / toggles:** code ships **dark** (off), and is enabled per user, percentage, region, or internal staff.
-  - ✅ Decouples deploy from release, gives instant kill switches, A/B tests, and trunk-based development. ❌ Flag debt (clean them up!), and combinations to test.
-- **Shadow / dark launch:** mirror real traffic to the new version without using its responses, to test performance safely.
-- **Database changes: expand → migrate → contract** (backward-compatible migrations):
-  1. **Expand:** add the new column or table (the old code ignores it).
-  2. Deploy code that writes **both** and reads the new one, and **backfill** the data.
-  3. **Contract:** remove the old column once nothing uses it.
-  - Never deploy code and a breaking schema change together, because rollback would break.
-- **Automate rollback** on SLO regression. Deploy during working hours, and freeze during peak events.
+- **Rolling:** replace instances in batches (e.g. 10%) gated by readiness. It's cheap and the Kubernetes default, but versions are mixed and rollback is itself a slow roll.
+- **Blue-green:** deploy to the idle environment, test it, then **flip traffic** at the LB. **Rollback is instant** (flip back), but you need **2× capacity** briefly, and the **database is shared**, so schemas must suit both versions.
+- **Canary:** send 1% → 5% → 25% → 100% of real traffic, **automatically comparing** error rate, latency, and **business metrics** against the stable baseline, and **auto-rolling back** on regression. Small blast radius, but it needs good metrics.
+- **Feature flags:** ship code **dark**, then enable it per user, percentage, region, or staff. **Deploy ≠ release**, with instant kill switches and A/B tests. Clean up **flag debt**. **Shadow launches** mirror real traffic to v2 and discard its responses.
+- **Database changes are expand → migrate → contract:** add new structures (old code ignores them) → dual-write + backfill → switch reads → stop the old writes → drop. **Never** ship code and a breaking schema change together. Freeze risky deploys during peaks.
 
 ## 🧩 Worked example
-
-**Canary with automatic analysis (Argo Rollouts-style):**
 
 ```yaml
 strategy:
@@ -68,7 +66,7 @@ strategy:
     steps:
       - setWeight: 5
       - pause: { duration: 10m }
-      - analysis: { templates: [{ templateName: error-rate-and-p99 }] }   # compare vs stable
+      - analysis: { templates: [{ templateName: payment-success-and-p99 }] }
       - setWeight: 25
       - pause: { duration: 10m }
       - setWeight: 50
@@ -76,99 +74,99 @@ strategy:
       - setWeight: 100
 ```
 
-**Feature flag in code:**
-
 ```python
-if flags.enabled("new_checkout_flow", user=user):   # 10% of users, staff always on
+if flags.enabled("new_currency_rounding", user=user):   # staff + 1% of users, sticky
     return new_checkout(cart)
 return old_checkout(cart)
 ```
 
-**Renaming a column safely (expand/contract):**
+**Friday, replayed:** v2 gets **5%** → payment success on the canary drops to 61% vs 98% on stable → analysis fails at **minute 3** → **automatic rollback**. Impact: **~1.6% of checkouts for 3 minutes** instead of **every checkout for 40 minutes**. The fix ships Monday, behind a flag.
+
+**Renaming a column safely:**
 
 ```
-Release 1: ADD COLUMN full_name; code writes name + full_name, still reads name
-Backfill:  UPDATE users SET full_name = name WHERE full_name IS NULL (in batches)
-Release 2: code reads full_name, and still writes both
-Release 3: code stops writing name
-Release 4: DROP COLUMN name
-Every step is independently deployable AND rollback-safe ✅
+R1: ADD COLUMN full_name; write name + full_name, read name
+    Backfill full_name in throttled batches
+R2: read full_name, still write both
+R3: stop writing name
+R4: DROP COLUMN name           ← each step deployable AND rollback-safe ✅
 ```
 
 ## ⚖️ Trade-offs
 
 | Strategy | Rollback speed | Extra capacity | Blast radius | Complexity |
 |---|---|---|---|---|
-| Recreate (stop all, start new) | Slow | None | 100% + downtime | 🟢 |
+| Recreate | Slow | None | 100% + downtime | 🟢 |
 | Rolling | Medium | Little | Growing % | 🟢 |
-| Blue-green | ⚡ Instant | 2× | 100% at the switch | 🟡 |
+| Blue-green | ⚡ Instant | 2× | 100% at the flip | 🟡 |
 | Canary | Fast (automatic) | Little | Small % | 🟡–🔴 |
-| Feature flags | ⚡ Instant (per feature) | None | Configurable | 🟡 (flag debt) |
+| Feature flags | ⚡ Instant, per feature | None | Configurable | 🟡 flag debt |
 
 ## 🌍 Real world
 
-- **Google SRE:** about 70% of outages come from changes, hence progressive rollouts everywhere.
-- **Netflix Spinnaker / Kayenta** does automated canary analysis. **Argo Rollouts / Flagger** does it for Kubernetes.
-- **LaunchDarkly, Unleash, Flagsmith** are feature flag platforms. Facebook's **Gatekeeper** is an internal equivalent.
-- **The 2024 CrowdStrike incident** showed the danger of pushing a change to everyone at once, with no staged rollout.
+- **Google SRE** estimates that roughly **70% of outages come from changes**, so progressive rollouts are mandatory there.
+- **Netflix Spinnaker + Kayenta** do automated canary analysis. **Argo Rollouts / Flagger** do it on Kubernetes.
+- **The 2024 CrowdStrike incident** showed the cost of pushing one change to everyone simultaneously, with no staged rollout.
 
 ## 📌 Cheat card
 
 > - **Most outages = changes.** Make every change **gradual and reversible**.
-> - **Rolling** (default) · **Blue-green** (instant flip-back) · **Canary** (small % + auto-analysis) · **Flags** (deploy ≠ release).
-> - **DB migrations: expand → migrate → contract.** Always backward compatible.
-> - **Automate rollback** on SLO regressions. Clean up old flags.
+> - **Rolling · Blue-green (instant flip-back) · Canary (small % + automatic analysis) · Flags (deploy ≠ release).**
+> - **Schema: expand → migrate → contract.**
+> - **Automate rollback** on SLO and business-metric regression.
+> - **Clean up flags.** Avoid deploying before peaks.
 
 ## 🧪 Feynman check
 
-Explain the restaurant menu-change analogy for each strategy, and why changing the database and the code in one step is dangerous.
+Explain each strategy with the restaurant menu, and why changing the database and the code in one step is dangerous.
 
-⚠️ **Common confusion:** "Blue-green makes rollbacks free." Only for **stateless** code. If green already wrote data in a new format or ran a destructive migration, flipping back to blue may break. That's why schema changes must be backward compatible.
+⚠️ **Common confusion:** "Blue-green makes rollback free." Only for **stateless code**. If green already wrote data in a new format, or ran a destructive migration, flipping back to blue can break, which is why schema changes must stay backward-compatible across both versions.
 
 ## ⚡ Quick recall
 
-1. Canary vs blue-green in one line each?
-<details><summary>Answer</summary>
+1. Canary vs blue-green, in one line each?
+<details><summary>Reveal Answer</summary>
 
-Canary: shift a small percentage of traffic to the new version and increase it gradually based on metrics. Blue-green: switch 100% of traffic between two full environments, with instant rollback.
+Canary: shift a small, growing percentage of traffic to the new version, gated by metrics. Blue-green: switch 100% of traffic between two full environments, with instant rollback.
 </details>
 
 2. What do feature flags decouple?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 Deploying code from releasing (enabling) the feature to users.
 </details>
 
 3. What are the three phases of a safe schema change?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 Expand (add new structures), migrate (dual-write, backfill, switch reads), contract (remove old structures).
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "How would you roll out a risky change to the payment service?"**
+**Q. "Roll out a risky change to the payment service, including a schema change that splits `users.name` into first and last name, with zero downtime."**
 <details><summary>Model answer</summary>
 
-- Put it behind a **feature flag** (off by default), and deploy dark.
-- Enable it for **internal users**, then a **canary cohort** (1% of traffic, low-risk regions or merchants), with automated comparison of the payment success rate, error rate, and latency against control.
-- Ramp up gradually (1 → 5 → 25 → 100%) with bake time at each step. Automatic rollback (flag off) on regression.
-- Any DB changes are expand/contract. Watch business metrics (authorization rates) as well as technical ones.
-- **Likely follow-up:** "How do you pick the canary population?" → random but sticky per user (a consistent experience), and exclude VIP or high-value merchants at first.
+- **The code path:**
+  - Ship behind a **feature flag**, off by default (deployed dark).
+  - Enable for **internal staff**, then a **canary cohort** (1%, random but **sticky per user**, excluding high-value merchants at first).
+  - **Automated comparison** vs control: payment **authorization rate**, error rate, p99. Business metrics catch what HTTP 200s hide.
+  - Ramp **1 → 5 → 25 → 100%** with bake time at each step. Any regression → **automatic flag-off** in seconds.
+- **The schema (expand/contract):**
+  1. **Expand:** add nullable `first_name`, `last_name`.
+  2. **Dual-write** old and new. **Backfill** existing rows in throttled batches (watch replica lag).
+  3. **Switch reads** to the new columns behind a flag, and verify with consistency checks.
+  4. **Stop writing** `name`, and wait out the rollback window.
+  5. **Drop** `name`.
+  - Every step is deployable and reversible **on its own**.
+- **Other consumers reading `users.name` directly?** That's the shared-database anti-pattern. Keep the old column until every consumer moves to an API or event, and coordinate the migration.
+- **Guardrails:** no deploys during peak windows, an on-call engineer watching, runbooks for manual flag-off, and a post-rollout cleanup ticket for the flag.
+- **Likely follow-up:** "Why not blue-green here?" → it flips 100% at once, so a subtle payment regression would hit everyone before the metrics noticed. Canaries contain it.
 </details>
 
-**Q2. "We need to split the `users.name` column into first_name and last_name with zero downtime. How?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- **Expand:** add `first_name` and `last_name` (nullable).
-- **Dual-write:** the app writes both the old and new columns, and **backfills** existing rows in batches (throttled, to avoid replica lag).
-- **Switch reads** to the new columns (behind a flag), and verify.
-- **Stop writing** the old column, and later **drop** it.
-- Each step is deployable and reversible on its own.
-- **Likely follow-up:** "What if other services read `users.name` directly?" → that's the shared-DB anti-pattern. Coordinate via APIs or events, and keep the old column until all consumers migrate.
-</details>
-
-> 📖 *Next, a security researcher emails: "I can see other people's orders."*
+> 📖 *Deploys are boring now, in the best way, and then a security researcher emails a single line: "I can see other people's orders."*
 
 ---
 
