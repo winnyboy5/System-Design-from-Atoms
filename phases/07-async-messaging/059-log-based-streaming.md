@@ -8,156 +8,161 @@
 
 ## 📖 Story
 
-The analytics team found a bug that had corrupted last week's revenue numbers. "Can we just replay last week's orders?" they asked. With an ordinary queue, those messages are gone forever. Then Maya discovered the tool I reach for most often in my own work: a log you can reread.
+Monday morning, the analytics dashboard says Pantry's revenue **dropped 31%** last week. The investors' email is already drafted.
+
+It's a lie. A bug in the analytics consumer has been **double-counting refunds** for seven days. The fix is a two-line change.
+
+But fixing the code doesn't fix the **numbers**. To recompute last week, analytics needs last week's order events, all **4.2 million** of them. And the queue did exactly what queues do: the moment each message was acknowledged, it was **deleted**. Gone, like chalk wiped off a blackboard.
+
+Maya stares at the empty queue, imagining an alternative: a stream where messages **stay**, where any consumer can **rewind** to any point in time, and where new services can **replay history** from day one.
+
+Then she discovered the tool I reach for most often in my own work: **a log you can reread.**
 
 ## 🎯 One-sentence idea
 
-**Kafka-style systems store messages in an append-only, partitioned log that's kept for days, not deleted on read. Each consumer group tracks its own position (offset), so many consumers can read the same stream independently, in order per partition, and replay history whenever they want.**
+**Kafka-style systems keep messages in an append-only, partitioned log retained for days rather than deleted on read, and each consumer group tracks its own offset, so many consumers can read the same stream independently, in order per partition, and replay history whenever they need to.**
 
 ## 🧸 Analogy
 
-A **ship's logbook** (vs a to-do list):
+A **ship's logbook**, not a to-do list:
 
-- Entries are **only appended**, never erased, and numbered 0, 1, 2, 3…
-- Many readers can read the same logbook. Each keeps a **bookmark** (offset) of where they're up to.
-- A new reader can start **from page 1** (replay history) or from **today**.
-- The logbook is so big it's split into **several volumes** (partitions). Entries about the same ship always go in the same volume, so they stay in order.
-
-A classic queue is a **to-do list**: once a task is done, it's crossed off and gone.
+- Entries are **only appended**, never erased, and numbered 0, 1, 2…
+- Every reader keeps their own **bookmark** (offset).
+- A new reader can start **from page 1** or from **today**.
+- It's split into **volumes** (partitions). Every entry about the same ship goes into the same volume, so it stays in order.
 
 ## 🖼️ Visual
 
+*Diagram brief:* three parallel conveyor-belt logs (partitions) with numbered slots. Two reader groups hold bookmarks at different positions on each belt. One group's bookmarks rewind with a curved arrow, labelled "replay".
+
 ```mermaid
 flowchart LR
-    P["Producers"] -->|"key = user_id"| T
-    subgraph T["📚 Topic: user-events (3 partitions)"]
-        P0["Partition 0: 0 1 2 3 4 5 →"]
-        P1["Partition 1: 0 1 2 3 →"]
-        P2["Partition 2: 0 1 2 3 4 →"]
+    P["Producers"] -->|"key = order_id"| T
+    subgraph T["📚 Topic: order-events (3 partitions, 7-day retention)"]
+        P0["P0: 0 1 2 3 4 5 →"]
+        P1["P1: 0 1 2 3 →"]
+        P2["P2: 0 1 2 3 4 →"]
     end
-    T --> G1["👥 Consumer group A: analytics<br/>offsets P0:5 P1:3 P2:4"]
-    T --> G2["👥 Consumer group B: search indexer<br/>offsets P0:2 P1:1 P2:3 (behind, that's fine)"]
+    T --> G1["👥 Group: analytics<br/>offsets P0:5 P1:3 P2:4"]
+    T --> G2["👥 Group: search-indexer<br/>offsets P0:2 P1:1 P2:3 (behind, fine)"]
+    G1 -. "reset to 7 days ago → replay" .-> T
 ```
 
 ## 🔬 How it works
 
-- **Topic → partitions.** Each partition is an **ordered, append-only log** on disk, replicated across brokers (a leader + followers per partition).
-- **Producers** choose a partition via the **message key** (`hash(key) % partitions`), so all events for the same key (user, order) are **in order in one partition**.
-- **Consumers** belong to **consumer groups**:
-  - Within a group, **each partition is read by one consumer** → parallelism = number of partitions.
-  - Different groups read the **same data independently** (pub/sub semantics).
-- **Offsets:** each group commits "I've processed up to offset N" per partition. On restart, it resumes from there. **Replay** = reset the offset.
-- **Retention:** messages are kept by time or size (e.g., 7 days) or **compacted** (keep only the latest value per key, which is great for changelogs/state).
-- **Why it's so fast:** sequential disk writes, OS page cache, batching, compression, and zero-copy transfer → **millions of messages/s** per cluster.
-- **Ordering guarantee:** **only within a partition**, with no global order across partitions.
-- **Consumer lag** = latest offset − committed offset. It's the key health metric.
-- **Ecosystem:** Kafka Connect (CDC sources and sinks), Kafka Streams/Flink (stream processing, lesson 091), Schema Registry.
+- **Topic → partitions:** each partition is an **ordered, append-only log** on disk, replicated (a leader + followers, an **ISR** set). The producer's **key** picks the partition (`hash(key) % P`), so **all events for one order stay in order**. There is **no global order** across partitions.
+- **Consumer groups:** within a group, **each partition is read by exactly one consumer** → **max parallelism = partition count**. Different groups read the **same data independently** (pub/sub for free).
+- **Offsets = bookmarks:** a group commits "processed up to N" per partition and resumes there after a restart. **Replay** = reset the offsets. **Commit after processing** → at-least-once → idempotent consumers.
+- **Retention:** keep data by time or size (e.g. 7 days), or use **log compaction** (keep only the latest value per key: perfect for changelogs, CDC, and state).
+- **Why it's so fast:** sequential appends, OS page cache, batching, compression, and **zero-copy** sendfile → **millions of messages/s** per cluster. **Consumer lag** (latest − committed offset) is the key health signal.
 
 ## 🧩 Worked example
 
-**Producer with a key (Python):**
-
 ```python
 producer.send("order-events",
-              key=str(order_id).encode(),            # same order → same partition → ordered
+              key=str(order_id).encode(),           # same order → same partition → ordered
               value=json.dumps(event).encode())
-```
 
-**Consumer group:**
-
-```python
-consumer = KafkaConsumer("order-events", group_id="email-service",
-                         enable_auto_commit=False)
+consumer = KafkaConsumer("order-events", group_id="analytics", enable_auto_commit=False)
 for msg in consumer:
-    handle(msg.value)          # must be idempotent (at-least-once)
-    consumer.commit()          # commit the offset AFTER processing
+    upsert_revenue(msg.value)       # idempotent upsert keyed by event_id
+    consumer.commit()               # commit AFTER processing
 ```
+
+**Maya's replay:**
+
+```bash
+# deploy the fix, then rewind ONLY the analytics group by 7 days
+kafka-consumer-groups --group analytics --topic order-events \
+  --reset-offsets --to-datetime 2026-09-24T00:00:00.000 --execute
+```
+
+4.2M events re-processed in **~6 minutes** (at ~12k msg/s), the numbers corrected, and **no other consumer noticed**. ✨
 
 **Partition sizing:**
 
 ```
-Target: 300k msgs/s. One consumer handles ~10k msgs/s
-→ need ≥ 30 consumers in the group → ≥ 30 partitions (choose 48–64 for growth)
-Note: you can add partitions later, but key → partition mapping changes (it breaks per-key ordering during the transition)
+Target 300k msg/s; one consumer ≈ 10k msg/s → ≥ 30 consumers → ≥ 30 partitions (choose 48–64)
+Adding partitions later changes key → partition mapping (per-key order breaks across the transition)
 ```
-
-**Replay to fix a bug:** the search indexer had a bug for 2 days. Deploy the fix → **reset its group's offsets to 2 days ago** → it re-reads and re-indexes. No other consumer is affected. ✨
 
 ## ⚖️ Trade-offs
 
-| | Kafka-style log | Classic queue (RabbitMQ/SQS) |
+| | Kafka-style log | Classic queue (SQS/RabbitMQ) |
 |---|---|---|
 | After consumption | Kept (retention) | Deleted |
-| Replay | ✅ Yes | ❌ No (mostly) |
-| Multiple independent readers | ✅ Consumer groups | Needs fan-out to multiple queues |
-| Ordering | Per partition | Best-effort (or FIFO at low throughput) |
-| Per-message routing/priority | Limited | ✅ Rich (RabbitMQ) |
-| Parallelism | Capped by partition count | Add workers freely |
-| Throughput | 🚀 Very high | High |
+| Replay | ✅ | ❌ (mostly) |
+| Many independent readers | ✅ Consumer groups | Needs fan-out queues |
+| Ordering | Per partition | Best-effort (or FIFO, slowly) |
+| Per-message routing and priority | Limited | ✅ Rich |
+| Parallelism | Capped by partitions | Add workers freely |
 
 ## 🌍 Real world
 
-- **LinkedIn** created Kafka, and runs trillions of messages per day.
-- **Uber, Netflix, Airbnb** use Kafka as the central nervous system for events, logs, metrics, and CDC.
-- **Alternatives:** AWS Kinesis, Apache Pulsar, Redpanda, Azure Event Hubs, Google Pub/Sub.
+- **LinkedIn** created Kafka, and now processes **trillions** of messages a day.
+- **Uber, Netflix, and Airbnb** use Kafka as the nervous system for events, logs, metrics, and CDC.
+- **Alternatives:** AWS Kinesis, Apache Pulsar, Redpanda, Azure Event Hubs.
 
 ## 📌 Cheat card
 
 > - **Kafka = an append-only logbook + a bookmark (offset) per consumer group.**
 > - **Key → partition → ordered per key.** No global order.
-> - **Parallelism = partitions** (one consumer per partition per group).
-> - **Retention + offsets = replay.** Compacted topics keep the latest value per key.
-> - Watch **consumer lag**. Commit offsets **after** processing (at-least-once → idempotent consumers).
+> - **Parallelism = partitions.**
+> - **Retention + offsets = replay.** **Compaction** keeps the latest per key.
+> - Watch **consumer lag**. **Commit after processing.**
 
 ## 🧪 Feynman check
 
-Explain the logbook-with-bookmarks analogy, and how a buggy consumer can "go back in time" to reprocess two days of events without bothering anyone else.
+Explain the logbook with bookmarks, and how the buggy analytics consumer "went back in time" without bothering anyone else.
 
-⚠️ **Common confusion:** "Adding more consumers always increases throughput." Not beyond the **number of partitions**. Extra consumers in a group sit idle.
+⚠️ **Common confusion:** "More consumers always means more throughput." Not beyond the **partition count**: in a 12-partition topic, the 13th consumer in a group sits **idle**.
 
 ## ⚡ Quick recall
 
-1. How does Kafka keep all events for one user in order?
-<details><summary>Answer</summary>
+1. How does Kafka keep all events for one order in sequence?
+<details><summary>Reveal Answer</summary>
 
-By using the user ID as the message key, so all of that user's events hash to the same partition, which is strictly ordered.
+By using the order ID as the message key, so every event for it hashes to the same partition, which is strictly ordered.
 </details>
 
 2. What's the max useful number of consumers in one group for a 12-partition topic?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-12. More would be idle.
+12. Any more sit idle.
 </details>
 
 3. What is consumer lag?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-How far behind a consumer group is: the latest offset minus the committed offset, per partition.
+How far behind a group is: the latest offset minus the committed offset, per partition.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Why would you use Kafka instead of RabbitMQ/SQS?"**
+**Q. "Why choose Kafka over SQS/RabbitMQ? And consumer lag is growing steadily. What do you do?"**
 <details><summary>Model answer</summary>
 
-- **Many independent consumers** of the same events (analytics, search, notifications) without duplicating queues.
-- **Replay** (reprocess after bugs, bootstrap new services from history).
-- **Very high throughput** and **ordered per-key** processing.
-- Event sourcing, CDC pipelines, and stream processing integration.
-- Choose RabbitMQ/SQS for simple task queues, per-message routing and priorities, and delayed messages without the Kafka ops overhead.
-- **Likely follow-up:** "What's hard about Kafka?" → partition planning, rebalancing pauses, ordering vs parallelism, operating the cluster (managed options help).
+- **Choose Kafka when you need:**
+  - Many **independent consumers** of the same events.
+  - **Replay** (bug fixes, bootstrapping new services, reprocessing).
+  - **Very high throughput** with **per-key ordering**.
+  - CDC pipelines, event sourcing, and stream processing (Flink, Kafka Streams).
+- **Choose SQS/RabbitMQ when you need:** simple task queues, per-message routing and priority, delayed messages, and minimal ops.
+- **Kafka's costs:** partition planning, rebalance pauses, the ordering vs parallelism tension, and cluster operations (managed services help).
+- **Growing lag, the diagnosis:**
+  - **One partition lagging** → **key skew** (a hot key). Re-key, or salt the hot key.
+  - **All partitions lagging** → consumers are too slow:
+    - Scale consumers up to the partition count, and **add partitions** if needed.
+    - **Batch** writes downstream and optimize the handler.
+    - Check the **downstream bottleneck** (a slow DB).
+    - Watch for **rebalance storms** (`max.poll.interval.ms` exceeded by slow batches).
+  - **Parallelize within a partition** with per-key worker pools. Commit an offset only when **all** earlier messages in that partition are done.
+- **Likely follow-up:** "Can you replay safely?" → only if consumers are **idempotent** (upserts keyed by event ID), otherwise replay duplicates side effects.
 </details>
 
-**Q2. "Consumer lag is growing steadily. What do you do?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- Check whether it's **all partitions or one**. One hot partition means **key skew** (a hot key), which you fix with a better key or salting.
-- All partitions: consumers are too slow → **scale consumers** (up to the partition count), **add partitions**, **batch processing**, optimize handlers, parallelize within a partition while preserving key order.
-- Check downstream bottlenecks (a slow DB), and consumer rebalancing loops (session timeouts).
-- **Likely follow-up:** "Can you parallelize within a partition?" → yes, with per-key worker pools inside the consumer, committing offsets only when all earlier messages are done.
-</details>
-
-> 📖 *Next, some customers get two confirmation emails, and one gets none at all.*
+> 📖 *Replays work, but some customers now receive two confirmation emails, and one receives none at all, and Maya has to face what "delivered" really means.*
 
 ---
 

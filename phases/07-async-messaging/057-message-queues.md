@@ -8,28 +8,38 @@
 
 ## 📖 Story
 
-Maya moved the "later" work out of checkout. But where should it go? If the email service is down, the emails can't just vanish. I told her what she needed, and I'll show you the same thing: a to-do list between services that holds the work safely until someone is ready to do it.
+Maya has moved the "later" work out of checkout. For a few hours, she keeps it in an **in-memory list** on the order service. It's quick, simple, and fragile as a soap bubble.
+
+At 7:22 p.m. that server is redeployed. The list, holding **3,800 unsent kitchen tickets**, evaporates. Cooks never hear about the orders. Customers wait. And wait. And then call.
+
+The next night the kitchen-ticket printer service crashes for twenty minutes. Thousands of tickets have nowhere to go. A sudden spike of 2,000 orders a second slams into workers that can handle 250.
+
+She needs something between the services that **holds work safely**, **survives crashes**, and **lets workers catch up at their own pace**.
+
+I told her what she needed, and I'll show you the same: a **durable to-do list between services**.
 
 ## 🎯 One-sentence idea
 
-**A message queue is a durable to-do list between services. Producers add tasks, workers take them one at a time, and each task is handled by exactly one worker (the competing consumers pattern). It smooths out spikes and lets work happen reliably in the background.**
+**A message queue is a durable to-do list between services: producers append tasks, workers take them, and each task is handled by exactly one worker (competing consumers), which smooths spikes and makes background work reliable.**
 
 ## 🧸 Analogy
 
 The **ticket rail in a restaurant kitchen**:
 
-- Waiters (producers) **clip order tickets** on the rail as fast as customers order.
-- Cooks (consumers) **take the next ticket**, cook it, and throw the ticket away when the dish is done (**ack**).
-- At rush hour the rail **gets long**, but no order is lost. Add more cooks to clear it faster (**scale consumers**).
-- If a cook drops a dish halfway through, the ticket goes **back on the rail** for someone else (**redelivery**).
-- A ticket that keeps failing ("dish we can't make") goes to a **"problem orders" pile** (**dead-letter queue**).
+- Waiters **clip tickets** on the rail as fast as orders arrive.
+- Cooks **take the next ticket**, cook it, and bin the ticket when done (**ack**).
+- At rush hour the rail **gets long**, but nothing is lost. Add cooks to clear it (**scale consumers**).
+- A cook drops a dish halfway through? The ticket goes **back on the rail** (**redelivery**).
+- A dish nobody can make goes to the **"problem orders" pile** (**dead-letter queue**).
 
 ## 🖼️ Visual
 
+*Diagram brief:* producers clip messages onto a long rail. Three workers pull from the far end. One poisoned message falls through a trapdoor into a dead-letter bin after five failed attempts.
+
 ```mermaid
 flowchart LR
-    P1["📱 Producer"] --> Q[["📥 Queue<br/>msg msg msg msg"]]
-    P2["🖥️ Producer"] --> Q
+    P1["🛒 Order service"] --> Q[["📥 kitchen-tickets queue<br/>msg msg msg msg"]]
+    P2["📱 Cook app"] --> Q
     Q --> C1["👷 Worker 1"]
     Q --> C2["👷 Worker 2"]
     Q --> C3["👷 Worker 3"]
@@ -38,119 +48,107 @@ flowchart LR
 
 ## 🔬 How it works
 
-- **Produce → store durably → deliver to one consumer → consumer processes → ack → delete.**
-- **Competing consumers:** many workers read the same queue, and each message goes to **one** of them. Scale by adding workers.
-- **Acknowledgements & visibility timeout:**
-  - A worker receives a message, and it becomes **invisible** to others for N seconds.
-  - If the worker **acks** in time, it's deleted. If the worker crashes or times out, the message **reappears** → redelivery (**at-least-once**, lesson 060). So consumers must be **idempotent** (lesson 055).
-- **Retries & dead-letter queue (DLQ):** after N failed attempts, move the message to a DLQ for inspection. This stops a "poison message" from blocking the queue forever.
-- **Ordering:** most queues are **best-effort ordered**. Strict FIFO is possible (SQS FIFO, per-group ordering) at lower throughput.
-- **Delayed messages / scheduling:** "process in 10 minutes" (retries with backoff, reminders).
-- **Priority queues:** urgent jobs first (separate queues per priority is the usual approach).
-- **Monitoring:** **queue depth** and **age of the oldest message** are the key signals. Autoscale workers on them (lesson 025).
-- **Common tools:** **RabbitMQ** (AMQP, flexible routing), **AWS SQS** (managed, simple), **Redis lists/streams**, **Celery/Sidekiq** (task frameworks), **Kafka** (a log, not a classic queue, lesson 059).
+- **Lifecycle:** produce → **stored durably** (replicated to disk) → delivered to **one** consumer → processed → **ack** → deleted. Many workers read one queue (**competing consumers**), so you scale by adding workers.
+- **Visibility timeout:** a received message is **hidden** for N seconds. No ack in time (crash, timeout) → it **reappears** → redelivery. That makes queues **at-least-once**, so consumers must be **idempotent** (lesson 055).
+- **Retries + DLQ:** back off between attempts, and after N failures move the message to a **dead-letter queue**, so one poison message can't block the line forever. Alert on DLQ depth and replay after the fix.
+- **Ordering and extras:** standard queues are best-effort ordered. **FIFO / message groups** give per-key order at lower throughput. You also get **delayed** messages (scheduled retries, reminders) and **priority** via separate queues.
+- **Operate on two signals:** **queue depth** and **age of the oldest message**. Autoscale workers on them (lesson 025). Common tools: **SQS**, **RabbitMQ**, **Redis streams**, Celery/Sidekiq. Kafka is a *log*, not a classic queue (lesson 059).
 
 ## 🧩 Worked example
 
-**Image-processing pipeline (SQS-style):**
-
 ```python
-# Producer (API)
-sqs.send_message(QueueUrl=Q, MessageBody=json.dumps({"image_id": 42, "sizes": [128, 512]}))
+# Producer (order service)
+sqs.send_message(QueueUrl=Q, MessageBody=json.dumps({"order_id": 123, "cook_id": 7}))
 
 # Worker
 while True:
     for m in sqs.receive_message(QueueUrl=Q, MaxNumberOfMessages=10,
-                                 WaitTimeSeconds=20,            # long polling
-                                 VisibilityTimeout=120)["Messages"]:
+                                 WaitTimeSeconds=20,              # long polling
+                                 VisibilityTimeout=60)["Messages"]:
         job = json.loads(m["Body"])
-        if already_done(job["image_id"]):                       # idempotency check
-            sqs.delete_message(QueueUrl=Q, ReceiptHandle=m["ReceiptHandle"]); continue
-        make_thumbnails(job)                                    # takes ~5 s
+        if not ticket_already_printed(job["order_id"]):           # idempotency
+            print_kitchen_ticket(job)
         sqs.delete_message(QueueUrl=Q, ReceiptHandle=m["ReceiptHandle"])   # ack
 ```
 
-**Sizing workers with Little's Law:**
+**Absorbing the 2,000/s spike with Little's Law:**
 
 ```
-Arrivals: 200 jobs/s, each takes 2 s of worker time
-Workers busy at once = 200 × 2 = 400 → run ~500 workers for headroom
-Flash spike to 2,000 jobs/s for 1 minute → the queue grows by ~(2,000 − 250) × 60 ≈ 105k messages
-→ drains in minutes after the spike, and nothing is lost ✅
+Normal: 200 tickets/s × 1 s each → ~200 busy workers; run 250
+Spike:  2,000/s for 60 s → backlog grows ≈ (2,000 − 250) × 60 ≈ 105,000 messages
+Autoscaler sees the oldest-message age climb → scales to 1,000 workers → backlog drains in ~2–3 min
+Lost tickets: 0 ✅   Deploys and crashes: messages simply reappear and are retried ✅
 ```
 
 ## ⚖️ Trade-offs
 
-| You gain | You pay | Use it when |
+| Maya's choice | What she gains | What she pays |
 |---|---|---|
-| Spike absorption (load levelling) | Added latency before processing | Bursty workloads |
-| Reliable retries, DLQ | Duplicate deliveries → idempotency | Must-not-lose tasks |
-| Independent scaling of workers | Another system to operate | Background jobs |
-| FIFO ordering | Lower throughput | Order truly matters (per entity) |
+| A durable queue | No lost work across crashes and deploys | Another system to run |
+| Load levelling | Spikes absorbed | Seconds to minutes of processing delay |
+| At-least-once + retries | Reliability | Duplicates → idempotency required |
+| FIFO ordering | Per-key order | Lower throughput, head-of-line blocking |
 
 ## 🌍 Real world
 
-- **SQS** is one of AWS's oldest services, used for decoupling everywhere.
-- **RabbitMQ** powers task queues at many companies (often via Celery in Python).
-- **GitHub, Shopify** run huge background job systems (Resque/Sidekiq-style on Redis).
+- **Amazon SQS** is one of AWS's oldest services and decouples systems everywhere.
+- **RabbitMQ** powers countless task queues, often behind **Celery**.
+- **GitHub and Shopify** run enormous background job systems on Redis-backed queues (Resque/Sidekiq lineage).
 
 ## 📌 Cheat card
 
-> - **Queue = ticket rail. Each message → one worker. Ack when done.**
-> - **Visibility timeout + ack → at-least-once** → make consumers **idempotent**.
-> - **DLQ** for poison messages after N retries.
-> - Watch **queue depth + oldest message age**. Autoscale workers on them.
-> - **Load levelling:** the queue absorbs spikes, and workers process at a steady rate.
+> - **Queue = ticket rail. One message → one worker. Ack when done.**
+> - **Visibility timeout + ack ⇒ at-least-once** → **idempotent consumers**.
+> - **DLQ** after N retries.
+> - Watch **depth + oldest-message age**. Autoscale on them.
+> - **Load levelling:** the queue soaks up spikes, and workers run at a steady rate.
 
 ## 🧪 Feynman check
 
-Explain the kitchen ticket rail, including what happens when a cook drops a dish (redelivery) and when a ticket is impossible to cook (dead-letter queue).
+Explain the kitchen ticket rail, including what happens when a cook drops a dish (redelivery) and when a ticket is impossible to cook (DLQ).
 
-⚠️ **Common confusion:** "A message queue guarantees each message is processed exactly once." Standard queues are **at-least-once**, since crashes after processing but before the ack cause redelivery. You get effectively-once only with idempotent consumers.
+⚠️ **Common confusion:** "A message queue processes each message exactly once." Standard queues are **at-least-once**: a worker can finish the work and crash just before it acks, and the message comes back. "Exactly once" only appears to happen when your **consumer is idempotent**.
 
 ## ⚡ Quick recall
 
 1. What is a visibility timeout?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-The period a received message is hidden from other consumers. If it isn't acked in time, it becomes visible again for redelivery.
+The window during which a received message is hidden from other consumers. If it isn't acked in time, it becomes visible again for redelivery.
 </details>
 
 2. What's a dead-letter queue for?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-To hold messages that repeatedly fail processing, so they don't block the main queue and can be inspected or replayed.
+Holding messages that repeatedly fail, so they don't block the main queue and can be inspected or replayed later.
 </details>
 
 3. Which metric best signals that workers are falling behind?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Queue depth growing and/or the age of the oldest message rising.
+A growing queue depth and, especially, a rising age of the oldest message.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Design a system to send 10 million push notifications for a marketing campaign without overloading anything."**
+**Q. "Send 10 million push notifications for a campaign without overloading anything, and without delaying password-reset messages."**
 <details><summary>Model answer</summary>
 
-- A campaign service **batches recipients** into messages (e.g., 1,000 user IDs each) and enqueues them (10k messages).
-- Workers pull batches, fetch device tokens, and call APNs/FCM with **rate limits** that respect the provider quotas.
-- **Idempotency:** track `(campaign_id, user_id)` as sent, so retries don't double-notify.
-- Retries with backoff for transient errors, and a DLQ for persistent failures. Remove invalid tokens.
-- Throttle overall throughput to avoid a thundering herd of app opens hitting the backend (stagger the sends).
-- **Likely follow-up:** "How do you prioritize transactional notifications (password reset) over marketing?" → separate queues and worker pools (bulkheads, lesson 064).
+- **Fan-in batching:** the campaign service splits recipients into messages of ~1,000 user IDs → **~10k messages** on a `marketing-push` queue.
+- **Workers:**
+  - Pull a batch, resolve device tokens, and call **APNs/FCM** under **per-provider rate limits** (token buckets).
+  - Remove invalid tokens on feedback.
+- **Idempotency:** a `(campaign_id, user_id)` sent-marker (unique), so redeliveries never double-notify.
+- **Failures:** exponential backoff for transient errors (429/5xx from the provider), and a **DLQ** for persistent failures, with an alert.
+- **Protect the backend:** **stagger** the sends over 30–60 minutes, so 10M app opens don't stampede the API, and pre-scale or CDN-cache the landing content.
+- **Transactional vs marketing (bulkheads):** a **separate `transactional-push` queue and worker pool** with its own capacity and higher priority, so a 10M-message campaign can never sit in front of a password reset (lesson 064).
+- **Ordering:** not needed here. Where per-entity order matters, use **FIFO message groups** or Kafka partitions keyed by entity, or make handlers **version-aware** ("apply only if version > current").
+- **Likely follow-up:** "What's the cost of strict ordering?" → less parallelism: one slow message blocks everything behind it in its group.
 </details>
 
-**Q2. "Messages in our queue are processed out of order and it causes bugs. What do you do?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- Ask whether **global** order is really needed. Usually **per-entity** order suffices (per order ID or per user).
-- Use **FIFO with message groups** (SQS FIFO `MessageGroupId`) or **Kafka partitions keyed by entity ID** (lesson 059), so one entity's messages are processed in order.
-- Or make handlers **order-insensitive**: include versions or timestamps, and ignore stale updates ("only apply if version > current").
-- **Likely follow-up:** "What's the cost of strict ordering?" → less parallelism: one slow message blocks the rest of its group.
-</details>
-
-> 📖 *Next, five different teams all want to hear about every new order.*
+> 📖 *The queue is solid, but now five different teams all want to hear about every new order, and a queue only hands each message to one of them.*
 
 ---
 

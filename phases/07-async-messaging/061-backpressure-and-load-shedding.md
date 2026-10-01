@@ -8,159 +8,156 @@
 
 ## 📖 Story
 
-New Year's Eve. Orders arrived three times faster than Pantry could process them. The queue grew, memory filled, response times hit two minutes, and customers who had given up long ago still clogged the line. It took me years to learn what Maya learned that night: sometimes "not now" is the kindest answer.
+New Year's Eve, 11:15 p.m. Orders arrive at **3,600 a second**. Pantry can process **1,200**.
+
+The request queue doesn't complain. It just **grows**: 10,000… 100,000… **400,000** waiting requests. Memory climbs like floodwater in a sealed room. A new order now waits **five minutes** to be touched.
+
+But every phone that sent those requests gave up after **10 seconds**. The customers have long since closed the app. So Pantry's servers are working flat out, sweating, at 100% CPU, **cooking orders for people who have already left the restaurant**.
+
+Throughput: maxed. **Goodput** (orders that actually reach a waiting customer): **almost zero**.
+
+At 11:31 p.m. the order service runs out of memory and dies. Its replacement inherits the flood and dies in four minutes.
+
+It took me years to learn what Maya learned that night: **sometimes "not now" is the kindest answer.**
 
 ## 🎯 One-sentence idea
 
-**When work arrives faster than a system can handle it, it must either push back ("slow down": backpressure) or deliberately drop some work ("not now": load shedding). Otherwise queues grow without limit, latency explodes, and everything falls over.**
+**When work arrives faster than a system can handle, it must either push back ("slow down": backpressure) or deliberately drop some work ("not now": load shedding), or queues grow without limit, latency explodes, and everything collapses.**
 
 ## 🧸 Analogy
 
 A **popular nightclub**:
 
-- 🚪 **Backpressure:** the bouncer says "**wait in line**" when the club is full. The line outside grows, but the inside stays comfortable.
-- 🙅 **Load shedding:** when even the line is too long, the bouncer tells newcomers "**not tonight, try later**." Some people are disappointed, but the club doesn't become a dangerous crush.
-- 🎫 **Priority:** VIPs (paying customers, critical requests) still get in. Casual walk-ins are turned away first.
-
-Without a bouncer, everyone squeezes in, nobody can move, and **the whole night is ruined for everyone** (congestion collapse).
+- 🚪 **Backpressure:** the bouncer says "**wait in line**" when the club is full.
+- 🙅 **Load shedding:** when even the line is too long, "**not tonight, try later**."
+- 🎫 **Priority:** VIPs (checkout, login) still get in, and casual walk-ins are turned away first.
+- No bouncer → everyone squeezes in, nobody can move, and **the night is ruined for everyone** (congestion collapse).
 
 ## 🖼️ Visual
 
+*Diagram brief:* a funnel with a gate. Traffic within capacity flows straight through. A small bounded waiting area holds a short line. Overflow and low-priority traffic bounce off a "503 + Retry-After" wall.
+
 ```mermaid
 flowchart LR
-    IN["📥 Incoming<br/>10k req/s"] --> G{"🚪 Admission control"}
-    G -->|"within capacity"| SVC["⚙️ Service<br/>capacity 6k/s"]
-    G -->|"queue not full"| BQ[["⏳ Bounded queue<br/>(backpressure)"]]
+    IN["📥 Incoming<br/>3,600 req/s"] --> G{"🚪 Admission control"}
+    G -->|"within capacity"| SVC["⚙️ Order service<br/>capacity 1,200/s"]
+    G -->|"bounded queue not full"| BQ[["⏳ Bounded queue<br/>≤ 2 s of work"]]
     BQ --> SVC
-    G -->|"queue full or low priority"| SHED["🙅 429 / 503<br/>Retry-After"]
+    G -->|"queue full or low priority"| SHED["🙅 503 / 429<br/>Retry-After: 5"]
 ```
 
 ## 🔬 How it works
 
-- **The core problem:** if arrival rate > processing rate for long enough, **unbounded queues** grow forever → memory exhaustion, and latency so high every request times out anyway (the client has already given up, so the work is wasted).
-- **Backpressure (push back upstream):**
-  - **Bounded queues/buffers:** when full, producers block or get rejected.
-  - **Flow control:** TCP windows, gRPC/HTTP/2 flow control, reactive streams (`request(n)`), Kafka consumers pulling at their own pace (a pull model is natural backpressure).
-  - Propagates "slow down" **to the source**, so upstream services reduce their rate.
-- **Load shedding (drop work deliberately):**
-  - Reject early with **503/429 + Retry-After** when overloaded (CPU, concurrency, or queue-time thresholds).
-  - **Prioritize:** shed low-value work first (analytics, prefetch, bots) and keep critical work (checkout, login).
-  - **Drop stale work:** if a request has waited longer than its deadline, don't process it (**deadline propagation**).
-  - **LIFO under overload** (serve the newest requests first, since the oldest have probably timed out already) is used by some systems.
-- **Concurrency limits:** cap in-flight requests per service (static or **adaptive**, like TCP congestion control: Netflix's concurrency-limits library).
-- **Graceful degradation:** serve cached or partial results, disable expensive features ("recommendations unavailable"), and lower quality (smaller images).
-- **Clients must cooperate:** respect `Retry-After`, back off with **jitter** (lesson 063), and don't retry-storm.
+- **The physics:** if arrivals exceed capacity long enough, an **unbounded queue** grows forever. Memory runs out, and wait time passes every client timeout, so **all the work becomes waste**. Measure **goodput** (useful completions), not throughput.
+- **Backpressure** pushes "slow down" **upstream**: **bounded buffers** (block or reject when full), **flow control** (TCP windows, HTTP/2 and gRPC flow control, reactive `request(n)`), and **pull-based consumers** (Kafka) that naturally take only what they can handle.
+- **Load shedding** drops work **early and cheaply**: reject with **503/429 + `Retry-After`** on CPU, concurrency, or **queue-time** thresholds. **Shed by priority** (analytics, prefetch, and bots first, checkout last), and **drop requests past their deadline** (**deadline propagation**). Some systems serve **LIFO under overload**, because the oldest requests have already timed out.
+- **Concurrency limits:** cap in-flight requests per service, statically or **adaptively** (TCP-congestion-style algorithms like Netflix's concurrency-limits), so the system stays at the knee of the latency curve.
+- **Degrade gracefully, and make clients cooperate:** serve cached or partial results, switch off expensive features, and require clients to honour `Retry-After` and back off **with jitter** (lesson 063) instead of retry-storming.
 
 ## 🧩 Worked example
 
-**Unbounded queue disaster:**
+**The unbounded disaster:**
 
 ```
-Capacity: 1,000 req/s. Arrivals: 1,200 req/s for 10 minutes
-Backlog grows 200/s → after 10 min = 120,000 queued
-Wait time for a new request = 120,000 / 1,000 = 120 s → every client (timeout 5 s) has given up
-→ 100% of the work done is wasted, while the system looks "busy". Goodput → 0.
+Capacity 1,200/s, arrivals 3,600/s → backlog grows 2,400/s
+After 3 min: 432,000 queued → wait ≈ 432,000 ÷ 1,200 = 360 s
+Client timeout = 10 s → ~100% of completed work is for clients who already left. Goodput ≈ 0.
 ```
 
-**Bounded queue + shedding:**
+**Bounded + shed:**
 
 ```
-Queue max = 2,000 (≈ 2 s of work)
-Arrivals above capacity → queue fills → then 503 for the excess 200 req/s
-Result: ~1,000 req/s succeed with ≤ 2 s latency, and ~17% get a fast 503 → goodput stays ~1,000/s ✅
+Queue cap = 2,400 (≈ 2 s of work). Excess → immediate 503 + Retry-After with jitter.
+→ ~1,200 orders/s succeed in ≤ 2 s; the rest get a fast, honest "try again in a few seconds."
+→ Goodput ≈ 1,200/s ✅, memory flat, no crash.
 ```
-
-**Priority shedding in middleware (sketch):**
 
 ```python
 def admit(req):
     load = inflight / MAX_INFLIGHT
-    if load < 0.8:                       return True
-    if load < 0.95 and req.priority >= 1: return True   # keep important traffic
-    if req.priority == 2:                return True    # critical (checkout/login) always tries
-    return False                                        # shed: 503 + Retry-After
-```
-
-**Deadline propagation:**
-
-```
-Client deadline 2 s → gateway passes "deadline = now + 1.9 s" → service A → B
-B sees only 50 ms left, but needs 200 ms → fail fast instead of doing wasted work
+    if req.remaining_deadline_ms < EST_COST_MS: return reject(504)     # can't finish in time
+    if load < 0.80:                              return True
+    if load < 0.95 and req.priority >= 1:        return True            # important traffic
+    if req.priority == 2:                        return True            # checkout/login always try
+    return reject(503, retry_after=jittered(5))
 ```
 
 ## ⚖️ Trade-offs
 
-| Technique | Gain | Cost |
+| Maya's choice | What she gains | What she pays |
 |---|---|---|
-| Bounded queues | Protects memory and latency | Producers block or get errors |
-| Load shedding | Keeps goodput high under overload | Some users get errors |
-| Priority shedding | Protects critical flows | Must classify traffic |
-| Adaptive concurrency limits | Self-tuning | More complex, needs good signals |
-| Graceful degradation | Users get *something* | Reduced features |
+| Bounded queues | Flat memory, bounded latency | Producers block or see errors |
+| Load shedding | High goodput under overload | Some users get "try later" |
+| Priority shedding | Critical flows survive | Traffic must be classified |
+| Adaptive concurrency limits | Self-tuning protection | Complexity, signal quality |
+| Graceful degradation | Users still get *something* | Reduced features |
 
 ## 🌍 Real world
 
-- **Google SRE** book: "handling overload" and "addressing cascading failures" chapters. Load shedding and criticality levels are standard at Google.
-- **Netflix** uses adaptive concurrency limits and prioritized shedding (keeping playback working while shedding less important traffic).
-- **Amazon** uses admission control and shedding based on queue time, with retries capped by tokens.
+- The **Google SRE book** chapters "Handling Overload" and "Addressing Cascading Failures" describe criticality-based shedding.
+- **Netflix** uses adaptive concurrency limits and prioritized shedding to keep **playback** working while dropping less important traffic.
+- **Amazon** sheds on queue time and caps retries with token buckets.
 
 ## 📌 Cheat card
 
-> - **Arrivals > capacity → something must give. Choose what.**
-> - **Backpressure = "wait / slow down". Shedding = "not now" (503/429 + Retry-After).**
-> - **Never use unbounded queues** on the request path.
-> - **Shed low-priority first. Drop requests past their deadline.**
-> - Measure **goodput** (useful completed work), not just throughput.
+> - **Arrivals > capacity ⇒ something must give. Choose what.**
+> - **Backpressure = "slow down". Shedding = "not now" (503/429 + Retry-After).**
+> - **Never** put unbounded queues on the request path.
+> - **Shed low priority first. Drop work past its deadline.**
+> - Track **goodput**, not throughput.
 
 ## 🧪 Feynman check
 
-Explain the nightclub-bouncer analogy, and why letting *everyone* in makes the night worse for *everyone*.
+Explain the nightclub bouncer, and why letting *everyone* in ruins the night for *everyone*.
 
-⚠️ **Common confusion:** "Rejecting requests is a failure, so we should queue everything." Queueing beyond what can be served in time just converts errors into **timeouts plus wasted work**. A fast, honest "try later" is kinder to users and to the system.
+⚠️ **Common confusion:** "Rejecting requests is failure, so queue everything." Queueing beyond what can be served in time just converts fast errors into **slow timeouts plus wasted work**. A quick, honest "try later" is kinder to customers and to the system.
 
 ## ⚡ Quick recall
 
 1. What's the difference between backpressure and load shedding?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 Backpressure signals upstream to slow down or wait (bounded buffers, flow control). Load shedding deliberately rejects excess work.
 </details>
 
 2. Why are unbounded queues dangerous?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-They grow without limit under sustained overload, exhausting memory and pushing wait times past client timeouts, so all the work gets wasted.
+Under sustained overload they grow without limit, exhaust memory, and push waits past client timeouts, so all the work is wasted.
 </details>
 
 3. What is deadline propagation?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Passing the remaining time budget along the call chain, so downstream services can skip work that can't finish in time.
+Passing the remaining time budget along the call chain, so downstream services skip work that can't finish in time.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "During a flash sale, the checkout service becomes unresponsive for everyone. How do you design for this?"**
+**Q. "During a flash sale, checkout becomes unresponsive for everyone, and threads pile up waiting on a slow payment dependency. Design for both."**
 <details><summary>Model answer</summary>
 
-- **Admission control** at the gateway: a virtual waiting room or queue for the sale (users get a place in line), plus rate limits per user.
-- **Prioritize** checkout and payment over browsing and recommendations, and shed non-critical traffic first.
-- **Bounded concurrency** per service, fast 503s with `Retry-After`, and clients back off with jitter.
-- **Degrade:** serve product pages from the CDN/cache, and turn off expensive features.
-- **Pre-scale** capacity, and put inventory decrements behind an atomic, fast path (lesson 098).
-- **Likely follow-up:** "What's a virtual waiting room?" → users are queued at the edge and admitted at the rate the backend can handle (like Ticketmaster or Queue-it).
+- **At the edge:**
+  - A **virtual waiting room**: users get a place in line and are admitted at the rate the backend can absorb.
+  - **Per-user rate limits**, with bots blocked at the WAF.
+- **Priority:**
+  - **Checkout and payment** are critical. Browsing comes next. Recommendations and analytics come last.
+  - Shed from the bottom up, and serve product pages from the **CDN/cache**.
+- **Admission control per service:**
+  - **Bounded concurrency** and **bounded queues** (a couple of seconds of work at most).
+  - Fast **503 + `Retry-After`**, and clients back off **with jitter**.
+- **Deadlines:** propagate the client's remaining budget, so services **refuse work they can't finish in time**.
+- **The slow dependency (thread exhaustion):**
+  - Without protection, every thread blocks on payments and the service stops serving *everything*: a **cascading failure**.
+  - Fix it with **tight timeouts**, a **circuit breaker** (fail fast while payments are sick), and **bulkheads** (a separate, small pool for payment calls, lesson 064).
+  - Return a clear **"payment temporarily unavailable, your cart is saved"**.
+- **Before the sale:** pre-scale, and put inventory decrements on an atomic fast path (lesson 098).
+- **Likely follow-up:** "What does the breaker return when open?" → a cached or default response, or a fast error, depending on criticality. Never a 30-second hang.
 </details>
 
-**Q2. "A downstream service is slow, and our service's threads all block waiting on it. What happens, and how do you prevent it?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- **Thread and connection pool exhaustion**, so our service stops serving *everything*, including requests that don't need that dependency (a cascading failure).
-- Prevent it with **timeouts**, **circuit breakers** (fail fast when the dependency is unhealthy), **bulkheads** (separate pools per dependency), **concurrency limits**, and **load shedding** (lessons 063–064).
-- Propagate deadlines so no one waits longer than the user will.
-- **Likely follow-up:** "What do you return when the breaker is open?" → a cached or default response, or a fast error, depending on criticality.
-</details>
-
-> 📖 *Next, an order is saved, but its announcement never reaches the kitchen.*
+> 📖 *The bouncer holds the line, but one night an order is saved to the database, the server crashes a heartbeat later, and the "OrderPlaced" announcement never reaches the kitchen.*
 
 ---
 

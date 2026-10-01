@@ -8,158 +8,151 @@
 
 ## 📖 Story
 
-Every new order mattered to the kitchen, the courier team, analytics, loyalty, and the new fraud team. Maya's order service was turning into a switchboard operator, calling everyone one by one. I suggested a better way, and I'll share it with you: announce once, and let anyone who cares listen in.
+Every new Pantry order matters to **five** different teams: the **kitchen**, the **courier dispatch**, **analytics**, **loyalty**, and the brand-new **fraud** team.
+
+Maya's order service has quietly turned into an exhausted **switchboard operator**. After every order it calls the kitchen. Then dispatch. Then analytics. Then loyalty. Then fraud. Five calls, five failure modes, five timeouts to tune. When the fraud team asks to be added, Maya has to **edit, test, and redeploy checkout**, the most critical code in the company, just so someone else can listen.
+
+Then analytics goes down for an hour, and the switchboard keeps ringing its dead line, slowing every order.
+
+The order service shouldn't have to know who cares. It should just **announce**, once.
+
+I suggested a better way, and I'll share it with you: **announce once, and let anyone who cares listen in.**
 
 ## 🎯 One-sentence idea
 
-**In publish/subscribe, a publisher sends an event to a topic, and every subscriber gets its own copy. One event fans out to many independent listeners, and the publisher doesn't know or care who they are.**
+**In publish/subscribe, a publisher sends an event to a topic and every subscriber gets its own copy, so one event fans out to many independent listeners and the publisher never needs to know who they are.**
 
 ## 🧸 Analogy
 
-A **YouTube channel**:
+A **YouTube channel**: the creator **publishes** once, and every **subscriber** is notified and watches in their own time. New fans subscribe **without the creator changing anything**.
 
-- The creator **publishes** a video (event) to their **channel** (topic).
-- Every **subscriber** gets notified, and each watches in their own time.
-- The creator doesn't message each fan personally, and doesn't even know who they all are.
-- New fans can subscribe any time **without the creator changing anything**.
-
-Compare with a **queue**, which is more like a **"take a number" deli counter**: each ticket is served by **one** clerk, not all of them.
+A **queue** is a **deli counter**: each ticket is served by **one** clerk, not all of them.
 
 ## 🖼️ Visual
 
+*Diagram brief:* one publisher fires a single event into a broadcast tower (topic). Five separate antennas, each with its own buffer, receive a copy and process it at their own speed.
+
 ```mermaid
 flowchart LR
-    P["🛒 Order service<br/>(publisher)"] -->|"OrderPlaced"| T(["📢 Topic: orders"])
-    T --> S1["📧 Email<br/>subscription"]
-    T --> S2["📦 Warehouse<br/>subscription"]
-    T --> S3["📊 Analytics<br/>subscription"]
-    T --> S4["🎁 Loyalty<br/>subscription"]
+    P["🛒 Order service<br/>(publisher)"] -->|"OrderPlaced"| T(["📢 Topic: order-events"])
+    T --> S1["🍳 Kitchen queue"]
+    T --> S2["🛵 Dispatch queue"]
+    T --> S3["📊 Analytics queue"]
+    T --> S4["🎁 Loyalty queue"]
+    T --> S5["🕵️ Fraud queue (new, zero publisher changes)"]
 ```
 
-**Queue vs pub/sub:**
-
 ```
-Queue:    1 message → exactly ONE of the consumers (work distribution)
+Queue:    1 message → exactly ONE consumer (work distribution)
 Pub/sub:  1 message → EVERY subscriber gets a copy (broadcast)
-Combined: topic → one queue per subscriber service → competing workers inside each service
+Combined: topic → one queue per service → competing workers inside each service
 ```
 
 ## 🔬 How it works
 
-- **Topic** = a named channel. **Publishers** send events to it. **Subscriptions** receive copies.
-- **Each subscription is independent:** its own pace, its own retries, and its own backlog. A slow analytics consumer doesn't slow email.
-- **Typical combination (fan-out to queues):** topic → a **queue per subscribing service** → that service's workers compete on its queue. (AWS **SNS → SQS**, GCP Pub/Sub subscriptions, Kafka consumer groups.)
-- **Push vs pull subscriptions:** the broker pushes to an endpoint (webhook-style), or subscribers pull.
-- **Filtering:** subscribers can filter by attributes ("only orders over $100", "only country=DE").
-- **Durable vs ephemeral:**
-  - **Durable** (Kafka, SNS→SQS, Google Pub/Sub): messages are stored until each subscriber processes them.
-  - **Ephemeral** (Redis Pub/Sub, basic MQTT QoS 0): if a subscriber is offline, **it misses the message**. That's fine for live updates, and bad for business events.
-- **Events should be facts in the past tense:** `OrderPlaced`, `UserSignedUp`, `PaymentFailed`. Not commands (`SendEmail`).
-- **Schema contracts:** consumers depend on event formats, so version them (schema registry, backward-compatible changes).
+- **Topic → subscriptions:** each subscription receives every message **independently**, with its own pace, backlog, retries, and DLQ. A slow analytics subscriber never slows the kitchen.
+- **Fan-out to queues (the workhorse pattern):** topic → **one durable queue per subscribing service** → that service's workers compete on it (AWS **SNS → SQS**, GCP Pub/Sub subscriptions, Kafka consumer groups).
+- **Push vs pull, plus filtering:** the broker pushes to an endpoint or subscribers pull. **Attribute filters** deliver subsets ("only orders > £100", "country = DE").
+- **Durable vs ephemeral:** **durable** pub/sub (Kafka, SNS→SQS, Google Pub/Sub, Redis Streams) stores messages until each subscriber processes them. **Ephemeral** pub/sub (Redis Pub/Sub, MQTT QoS 0) **drops** messages for offline subscribers. That's fine for live UI signals, and fatal for business events.
+- **Events are past-tense facts with contracts:** `OrderPlaced`, not `SendEmail`. Every event carries an **ID, type, schema version, and timestamp**, with schemas versioned in a registry and evolved backward-compatibly.
 
 ## 🧩 Worked example
 
-**AWS-style fan-out:**
-
 ```
 SNS topic "order-events"
- ├─ SQS "email-queue"      (filter: none)          → email workers
- ├─ SQS "warehouse-queue"  (filter: type=physical) → warehouse workers
- └─ SQS "analytics-queue"  (filter: none)          → analytics loader
+ ├─ SQS "kitchen-queue"   (filter: none)               → kitchen workers
+ ├─ SQS "dispatch-queue"  (filter: delivery=true)      → dispatch workers
+ ├─ SQS "analytics-queue" (filter: none)               → warehouse loader
+ └─ SQS "fraud-queue"     (filter: total_cents>10000)  → fraud scorer   ← added in 10 minutes
 ```
-
-**An event payload:**
 
 ```json
 {
-  "event_id": "evt_01J8Z...",
+  "event_id": "evt_01J8Z…",
   "type": "OrderPlaced",
   "version": 2,
-  "occurred_at": "2026-10-01T12:00:00Z",
-  "data": { "order_id": "o_123", "user_id": "u_42", "total_cents": 4599, "items": 3 }
+  "occurred_at": "2026-10-01T19:00:00Z",
+  "data": { "order_id": "o_123", "user_id": "u_42", "cook_id": 7, "total_cents": 4599 }
 }
 ```
 
-**Adding a new feature without touching the order service:** the fraud team wants to score every order. They **subscribe** a new queue to `order-events`. **Zero changes** to the publisher. That's the power of decoupling.
+**Before vs after:** checkout made **5 synchronous calls** (p99 ~1.4 s, any outage could block orders) → **1 publish** (p99 ~120 ms). The analytics outage now just grows *its* queue, which drains when it recovers.
 
-**Redis Pub/Sub for live updates (ephemeral):**
-
-```bash
-SUBSCRIBE room:42           # chat gateway servers
-PUBLISH room:42 "Ada: hi"   # any server delivers to all gateways holding room 42's users
-```
+**Ephemeral pub/sub, used correctly:** WebSocket gateways `SUBSCRIBE order:123:live` to push the courier's dot to the customer. A missed dot is harmless, because the next one arrives in 2 s.
 
 ## ⚖️ Trade-offs
 
-| You gain | You pay | Use it when |
+| Maya's choice | What she gains | What she pays |
 |---|---|---|
-| Add consumers without changing producers | Harder to see "who depends on this event?" | Many independent reactions to one event |
-| Independent pace and failure per subscriber | Storage per subscription | Business events |
-| Ephemeral pub/sub (low latency) | Offline subscribers miss messages | Live UI updates, chat routing |
-| Filtering at the broker | Broker config complexity | Subscribers need subsets |
+| Durable pub/sub | New consumers with zero publisher changes, isolated failures | Harder to see "who depends on this event?" |
+| A queue per subscriber | Independent pace, retries, scaling | Storage per subscription |
+| Ephemeral pub/sub | Very low latency, simple | Offline subscribers miss messages |
+| Broker-side filtering | Subscribers get only what they need | Broker config complexity |
 
 ## 🌍 Real world
 
-- **AWS SNS + SQS**, **Google Cloud Pub/Sub**, **Azure Service Bus topics**, and **Kafka topics with consumer groups**.
-- **Redis Pub/Sub** routes chat messages between WebSocket gateway servers (lesson 016).
-- **IoT** uses **MQTT** pub/sub for millions of devices.
+- **AWS SNS + SQS**, **Google Cloud Pub/Sub**, **Azure Service Bus topics**, and **Kafka consumer groups**.
+- **Redis Pub/Sub** routes chat messages between WebSocket gateways (lesson 016).
+- **MQTT** pub/sub connects millions of IoT devices.
 
 ## 📌 Cheat card
 
 > - **Queue = one worker per message. Pub/sub = every subscriber gets a copy.**
-> - Pattern: **topic → a queue per service → workers.**
-> - **Durable** for business events. **Ephemeral** (Redis Pub/Sub) for live, loss-tolerant updates.
-> - Events = **past-tense facts** with an **ID, type, version, and timestamp**.
+> - **Topic → a queue per service → workers.**
+> - **Durable** for business events. **Ephemeral** for loss-tolerant live updates.
+> - Events = **past-tense facts** + **ID, type, version, timestamp**.
 > - **New consumers need zero producer changes.**
 
 ## 🧪 Feynman check
 
-Explain the YouTube-channel analogy vs the deli-counter analogy, and why a company can add a fraud checker without touching the order service.
+Explain the YouTube channel vs the deli counter, and why Pantry could add a fraud checker without touching checkout.
 
-⚠️ **Common confusion:** "Pub/sub guarantees subscribers get messages." Only **durable** pub/sub does. Plain Redis Pub/Sub drops messages for disconnected subscribers.
+⚠️ **Common confusion:** "Pub/sub guarantees subscribers get messages." Only **durable** pub/sub does. Plain Redis Pub/Sub is fire-and-forget: a subscriber that's restarting during a deploy simply **never sees** the messages sent in that window.
 
 ## ⚡ Quick recall
 
-1. Queue vs pub/sub in one sentence?
-<details><summary>Answer</summary>
+1. What's the difference between a queue and pub/sub, in one sentence?
+<details><summary>Reveal Answer</summary>
 
 A queue delivers each message to one consumer, while pub/sub delivers each message to every subscriber.
 </details>
 
-2. Why fan out a topic into one queue per service?
-<details><summary>Answer</summary>
+2. Why fan a topic out into one queue per service?
+<details><summary>Reveal Answer</summary>
 
-Each service gets its own durable backlog, retries, and pace, and can scale its own workers independently.
+Each service gets its own durable backlog, retries, and pace, and scales its own workers independently.
 </details>
 
 3. Why name events in the past tense?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-They represent facts that already happened, not commands, so producers stay unaware of what consumers will do.
+They're facts that already happened, not commands, so producers stay unaware of what consumers will do with them.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "When a user uploads a video, we need to transcode it, generate thumbnails, run moderation, and notify followers. Design the flow."**
+**Q. "When a cook uploads a recipe video, we must transcode it, generate thumbnails, run moderation, and notify followers only once it's approved. Design the flow, and say whether Redis Pub/Sub could carry these events."**
 <details><summary>Model answer</summary>
 
-- The upload completes → publish `VideoUploaded {video_id, owner, s3_key}` to a topic.
-- Subscriptions (a queue each): **transcoder** (heavy, autoscaled workers), **thumbnailer**, **moderation**.
-- Transcoding done → `VideoTranscoded` → the **notification** service fans out to followers (lesson 078) *only after* moderation passes (it could wait for both events, which is a small saga or state machine).
-- Idempotent consumers, DLQs, and a status field on the video (`processing → ready/blocked`).
-- **Likely follow-up:** "How do you know when all the steps are done?" → an orchestrator or state machine tracking the per-video step status (Step Functions, Temporal), or a consumer that aggregates the completion events.
+- **Publish once:** upload complete → `VideoUploaded {video_id, cook_id, s3_key}` to a **durable** topic.
+- **Independent subscriptions (a queue each):**
+  - **Transcoder:** heavy, autoscaled on queue depth, emits `VideoTranscoded`.
+  - **Thumbnailer:** emits `ThumbnailsReady`.
+  - **Moderation:** emits `VideoApproved` or `VideoRejected`.
+- **Coordinating "notify only when approved AND transcoded":**
+  - A small **state machine / orchestrator** (Step Functions, Temporal) or an aggregator consumer.
+  - It tracks per-video step status, and when both conditions hold, publishes `VideoReady` → the **notification service** fans out to followers (lesson 078).
+  - The video row moves `processing → ready | blocked`.
+- **Reliability:** every consumer is **idempotent** (keyed on `video_id` + step), with retries + backoff, a **DLQ** per subscription, and alerts on DLQ depth.
+- **Redis Pub/Sub?** **No.** It's fire-and-forget: a subscriber that's down or slow **loses** events, and there's no replay.
+  - Use Kafka, SNS+SQS, Google Pub/Sub, or **Redis Streams with consumer groups** (persistence, acks, replay by ID).
+  - Keep Redis Pub/Sub for ephemeral signals: typing indicators, live courier dots, invalidation hints.
+- **Likely follow-up:** "How do you know who consumes an event before changing its schema?" → a schema registry with compatibility checks plus a subscriber catalogue. Add fields freely, and never remove or rename them without a new version.
 </details>
 
-**Q2. "Can you use Redis Pub/Sub for order events?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- **No** for business-critical events: it's fire-and-forget, and subscribers that are down or slow **lose messages**, with no replay.
-- Use a **durable** system (Kafka, SNS+SQS, Google Pub/Sub, Redis Streams with consumer groups).
-- Redis Pub/Sub is fine for **ephemeral** signals (typing indicators, cache invalidation hints, chat routing between gateways, with durable storage elsewhere).
-- **Likely follow-up:** "What does Redis Streams add?" → persistence, consumer groups, acks, and replay by ID.
-</details>
-
-> 📖 *Next, the analytics team wants to replay last week's orders after fixing a bug.*
+> 📖 *The broadcasts work beautifully, until analytics finds a bug that corrupted last week's revenue numbers and asks to replay seven days of orders that the queue already deleted.*
 
 ---
 
