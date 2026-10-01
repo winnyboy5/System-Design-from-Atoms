@@ -10,178 +10,151 @@
 
 ## 📖 Story
 
-Within a week, bots were creating a million short links a day and flooding the API. Pantry needed rate limiting, and not on one server, but consistently across fifty gateways at once. I've built this exact system twice. Let me walk you through how Maya designed hers, and the traps I helped her avoid.
+The short links work beautifully. **Too** beautifully.
+
+Within a week, a bot farm discovers Pantry's link API and starts minting **a million short links a day**, pointing every one of them at phishing pages dressed up as food delivery receipts. Real customers' link creation slows to a crawl.
+
+Maya's first instinct is a quick in-memory counter on each server: *100 requests per minute per API key.* She deploys it and watches the bots keep going. Pantry runs **50 gateway nodes** behind round-robin balancing. Every bot gets 100 requests per minute **per node**: **5,000 a minute**, fifty times the limit, laughing at the door.
+
+She needs one limit, enforced **consistently across fifty doors at once**, adding barely a millisecond, and never becoming the thing that takes Pantry down.
+
+I've built this exact system twice. Let me walk you through how Maya designed hers, and the traps I helped her avoid.
 
 ## 🎯 One-sentence idea
 
-**A distributed rate limiter enforces "at most N requests per time window per client" across many servers. It needs a fast shared counter (usually Redis), a good algorithm (token bucket or sliding window), and a plan for when the limiter itself is slow or down.**
+**A distributed rate limiter enforces "at most N requests per window per client" across many servers using a fast shared counter (usually Redis), an atomic algorithm (token bucket or sliding window), and an explicit plan for when the limiter itself is slow or down.**
 
 ## 🧸 Analogy
 
-A **theme park ride** with **many entrance gates**. Each visitor may ride **10 times per hour**. With one gate, a clerk with a notebook is enough. With **50 gates**, all clerks need to **share one scoreboard** (Redis) so a visitor can't get 10 rides at *each* gate. And if the scoreboard breaks, the park decides: **let everyone ride** (fail open) or **close the ride** (fail closed).
+A **theme-park ride** with **50 entrance gates** and a rule of 10 rides per hour per visitor. With one gate, a clerk's notebook works. With 50, every clerk must **share one scoreboard**, or a visitor rides 10 times at *each* gate. If the scoreboard breaks: **let everyone ride** (fail open) or **close the ride** (fail closed)?
 
 ## 🖼️ Visual
 
+*Diagram brief:* many gateways, each with a small limiter module, all making one atomic call to a sharded Redis scoreboard. Allowed requests pass to the backends. Denied ones bounce with a 429 sign carrying headers.
+
 ```mermaid
 flowchart LR
-    C["Clients"] --> GW1["Gateway 1<br/>limiter middleware"]
-    C --> GW2["Gateway 2<br/>limiter middleware"]
-    C --> GW3["Gateway N"]
-    GW1 <-->|"atomic Lua:<br/>check + decrement"| R[("⚡ Redis Cluster<br/>sharded by key")]
+    C["Clients / bots"] --> GW1["Gateway 1<br/>limiter middleware"]
+    C --> GW2["Gateway 2"]
+    C --> GW3["Gateway 50"]
+    GW1 <-->|"atomic Lua:<br/>refill + check + take"| R[("⚡ Redis Cluster<br/>sharded by key")]
     GW2 <--> R
     GW3 <--> R
-    CFG[("⚙️ Rules store<br/>limits per tier/endpoint")] -.->|"cached"| GW1
+    CFG[("⚙️ Rules store<br/>per tier / endpoint")] -.->|"cached"| GW1
     GW1 -->|"allowed"| API["Backend services"]
     GW1 -->|"denied"| X["429 + Retry-After<br/>+ X-RateLimit-* headers"]
 ```
 
 ## 🔬 How it works
 
-### 1️⃣ Requirements
-- **Functional:** limit requests per **key** (user ID, API key, IP) per **rule** (e.g., 100/min, and 10/s burst). Rules differ per endpoint and plan tier. Return a clear 429 with headers.
-- **Non-functional:** adds **< 1–2 ms** latency, handles **millions of requests/s**, and is **highly available**. It must not become the reason the API is down. Accuracy: **approximately right is OK** (a few % over is acceptable).
-
-### 2️⃣ Estimates
-```
-1M requests/s across 100 gateway nodes
-Active keys: 10M clients, ~50 bytes of state each (token count + timestamp) → ~500 MB → fits in Redis easily
-Redis ops: ~1M/s (1 atomic script per request) → a Redis Cluster with ~10–20 shards
-```
-
-### 3️⃣ Where to put it
-- **In the API gateway / edge (recommended):** reject early, before any expensive work.
-- **As a sidecar or library** in services, for per-service limits.
-- **As a separate rate-limit service** (e.g., Envoy's global rate limit service): centralized rules, but an extra network hop.
-
-### 4️⃣ Algorithm choice
-- **Token bucket:** allows bursts up to the capacity and enforces the average rate. Store `{tokens, last_refill_ts}` per key. ✅ The most common.
-- **Sliding window counter:** `count = current_window + previous_window × overlap%`. Store 2 counters. ✅ Accurate and cheap.
-- (Fixed window: simplest but bursty at the boundary. Sliding log: exact but memory-heavy. Lesson 024.)
-
-### 5️⃣ Atomicity (the core deep dive)
-- Read-modify-write from many gateways **races**, since two gateways can both see "1 token left" and both allow.
-- Fix: do check-and-update **atomically inside Redis** with a **Lua script** (or `INCR` + `EXPIRE` for fixed windows).
-- Key design: `rl:{api_key}:{rule_id}`, sharded across the Redis Cluster by key.
-
-### 6️⃣ Scaling & latency tricks
-- **Pipelining / co-location:** Redis in the same AZ as the gateways (~0.3–1 ms).
-- **Local pre-allocation:** each gateway **leases a batch of tokens** (e.g., 10% of the limit) and serves from memory, syncing periodically. Much less Redis traffic, at a small accuracy cost.
-- **Local approximate counters** synced every ~100 ms for extremely hot keys.
-- **Hot keys** (one huge client): shard their counter across N sub-keys, or give them dedicated limits.
-
-### 7️⃣ Failure handling
-- **Redis slow or down → fail open** (allow the request) with **local in-memory limits** as a fallback, and alert. Blocking all traffic because the limiter broke is usually worse than a short window of over-limit traffic.
-- **Fail closed** only for security-critical limits (login attempts, OTP sends).
-- A circuit breaker around the Redis calls, and a tight timeout (e.g., 5 ms).
-
-### 8️⃣ Client experience
-```
-HTTP/1.1 429 Too Many Requests
-Retry-After: 12
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 0
-X-RateLimit-Reset: 1790000012
-```
+- **Requirements:** limit per **key** (user, API key, IP) per **rule** (e.g. 10/s with a burst of 20, plus 10k/day), with rules varying by endpoint and plan. Non-functional: **< 1–2 ms** added latency, **millions of req/s**, **highly available**, and "**approximately right**" accuracy (a few % over is fine).
+- **Estimates:** 1M req/s across 100 gateways, 10M active keys × ~50 B ≈ **500 MB** of state (fits easily), ~1M Redis ops/s → a **10–20-shard Redis Cluster** in the **same AZ** (~0.3–1 ms).
+- **Placement and algorithm:** enforce at the **gateway/edge** (reject before expensive work), with service-level limits for business quotas. Use a **token bucket** (bursts + an average rate, storing `{tokens, ts}`) or a **sliding window counter** (two counters, cheap and accurate). See lesson 024.
+- **Atomicity is the core deep dive:** a read-modify-write from many gateways **races**, because two gateways see "1 token left" and both allow. Run **refill + check + decrement inside Redis as one Lua script** (or `INCR` + `EXPIRE` for fixed windows), keyed `rl:{key}:{rule}` and sharded by key.
+- **Scaling tricks:** **local token leasing** (each gateway reserves a batch, e.g. 10% of the limit, and spends it from memory) slashes Redis traffic at a bounded accuracy cost. A **local fast path** skips Redis for clients far below their limits. Shard **hot keys** across sub-keys.
+- **Failure policy:** a tight Redis timeout (~5 ms) + a circuit breaker. **Fail open** with local in-memory fallback limits for general APIs (a broken limiter must not take Pantry down), and **fail closed** for security limits (login, OTP/SMS sends). Always return **429 + `Retry-After` + `X-RateLimit-*`**.
 
 ## 🧩 Worked example
 
-**Token bucket as an atomic Redis Lua script:**
+**Token bucket, atomic in Redis:**
 
 ```lua
--- KEYS[1] = bucket key | ARGV: rate (tokens/sec), capacity, now_ms, cost
+-- KEYS[1] = bucket | ARGV: rate (tokens/s), capacity, now_ms, cost
 local b = redis.call("HMGET", KEYS[1], "tokens", "ts")
 local rate, cap, now, cost = tonumber(ARGV[1]), tonumber(ARGV[2]), tonumber(ARGV[3]), tonumber(ARGV[4])
 local tokens = tonumber(b[1]) or cap
 local ts     = tonumber(b[2]) or now
-tokens = math.min(cap, tokens + (now - ts) / 1000 * rate)      -- refill
+tokens = math.min(cap, tokens + (now - ts) / 1000 * rate)          -- refill
 local allowed = 0
 if tokens >= cost then tokens = tokens - cost; allowed = 1 end
 redis.call("HSET", KEYS[1], "tokens", tokens, "ts", now)
-redis.call("PEXPIRE", KEYS[1], math.ceil(cap / rate * 1000) * 2) -- clean up idle keys
+redis.call("PEXPIRE", KEYS[1], math.ceil(cap / rate * 1000) * 2)   -- evict idle keys
 return {allowed, tokens}
 ```
 
-**Rules config:**
+**Rules:**
 
 ```yaml
-- match: { plan: free }       limit: { rate: 10/s, burst: 20, daily: 10000 }
-- match: { plan: pro }        limit: { rate: 100/s, burst: 200 }
-- match: { path: /v1/login }  key: ip          limit: { rate: 5/min }   fail: closed
-- match: { path: /v1/search } key: api_key     limit: { rate: 30/s }
+- match: { plan: free }          limit: { rate: 10/s, burst: 20, daily: 10000 }
+- match: { plan: pro }           limit: { rate: 100/s, burst: 200 }
+- match: { path: /v1/links }     key: api_key  limit: { rate: 2/s, daily: 500 }
+- match: { path: /v1/login }     key: ip       limit: { rate: 5/min }   fail: closed
 ```
+
+**The bot farm, replayed:** 5,000 req/min per key → **2/s and 500/day per key, globally enforced**. Bot link creation drops **~99%**, and real cooks never come close to the limit. The limiter adds **0.6 ms p99**.
 
 ## ⚖️ Trade-offs
 
-| Decision | Option A | Option B | Pick |
+| Decision | Option A | Option B | Maya's pick |
 |---|---|---|---|
-| Accuracy vs latency | Central Redis every request (accurate) | Local batches (fast, approximate) | Central by default, local leasing for hot, high-QPS keys |
+| Accuracy vs latency | Central Redis per request | Local leased batches | Central by default, leasing for hot, high-QPS keys |
 | Failure mode | Fail open | Fail closed | **Open** for general APIs, **closed** for security limits |
 | Placement | Gateway | Each service | **Gateway** for global limits, services for business quotas |
-| Algorithm | Token bucket | Sliding window counter | Either works. Token bucket if bursts are desired. |
+| Algorithm | Token bucket | Sliding window counter | Token bucket (bursts wanted) |
 
 ## 🌍 Real world
 
-- **Stripe:** multiple limiters (request rate, concurrent requests, fleet usage load shedder) built on Redis.
-- **Envoy global rate limiting** + Lyft's `ratelimit` service (Redis-backed).
-- **Cloudflare** rate limits at the edge across hundreds of cities, using approximate distributed counting.
-- **GitHub:** 5,000 requests/hour per token, with `X-RateLimit-*` headers.
+- **Stripe** runs several Redis-backed limiters: request rate, concurrency, and fleet-wide load shedders.
+- **Envoy's global rate limiting** with Lyft's `ratelimit` service (Redis-backed).
+- **Cloudflare** rate-limits at the edge across hundreds of cities with approximate distributed counting.
 
 ## 📌 Cheat card
 
 > - **Shared counter (Redis) + atomic Lua** = correct distributed limiting.
-> - **Token bucket** (bursty-friendly) or **sliding window counter** (cheap, accurate).
-> - **Put it at the gateway**, keyed by user, API key, or IP, with rules per endpoint and tier.
-> - **Fail open** (with local fallback limits), except for security-critical limits.
-> - **Local token leasing** cuts Redis load at huge QPS.
-> - **429 + Retry-After + X-RateLimit headers.**
+> - **Token bucket** (burst-friendly) or **sliding window counter**.
+> - **Gateway placement**, keyed by user, API key, or IP, with rules per endpoint and tier.
+> - **Fail open** (with local fallback) except for **security limits**.
+> - **Local token leasing** for huge QPS.
+> - **429 + Retry-After + X-RateLimit-* headers.**
 
 ## 🧪 Feynman check
 
-Explain the theme-park gates sharing one scoreboard, and what the park should do if the scoreboard breaks during peak hours, for the rides vs for the ticket office's anti-fraud checks.
+Explain the 50 gates sharing one scoreboard, and what the park should do when the scoreboard breaks, for the rides vs the anti-fraud check at the ticket office.
 
-⚠️ **Common confusion:** "Each gateway can just count locally." With 50 gateways, a client could get 50× the limit (with round-robin balancing). You need shared state, or deliberately split limits per node (limit ÷ N, which is only fair if load is evenly spread).
+⚠️ **Common confusion:** "Each gateway can just count locally." Behind round-robin balancing, N gateways give each client **N× the limit**. You need **shared state**, or deliberately split limits (limit ÷ N), which is fair only if the traffic spreads perfectly evenly.
 
 ## ⚡ Quick recall
 
 1. Why use a Lua script in Redis for rate limiting?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-To make the read-refill-check-decrement sequence atomic, preventing races between gateways.
+To make the refill-check-decrement sequence atomic, preventing races between gateways.
 </details>
 
 2. When should a rate limiter fail closed?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-For security-sensitive limits (login attempts, OTP/SMS sends, payments abuse), where over-allowing is dangerous.
+For security-sensitive limits (login attempts, OTP/SMS sends, payment abuse), where over-allowing is dangerous.
 </details>
 
 3. How does local token leasing reduce load?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Each gateway reserves a batch of tokens from Redis and serves requests from memory until the batch runs out, instead of calling Redis on every request.
+Each gateway reserves a batch of tokens and serves requests from memory until the batch runs out, instead of calling Redis on every request.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Your Redis-based limiter adds 3 ms p99 and Redis CPU is at 90%. Improve it."**
+**Q. "The Redis-based limiter adds 3 ms p99 and Redis CPU is at 90%. Improve it, and support 'per-day' and 'per-second burst' limits at the same time."**
 <details><summary>Model answer</summary>
 
-- **Scale out** the Redis Cluster (more shards), and put it in the same AZ as the gateways.
-- **Local token leasing / approximate local counting** for high-QPS keys, syncing periodically.
-- **Pipelining** where multiple rules are checked per request (one script evaluating all the rules).
-- Skip Redis for clients that are **far below** their limits (a local fast path), and only consult Redis near the threshold.
-- **Likely follow-up:** "What accuracy do you lose?" → a burst of up to about (lease size × gateways) over the limit, which is tunable.
+- **Cut the latency and the load:**
+  - **Scale out** the Redis Cluster (more shards, so the keys spread) and **co-locate** it in the gateways' AZ.
+  - **Local token leasing / approximate local counting** for high-QPS keys, syncing every ~100 ms. Accuracy loss ≤ lease size × gateways, and it's tunable.
+  - **Local fast path:** clients far below their limit skip Redis. Consult Redis only near the threshold.
+  - **One script per request** that evaluates **all** applicable rules, instead of several round trips.
+  - Shard **hot keys** (one giant client) across sub-buckets.
+- **Two limits at once:**
+  - Per key: a **token bucket** (rate + burst) **and** a **daily counter** (`INCR rl:{user}:{yyyymmdd}` with a ~25 h TTL).
+  - Evaluate both **atomically in one Lua script**. Deny if either fails, and return the **most restrictive** `Retry-After`.
+  - **Midnight-reset spikes:** use a **rolling 24 h sliding window**, or stagger resets per user.
+- **Resilience:** a 5 ms timeout + a breaker. On a Redis outage, fail open to local limits for most routes and fail closed for login/OTP. Alert either way.
+- **Likely follow-up:** "How do you test it?" → load tests with skewed keys, and chaos tests that kill a Redis shard while you verify the fail-open behaviour and that the accuracy stays within bounds.
 </details>
 
-**Q2. "How would you rate-limit by 'requests per user per day' AND 'burst per second' at the same time?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- Two rules per key: a **token bucket** (rate/s + burst) and a **fixed daily window counter** (`INCR rl:{user}:{yyyymmdd}` with a TTL of 1 day).
-- Evaluate both atomically in one Lua script, and deny if either fails. Return the most restrictive `Retry-After`.
-- **Likely follow-up:** "Daily resets at midnight UTC cause spikes?" → use rolling 24 h sliding windows, or stagger resets per user.
-</details>
-
-> 📖 *Next, Leo dreams of a feed of recipes from the cooks you follow.*
+> 📖 *The bots are tamed, and now the product team wants a home feed showing fresh dishes from every cook you follow, and one of those cooks has twelve million followers.*
 
 ---
 
