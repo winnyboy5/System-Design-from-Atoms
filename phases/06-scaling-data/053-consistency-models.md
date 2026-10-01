@@ -8,22 +8,34 @@
 
 ## 📖 Story
 
-Maya's team argued. "Likes can be a bit stale," said one. "Balances can't," said another. "Comments must appear in order," said a third. I told Maya they were all right, and that's the point I'll make to you here: there are many levels of consistency, and each feature gets to order its own.
+Three bug reports land on Maya's desk in the same afternoon, and each one feels like a different kind of ghost.
+
+**Ghost one:** a customer replies *"Yes! Until 9 p.m.!"* to a question about a cook's hours. A third customer, reading from another replica, sees the **answer with no question**, floating alone on the page.
+
+**Ghost two:** a cook's wallet shows **£240**, then refreshes to **£190**, then **£240** again. Money appears to be flickering in and out of existence.
+
+**Ghost three:** a dish's ❤️ count reads 1,204 on one phone and 1,198 on another.
+
+Maya wants to stamp "make it consistent" on all three. But each fix costs latency, and in the wrong place, availability.
+
+I told her what I'll tell you: these are **three different promises**. Consistency isn't a switch. It's a **menu**, and each feature gets to order its own dish.
 
 ## 🎯 One-sentence idea
 
-**A consistency model is the promise a system makes about what reads can return after writes. It ranges from strong (everyone sees the latest value, like a single copy) to eventual (copies agree *eventually*), with useful middle grounds like causal and read-your-writes.**
+**A consistency model is the promise a system makes about what reads can return after writes, ranging from strong (everyone sees the latest value, like a single copy) to eventual (copies agree *eventually*), with valuable middle grounds such as causal and read-your-writes.**
 
 ## 🧸 Analogy
 
 News of a **football goal** spreading:
 
-- 📺 **Strong (linearizable):** everyone watches **one live broadcast**. The moment the goal happens, *every* viewer sees it. No one ever sees an older score.
-- 🔗 **Causal:** you might hear about it late, but you'll **never** hear "what a comeback!" **before** hearing about the goal that caused it.
-- 🙋 **Read-your-writes:** the person who **posted** the score always sees their own post.
-- 📬 **Eventual:** news spreads by word of mouth. Some people know, some don't yet, and **eventually everyone knows**.
+- 📺 **Strong:** everyone watches **one live broadcast**. No one ever sees an older score.
+- 🔗 **Causal:** you may hear late, but never hear "what a comeback!" **before** the goal that caused it.
+- 🙋 **Read-your-writes:** whoever **posted** the score always sees their own post.
+- 📬 **Eventual:** word of mouth. **Eventually everyone knows.**
 
 ## 🖼️ Visual
+
+*Diagram brief:* a ladder of promises from strongest to weakest, with "easier to reason about" at the top and "faster, more available" at the bottom.
 
 ```mermaid
 flowchart LR
@@ -36,118 +48,105 @@ flowchart LR
 
 ## 🔬 How it works
 
-- **Strong consistency / linearizability:** once a write completes, **all** later reads (by anyone) see it. The system behaves like a single machine.
-  - Needs coordination (consensus or quorums with a leader) → higher latency, and less availability during partitions (CP).
-  - Needed for: locks, leader election, unique constraints, balances, inventory.
-- **Sequential consistency:** everyone sees operations in the **same order**, but not necessarily in real time.
-- **Causal consistency:** operations that are **causally related** (a reply after a post) are seen in order by everyone. Unrelated concurrent operations may appear in different orders.
-  - It's the strongest model that stays **available during partitions**. Great for social and collaborative apps.
-- **Session guarantees** (per client):
-  - **Read-your-writes:** you see your own updates (lesson 047).
-  - **Monotonic reads:** you never see time go backwards.
-  - **Monotonic writes:** your writes apply in the order you issued them.
-  - **Writes-follow-reads:** a write based on something you read is ordered after that read.
-- **Eventual consistency:** if writes stop, all replicas **converge** to the same value. No guarantee of *when*, or what you read meanwhile.
-  - Needs conflict resolution (LWW, CRDTs). It's highly available and fast.
-- **BASE** (Basically Available, Soft state, Eventually consistent) is the philosophy of many AP systems.
-- **Mix per feature:** the same app might use strong consistency for payments, causal for comments, and eventual for like counts.
+- **Linearizable (strong):** once a write completes, **every** later read by anyone sees it, in real-time order. It needs coordination (consensus/quorums), so it's slower and the minority side is unavailable during partitions. **Sequential** keeps one global order but drops the real-time requirement.
+- **Causal:** causally related operations (a reply after its question) appear in order **for everyone**. Concurrent unrelated operations may differ. It's the **strongest model that stays available during partitions**.
+- **Session guarantees (per client):** **read-your-writes**, **monotonic reads** (no time travel backwards, which is ghost two), **monotonic writes**, and **writes-follow-reads**. They're implemented with sticky replicas or session tokens (lesson 047).
+- **Eventual:** once writes stop, all replicas **converge**, with no promise about *when* or what you read in the meantime. It needs conflict resolution (LWW/CRDTs) and is the backbone of **BASE**.
+- **Mix per operation:** strong for money and uniqueness, causal for conversations, eventual for counters and suggestions.
 
 ## 🧩 Worked example
 
-**Comment thread anomaly under eventual consistency:**
+**Ghost one, under eventual consistency:**
 
 ```
-Alice posts:  "Is the store open today?"      (write 1 → replica A)
-Bob replies:  "Yes, until 9pm!"               (write 2 → replica B, after reading write 1)
-Carol reads from replica C, which received write 2 but not write 1 yet:
-  → sees "Yes, until 9pm!" with no question 🤔
-Causal consistency prevents this: write 2 depends on write 1, so C must show 1 first.
+Q:  "Is the kitchen open today?"      (write 1 → replica A)
+A:  "Yes! Until 9 p.m.!"              (write 2 → replica B, written AFTER reading write 1)
+Reader on replica C got write 2 before write 1 → sees an answer with no question 🤔
 ```
 
-**How systems implement causal consistency:** attach dependency metadata (version vectors or a session's "last seen" timestamp), and replicas **delay** showing a write until its dependencies have arrived.
+**Causal fix:** write 2 carries a **dependency** `{depends_on: write1}` (or a version vector). Replica C **buffers** write 2 until write 1 arrives, so cause always precedes effect.
 
-**Picking models for a banking app vs a social app:**
+**Maya's menu:**
 
-| Operation | Model |
+| Pantry operation | Model |
 |---|---|
-| Transfer money | Strong (linearizable, ACID) |
-| View my balance right after a transfer | Strong or read-your-writes |
-| Transaction history on a replica | Read-your-writes + monotonic reads |
-| Social comments/replies | Causal |
-| Like counter | Eventual |
-| Friend suggestions | Eventual (hours of staleness are fine) |
+| Wallet payout, transfer | **Strong** (linearizable, ACID) |
+| Cook views her balance after a payout | **Read-your-writes + monotonic reads** (kills ghost two) |
+| Q&A threads, chat replies | **Causal** (kills ghost one) |
+| ❤️ counts | **Eventual** (ghost three is fine) |
+| "Cooks you might like" | **Eventual** (hours of staleness are OK) |
 
 ## ⚖️ Trade-offs
 
-| Model | Latency | Availability during a partition | Programmer effort |
+| Model | Latency | Availability in a partition | Programmer effort |
 |---|---|---|---|
-| Strong | 🐢 Highest (coordination) | ❌ Minority side unavailable | 🟢 Easiest to reason about |
-| Causal | 🟡 Medium | ✅ Available | 🟡 Metadata tracking |
-| Session guarantees | 🟢 Low | ✅ (with stickiness) | 🟡 Routing and tokens |
-| Eventual | 🚀 Lowest | ✅ | 🔴 Must handle anomalies and conflicts |
+| Strong | 🐢 Highest | ❌ Minority side down | 🟢 Easiest to reason about |
+| Causal | 🟡 Medium | ✅ | 🟡 Dependency metadata |
+| Session | 🟢 Low | ✅ (with stickiness) | 🟡 Routing and tokens |
+| Eventual | 🚀 Lowest | ✅ | 🔴 Must tolerate anomalies |
 
 ## 🌍 Real world
 
-- **Spanner, etcd, ZooKeeper, CockroachDB** provide strong/linearizable operations.
-- **MongoDB** offers causal consistency sessions. **Azure Cosmos DB** famously offers 5 levels: strong, bounded staleness, session, consistent prefix, eventual.
-- **DNS, CDN caches, Cassandra at CL=ONE** are eventually consistent.
-- **Amazon S3** moved from eventual to **strong read-after-write** consistency in 2020.
+- **Spanner, etcd, ZooKeeper, and CockroachDB** offer linearizable operations.
+- **MongoDB** has causal-consistency sessions. **Azure Cosmos DB** famously exposes five levels: strong, bounded staleness, session, consistent prefix, and eventual.
+- **Amazon S3** switched from eventual to **strong read-after-write** consistency in December 2020.
 
 ## 📌 Cheat card
 
 > - **Strong** = one-copy illusion (slow, CP). **Eventual** = converges someday (fast, AP).
-> - **Causal** = cause before effect. It's the strongest model that stays available during partitions.
-> - **Session guarantees:** read-your-writes, monotonic reads, and friends.
-> - **Pick per operation:** money → strong · comments → causal · counters → eventual.
-> - Mnemonic: **BASE vs ACID**.
+> - **Causal** = cause before effect, the strongest model that stays available during partitions.
+> - **Session guarantees:** read-your-writes, monotonic reads/writes, writes-follow-reads.
+> - **Order per feature:** money → strong · threads → causal · counters → eventual.
 
 ## 🧪 Feynman check
 
-Using the football-goal story, explain the difference between strong, causal, and eventual consistency, and give one feature where eventual is totally fine.
+Using the football goal, explain strong vs causal vs eventual, and name one Pantry feature where eventual is perfectly fine.
 
-⚠️ **Common confusion:** "Eventual consistency means data might be wrong forever." No. It **converges** once updates stop propagating. The issue is *temporary* staleness and conflicts, which your design must tolerate.
+⚠️ **Common confusion:** "Eventual consistency means the data might be wrong forever." No: replicas **converge** once updates stop propagating. The real cost is **temporary** staleness and conflicts, which your UX and code must tolerate.
 
 ## ⚡ Quick recall
 
 1. What does linearizability guarantee?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-After a write completes, every subsequent read (by any client) returns that value or a newer one, as if there were a single copy.
+After a write completes, every later read by any client returns that value or a newer one, as if there were a single copy.
 </details>
 
 2. What anomaly does causal consistency prevent?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Seeing an effect before its cause (e.g., a reply before the question it answers).
+Seeing an effect before its cause, such as a reply before the question it answers.
 </details>
 
 3. Name two session guarantees.
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Read-your-writes, monotonic reads, monotonic writes, writes-follow-reads (any two).
+Any two of: read-your-writes, monotonic reads, monotonic writes, writes-follow-reads.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "What consistency model would you choose for a collaborative comment system, and how would you implement it?"**
+**Q. "Pick a consistency model for a collaborative comment system and implement it. Then answer the PM who asks, 'Why not make everything strongly consistent?'"**
 <details><summary>Model answer</summary>
 
-- **Causal** (+ read-your-writes). Replies must appear after their parents, and authors see their own comments immediately.
-- Implement: each comment references its parent ID. A client renders a reply only once its parent is present (buffer orphans). A session token tracks the last-written timestamp so the author's reads go to caught-up replicas.
-- Counts (replies, likes) can be eventually consistent.
-- **Likely follow-up:** "Why not strong consistency?" → cross-region coordination on every comment adds latency, and it isn't needed for correctness here.
+- **Model:** **causal + read-your-writes**. Replies must follow their parents everywhere, and authors must see their own comments instantly. Reply and like counts can be eventual.
+- **Implementation:**
+  - Each comment stores `parent_id` (and optionally a version vector or HLC timestamp).
+  - Replicas and clients **buffer orphans** until the parent arrives, then render in order.
+  - A **session token** carries the author's last write position, so their reads route to a caught-up replica or the leader.
+  - Counts are maintained asynchronously.
+- **To the PM:**
+  - Strong consistency needs **coordination on every write**: a majority round trip, which is **~100+ ms per write** cross-region, plus lower throughput.
+  - During a partition, the **minority side goes read-only or down**.
+  - Users forgive a like count that's a second old. They don't forgive a slow or unavailable app.
+  - So we buy strong consistency **only where correctness demands it**: payments, inventory, uniqueness, permissions.
+- **UX for weaker models:** optimistic UI updates, "syncing…" states, and "updated 2 s ago" timestamps.
+- **Likely follow-up:** "How do you implement monotonic reads cheaply?" → sticky replica per session (`hash(user_id)`), or a session token carrying the last-seen LSN.
 </details>
 
-**Q2. "A PM asks, 'Why can't we just make everything strongly consistent?'"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- Strong consistency needs **coordination** (consensus or quorums): higher latency (especially cross-region, ~100+ ms per write), lower throughput, and **unavailability** on the minority side during partitions.
-- Most features don't need it: users tolerate a like count that's a second old, but not a slow app or downtime.
-- Apply strong consistency where it matters (money, inventory, uniqueness, permissions), and weaker models elsewhere.
-- **Likely follow-up:** "How do you explain eventual consistency to users?" → UX patterns: optimistic UI updates, "syncing…" indicators, and last-updated timestamps.
-</details>
-
-> 📖 *Next, Maya wants fresh reads without asking every copy every time.*
+> 📖 *Maya wants fresh reads without asking every single copy every single time, and the answer turns out to be a little bit of arithmetic about overlapping majorities.*
 
 ---
 

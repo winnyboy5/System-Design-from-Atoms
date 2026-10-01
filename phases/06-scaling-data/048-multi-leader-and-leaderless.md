@@ -8,34 +8,41 @@
 
 ## 📖 Story
 
-Pantry's European customers waited 150 milliseconds on every save, because the only leader lived in America. Maya wanted a leader on each continent. I warned her, and now I'm warning you: two leaders might accept conflicting changes to the same shopping cart at the same moment. Then what?
+Pantry opens in Lisbon, Berlin, and Dublin. European customers love the food and hate the **lag**.
+
+Every "Add to cart" leaves Europe, crosses the Atlantic through an undersea cable, reaches the one and only leader in Virginia, waits for a commit, and swims back. **~150 ms per write**, on every tap. On a train with patchy signal it feels like wading through syrup.
+
+Maya sketches the obvious fix: **a leader on each continent**. Europeans write in Europe, Americans write in America, and the leaders sync behind the scenes.
+
+Then she imagines a couple sharing one Pantry account. One is in New York, one is in Lisbon. At the same second, one **adds a dish** to the shared cart and the other **removes it**. Two leaders, two truths, one cart.
+
+I warned her, and now I'm warning you: once more than one node accepts writes, **conflicts stop being hypothetical**. Then what?
 
 ## 🎯 One-sentence idea
 
-**When several nodes accept writes (multi-leader, or leaderless like Dynamo/Cassandra), writes stay fast and available even across regions, but two nodes can accept conflicting writes, so you need a conflict-resolution strategy.**
+**When several nodes accept writes (multi-leader, or leaderless like Dynamo/Cassandra), writes stay fast and available across regions, but two nodes can accept conflicting writes, so you need an explicit conflict-resolution strategy.**
 
 ## 🧸 Analogy
 
 A **shared family calendar** with a paper copy in **every room**:
 
-- Anyone can write in **their room's copy** (multi-leader), and copies are synced every evening.
-- Mom writes "dentist 3pm Tuesday" in the kitchen. Dad writes "football 3pm Tuesday" in the garage, for the **same slot**. 💥 **Conflict!**
-- How do you resolve it?
-  - "**Latest note wins**" (last-write-wins): simple, but someone's plan silently vanishes.
-  - "**Keep both and ask**" (siblings): the family decides later.
-  - "**Smart merge**" (CRDTs): e.g., for a shopping list, just combine both lists.
+- Anyone writes in **their room's copy**, and copies sync every evening.
+- One parent writes "dentist 3 p.m. Tuesday" in the kitchen, the other writes "football 3 p.m. Tuesday" in the garage. 💥
+- Resolve it by **"latest note wins"** (someone's plan silently vanishes), **"keep both and ask"** (siblings), or **"smart merge"** (CRDTs: combine two shopping lists).
 
 ## 🖼️ Visual
 
+*Diagram brief:* on the left, two crowned leaders on two continents with a two-way sync arrow, each taking local writes. On the right, a client spraying one write to three peer nodes with no crown at all.
+
 ```mermaid
 flowchart LR
-    subgraph ML["Multi-leader (one leader per region)"]
+    subgraph ML["Multi-leader (one per region)"]
         US[("👑 Leader US")] <-->|"async sync"| EU[("👑 Leader EU")]
         UW["US writes"] --> US
         EW["EU writes"] --> EU
     end
     subgraph LL["Leaderless (Dynamo-style)"]
-        C["Client"] -->|"write to N=3"| N1[("Node A")]
+        C["Client"] -->|"write to N=3, need W=2"| N1[("Node A")]
         C --> N2[("Node B")]
         C --> N3[("Node C")]
     end
@@ -43,126 +50,110 @@ flowchart LR
 
 ## 🔬 How it works
 
-- **Multi-leader:**
-  - Several leaders (usually **one per datacenter/region**), each accepting writes and replicating to the others asynchronously.
-  - ✅ Local write latency in every region, it survives a region outage, and it supports offline clients (each phone is a "leader": calendars, notes apps).
-  - ❌ **Write conflicts** when the same data is edited in two places concurrently.
-- **Leaderless (Dynamo-style: Cassandra, Riak, DynamoDB internals):**
-  - The client (or a coordinator) sends writes to **N replicas**, and succeeds when **W** acknowledge. Reads query **R** replicas (lesson 054).
-  - **Read repair** (fix stale replicas during reads) and **anti-entropy** (background sync with Merkle trees) converge the data.
-  - **Hinted handoff:** if a replica is down, another node temporarily holds its writes.
-  - ✅ No failover needed (there's no leader), and it's highly available. ❌ Eventual consistency, and conflicts.
-- **Conflict resolution strategies:**
-  - **Last-write-wins (LWW):** keep the write with the highest timestamp. Simple, but it **silently loses data**, and clock skew makes it worse.
-  - **Version vectors / siblings:** detect concurrent writes, keep both versions, and let the app or user merge (e.g., Amazon's shopping cart unions the items).
-  - **CRDTs (Conflict-free Replicated Data Types):** data structures that **merge automatically and deterministically** (counters, sets, text). Used in collaborative editing and in Redis Enterprise active-active.
-  - **Avoid conflicts:** route all writes for a given record to **one "home" leader** (e.g., a user's home region).
+- **Multi-leader:** usually **one leader per region**, each accepting local writes and replicating asynchronously to the others. You get local write latency, survival of a full region outage, and offline clients (every phone becomes a "leader"). The cost is **write conflicts**.
+- **Leaderless (Dynamo, Cassandra, Riak):** write to **N** replicas and succeed on **W** ACKs. Read from **R** (lesson 054). Convergence comes from **read repair**, **anti-entropy with Merkle trees**, and **hinted handoff** (a neighbour holds writes for a down replica). There's no failover, because there's no leader.
+- **Last-write-wins (LWW):** keep the highest timestamp. It's simple, and it **silently drops data**, which **clock skew** makes worse (lesson 084).
+- **Detect and merge:** **version vectors** spot truly concurrent writes and keep **siblings** for the app to merge (Dynamo's cart unions them). **CRDTs** (counters, OR-sets, sequence CRDTs for text) merge **automatically and deterministically**, so every replica converges.
+- **Avoid conflicts entirely:** give each record a **home leader** (the user's home region) and route all its writes there. Most traffic stays local, and conflicts become impossible.
 
 ## 🧩 Worked example
 
 **LWW losing data:**
 
 ```
-t=100 (US): cart = [book]
-t=101 (EU): cart = [pen]         ← concurrent edits of the same cart
-LWW keeps the highest timestamp → cart = [pen]  → the book vanished 😢
+t=100 (US):     cart = [lasagna]
+t=101 (Lisbon): cart = [curry]          ← concurrent edits
+LWW → [curry]   … the lasagna silently vanishes 😢
 ```
 
-**Sibling merge (Dynamo's cart):**
+**OR-Set CRDT cart (add/remove-safe):**
 
 ```
-Versions detected as concurrent: {book} and {pen}
-App merges: union → {book, pen}  ✅
-(Side effect: deleted items can "resurrect" → track removals too)
+US adds   (lasagna, tag u1)        Lisbon removes (lasagna, tags seen: {})   ← never saw u1
+merge → lasagna stays: a remove only deletes tags it actually observed. No resurrection bugs,
+        no silent loss.
 ```
 
-**A CRDT counter (G-Counter): each node counts its own increments.**
+**G-Counter (likes per dish):**
 
 ```
-Node A: {A:5, B:0}     Node B: {A:0, B:3}
-merge = element-wise max → {A:5, B:3} → value = 8   (never loses increments)
+US: {US:5, EU:0}   EU: {US:0, EU:3}   merge = element-wise max → {US:5, EU:3} → 8 ✅
 ```
 
-**Conflict avoidance by home region:**
-
-```
-user 42's home = EU → all writes for user 42 go to the EU leader
-US reads can use local replicas, and the US writes for user 42 are forwarded to the EU
-```
+**Home-region routing:** `user 42 → home = EU` → every write for user 42 goes to the EU leader, US replicas serve their reads, and **zero conflicts**.
 
 ## ⚖️ Trade-offs
 
-| Model | Gain | Cost | Use when |
+| Model | What Maya gains | What she pays | Use when |
 |---|---|---|---|
-| Single leader | Simple, no write conflicts | Write latency far from the leader, failover | Most systems |
-| Multi-leader | Local writes per region, offline support | Conflicts, complexity | Multi-region apps, collaborative/offline apps |
-| Leaderless | Very high availability, no failover | Eventual consistency, repairs, conflicts | Massive write-heavy, AP systems |
-| LWW | Simple | Silent data loss | Caches, idempotent overwrites, sensors |
-| CRDTs | Automatic, correct merges | Limited data types, metadata overhead | Counters, sets, collaborative editing |
+| Single leader | Simple, conflict-free | Far-away writes are slow, and failover | Most systems |
+| Multi-leader | Local writes, offline support | Conflicts, complexity | Multi-region, offline-first apps |
+| Leaderless | Extreme availability, no failover | Eventual consistency, repair machinery | Massive write-heavy AP workloads |
+| LWW | Trivial | Silent data loss | Sensor readings, idempotent overwrites |
+| CRDTs | Correct automatic merges | Limited types, metadata overhead | Counters, sets, collaborative text |
 
 ## 🌍 Real world
 
-- **Amazon Dynamo paper (2007)** introduced leaderless replication, sloppy quorums, and vector clocks. **Cassandra** and **Riak** followed.
-- **Google Docs** (operational transformation) and **Figma/Linear** (CRDT-inspired approaches) merge concurrent edits.
-- **CouchDB/PouchDB** multi-leader sync powers offline-first apps.
-- **DynamoDB Global Tables** use multi-region replication with last-writer-wins.
+- **Amazon's Dynamo paper (2007)** introduced sloppy quorums, hinted handoff, and vector clocks. **Cassandra** and **Riak** followed.
+- **Figma, Linear, and Notion-style editors** use CRDT-inspired or server-ordered merging. **Google Docs** uses operational transformation.
+- **CouchDB/PouchDB** sync powers offline-first apps. **DynamoDB Global Tables** replicate across regions with last-writer-wins.
 
 ## 📌 Cheat card
 
-> - **Multi-leader** = a leader per region. **Leaderless** = write to N, succeed at W.
-> - Both get you **availability + low write latency**, and both cost you **conflicts**.
-> - Conflict tools: **LWW** (loses data) · **version vectors/siblings** (app merges) · **CRDTs** (auto-merge) · **avoid** (a home leader per record).
-> - Leaderless repair: **read repair, anti-entropy (Merkle trees), hinted handoff**.
+> - **Multi-leader** = a leader per region. **Leaderless** = write N, succeed at W.
+> - You gain **availability + local write latency**, and you pay in **conflicts**.
+> - Conflict tools: **LWW** (lossy) · **version vectors/siblings** · **CRDTs** · **avoid via a home leader**.
+> - Leaderless repair: **read repair · Merkle anti-entropy · hinted handoff**.
 
 ## 🧪 Feynman check
 
-Explain the family-calendar analogy, and why "latest note wins" is dangerous for a shopping cart but fine for "last known temperature".
+Explain the family calendar, and why "latest note wins" is dangerous for a shopping cart but perfectly fine for "last known fridge temperature."
 
-⚠️ **Common confusion:** "Timestamps tell us which write happened last." Clocks on different machines drift, so "later" timestamps can belong to earlier events. LWW with skewed clocks can discard the genuinely newer write (lesson 084).
+⚠️ **Common confusion:** "Timestamps tell us which write happened last." Machine clocks drift by milliseconds to seconds, so a write stamped "later" may have happened **earlier**. LWW with skewed clocks can throw away the genuinely newer write and keep the stale one (lesson 084).
 
 ## ⚡ Quick recall
 
 1. What's the main problem multi-leader replication introduces?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 Write conflicts: the same data modified concurrently on different leaders.
 </details>
 
 2. What is a CRDT?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-A data type designed so concurrent updates can always be merged automatically and deterministically, and all replicas converge.
+A data type designed so concurrent updates always merge automatically and deterministically, and every replica converges to the same state.
 </details>
 
 3. What is hinted handoff?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-When a target replica is down, another node temporarily stores the write (with a hint) and delivers it when the replica recovers.
+When a target replica is down, another node stores the write with a "hint" and delivers it once the replica recovers.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Design a note-taking app that works offline on phones and syncs across devices."**
+**Q. "Design a note-taking app that works offline on phones and laptops and syncs across devices without losing edits. Then: what are your options for low-latency writes in both the US and EU?"**
 <details><summary>Model answer</summary>
 
-- Each device is effectively a **leader** (a local DB), and changes sync to the server when online. It's multi-leader.
-- Track changes per note with **version vectors** or per-field timestamps. Use **CRDTs** for text (e.g., sequence CRDTs like Yjs/Automerge), so concurrent edits merge.
-- The server stores the merged state and the change log, and devices pull deltas since their last sync.
-- For deletes, use **tombstones**, so deleted notes don't resurrect.
-- **Likely follow-up:** "Why not last-write-wins per note?" → editing on the plane and on the laptop would silently drop one set of changes.
+- **Offline notes (multi-leader by nature):**
+  - Each device holds a local DB and acts as a leader, syncing **deltas** when online.
+  - Represent note text as a **sequence CRDT** (Yjs/Automerge), so concurrent edits on a plane and on a laptop **both survive** and merge.
+  - Track per-device **version vectors**, so sync is "send me everything since vector V."
+  - **Tombstones** for deletes, so deleted notes don't resurrect, with garbage collection once every device has acknowledged them.
+  - The server stores the merged state and the op log for new devices.
+  - **Why not LWW per note:** editing on two devices would silently discard one whole session of work.
+- **US + EU low-latency writes, choosing per data type:**
+  1. **Multi-leader + conflict avoidance:** a **home region per user**, and route that user's writes there. It's local for ~all real traffic, with zero conflicts.
+  2. **Multi-leader + resolution** (CRDTs/LWW) for naturally mergeable data: likes, preferences, presence.
+  3. **Globally consistent SQL** (Spanner/CockroachDB) for money and inventory. Every write pays **~100+ ms** of cross-region consensus, but it's linearizable.
+- **During a transatlantic partition:** multi-leader keeps both sides writable and reconciles afterwards (AP). Consensus systems **refuse writes on the minority side** (CP, lesson 052).
+- **Likely follow-up:** "How do you test conflict handling?" → deterministic simulation and property tests asserting that every replica converges after random interleavings.
 </details>
 
-**Q2. "We need writes accepted in both the US and EU with low latency. What are your options?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- **Multi-leader with conflict avoidance:** give each record a home region (e.g., the user's region), and route writes there. Most writes are local because users mostly act in their own region.
-- **Multi-leader with conflict resolution** (LWW or CRDTs) for data where concurrent edits are rare or mergeable.
-- **Globally consistent DB** (Spanner/CockroachDB): writes need cross-region consensus (~100+ ms) but give strong consistency.
-- Choose per data type: payments → strong. Likes and preferences → multi-leader/LWW.
-- **Likely follow-up:** "What happens during a transatlantic partition?" → multi-leader keeps accepting writes on both sides and reconciles later. Strongly consistent systems reject writes on the minority side (CAP, lesson 052).
-</details>
-
-> 📖 *Next, the orders table reaches 40 TB, and no single machine can hold it.*
+> 📖 *Writes are local now, but the orders table has hit 40 TB, grows by 2 TB a month, and there is no bigger machine left to buy.*
 
 ---
 

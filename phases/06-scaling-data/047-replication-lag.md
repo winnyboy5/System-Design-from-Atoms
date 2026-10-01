@@ -8,154 +8,155 @@
 
 ## 📖 Story
 
-A customer updated her delivery address, refreshed the page, and saw the old one. She updated it again. And again. Three dinners went to the wrong house. When Maya explained it, I recognized it right away: her write went to the leader, but her reads went to a copy that was a second behind.
+A customer moves house. She opens Pantry, changes her delivery address, and taps **Save**. A green toast: *"Address updated!"*
+
+The page redirects to her profile, and there's her **old address**, staring back at her.
+
+She frowns and saves again. Old address. And again. Old address. She gives up and orders dinner. Then breakfast the next morning. Then lunch.
+
+**Three meals go to the wrong house.**
+
+Maya traces it, and it's almost elegant in its cruelty. The **save** went to the leader. The **refresh**, 80 milliseconds later, was served by a follower that was **1.2 seconds behind**. The new address was still in flight, somewhere inside the replication stream.
+
+When Maya explained it, I recognized it instantly: the copy you read from is a step behind the one you wrote to.
 
 ## 🎯 One-sentence idea
 
-**Followers apply changes slightly after the leader (replication lag), so a read from a follower can return old data. Guarantees like read-your-writes and monotonic reads hide that lag from users where it matters.**
+**Followers apply changes slightly after the leader (replication lag), so a follower read can return old data, and guarantees like read-your-writes and monotonic reads hide that lag from users exactly where it matters.**
 
 ## 🧸 Analogy
 
-You **post a photo**, then refresh your profile, and **it's not there**. 😱 You panic and post it again. Now it's there **twice**.
+You text a friend *"I moved!"*, then look yourself up in the **phone book**, which hasn't been reprinted yet. Old address. You panic and text again.
 
-What happened: your post went to the **leader**, but your refresh was served by a **follower** that hadn't copied it yet. Like texting a friend "I moved!", then checking the **old phone book**, which hasn't been reprinted yet.
+The write arrived. You just **read from an old copy**.
 
 ## 🖼️ Visual
 
+*Diagram brief:* a write arrow hits the leader. A slow replication arrow crawls toward the follower. A read arrow hits the follower *before* the replication arrow arrives, and a red "stale!" stamp appears.
+
 ```mermaid
 sequenceDiagram
-    participant U as 🧑 User
+    participant U as 🧑 Customer
     participant L as 👑 Leader
-    participant F as 📖 Follower (lag 2 s)
-    U->>L: POST photo ✅
-    L--)F: replicate (arrives in 2 s)
-    U->>F: GET my profile (100 ms later)
-    F-->>U: no photo 😱 (stale)
-    Note over U,F: Fix: read your own recent writes from the leader
+    participant F as 📖 Follower (lag 1.2 s)
+    U->>L: PUT address = "12 New St" ✅
+    L--)F: replicate (arrives in 1.2 s)
+    U->>F: GET my profile (80 ms later)
+    F-->>U: "4 Old Rd" 😱 (stale)
+    Note over U,F: Fix: read your own recent writes from the leader or a caught-up replica
 ```
 
 ## 🔬 How it works
 
-- **Lag** is usually milliseconds, but it can grow to **seconds or minutes** under heavy load, long-running queries on the replica, network problems, or big batch writes.
-- **Anomalies users notice:**
-  - **Read-your-writes violation:** you don't see your own change.
-  - **Non-monotonic reads (time going backwards):** refresh 1 hits an up-to-date replica (you see the comment), refresh 2 hits a lagging one (the comment disappears).
-  - **Causality violations:** you see an answer before the question it replies to.
-- **Fixes:**
-  - **Read-your-writes (read-after-write) consistency:**
-    - Read **your own** data from the leader (e.g., your profile) and others' data from followers.
-    - After a write, **pin the user to the leader for N seconds**.
-    - Track the **write's log position (LSN/GTID/timestamp)**, and only read from a replica that has caught up to it.
-  - **Monotonic reads:** keep each user **sticky to the same replica** (e.g., hash user_id → replica).
-  - **Consistent prefix reads:** keep causally related writes in the same partition or order.
-- **Monitor lag** (`pg_stat_replication`, `Seconds_Behind_Master`), and **remove lagging replicas** from the read pool automatically.
+- **Lag is usually ms, sometimes minutes:** bulk writes, long queries on the replica, I/O saturation, or network trouble can stretch it from 50 ms to 10+ minutes.
+- **Three user-visible anomalies:** **read-your-writes violations** (your own change "vanishes"), **non-monotonic reads** (refresh 1 shows a comment, refresh 2 from a laggier replica hides it, so time goes backwards), and **consistent-prefix violations** (an answer appears before its question).
+- **Read-your-writes fixes:** read **your own** data from the leader, **pin the user to the leader for N seconds** after a write, or carry the write's **log position (LSN/GTID)** and only read from a replica that has replayed past it.
+- **Monotonic reads:** keep each user **sticky to one replica** (`hash(user_id) → replica`). **Consistent prefix:** keep causally related writes in the same partition and order.
+- **Operate it:** monitor `pg_stat_replication.replay_lag` / `Seconds_Behind_Source`, and **automatically eject** replicas above a lag threshold from the read pool.
 
 ## 🧩 Worked example
 
-**"Pin to the leader after a write" with a cookie:**
+**Pin-after-write with a cookie:**
 
 ```python
 def handle_write(req):
-    primary.execute(...)
+    primary.execute("UPDATE users SET address=%s WHERE id=%s", …)
     resp = ok()
-    resp.set_cookie("recent_write_until", now() + 5)   # 5 s > typical lag
+    resp.set_cookie("rw_until", now() + 5)        # 5 s > p99 lag
     return resp
 
 def choose_db(req):
-    if req.cookies.get("recent_write_until", 0) > now():
-        return primary          # read-your-writes
-    return replica_for(req.user_id)   # sticky replica → monotonic reads
+    if req.cookies.get("rw_until", 0) > now():
+        return primary                             # read-your-writes
+    return replica_for(req.user_id)                # sticky → monotonic reads
 ```
 
-**LSN-based (more precise):**
+**LSN tokens (precise, and they scale):**
 
 ```
-Write returns commit LSN = 0/5A3F20
-Client sends header X-Min-LSN: 0/5A3F20 on the next read
-Router picks a replica whose replay_lsn ≥ 0/5A3F20, else falls back to the leader
+Write returns commit LSN 0/5A3F20 → client sends X-Min-LSN: 0/5A3F20 on its next read
+Router picks a replica with replay_lsn ≥ 0/5A3F20, else falls back to the leader
 ```
-
-**What to read where:**
 
 | Read | From | Why |
 |---|---|---|
-| My own profile / settings right after editing | Leader (or a caught-up replica) | Read-your-writes |
-| Someone else's profile | Any replica | A few seconds of staleness is fine |
-| Account balance before a transfer | Leader | Correctness |
-| Product listing | Replica / cache | Staleness is OK |
+| My profile right after editing | Leader / caught-up replica | Read-your-writes |
+| A cook's public profile | Any replica | Seconds of staleness is fine |
+| Wallet balance before a payout | Leader | Correctness |
+| Dish listings | Replica / cache | Staleness is OK |
 
 ## ⚖️ Trade-offs
 
-| Technique | Gain | Cost |
+| Maya's choice | What she gains | What she pays |
 |---|---|---|
-| Always read from the leader | Always fresh | No read scaling |
-| Pin to the leader after a write | Simple read-your-writes | More leader load right after writes |
-| LSN/timestamp tracking | Precise, scales | Complexity (routing, passing tokens) |
-| Sticky replica per user | Monotonic reads | Uneven load, failover breaks stickiness |
+| Always read the leader | Always fresh | No read scaling |
+| Pin to the leader after a write | Simple read-your-writes | Extra leader load after writes |
+| LSN tokens | Precise and scalable | Routing complexity, token plumbing |
+| Sticky replica per user | Monotonic reads | Uneven load, stickiness breaks on failover |
 | Synchronous replication | No lag | Slow writes, availability risk |
 
 ## 🌍 Real world
 
-- **Facebook** and **LinkedIn** route "your own recent writes" to the primary or caught-up replicas.
-- **MongoDB** supports **causal consistency sessions** (it tracks operation times per session).
-- **AWS Aurora** replicas typically lag less than 100 ms, but "typically" isn't "always".
+- **Meta** and **LinkedIn** route reads of a user's own recent writes to primaries or caught-up replicas.
+- **MongoDB causal-consistency sessions** track `operationTime`/`clusterTime` per session to guarantee read-your-writes.
+- **Aurora** replicas usually lag under 100 ms, but "usually" is not a guarantee.
 
 ## 📌 Cheat card
 
 > - **Lag = followers are behind.** Usually ms, sometimes minutes.
-> - **Read-your-writes:** read your own data from the leader, or track the write's LSN.
-> - **Monotonic reads:** keep a user on the **same replica**.
-> - **Critical reads (money, auth) → the leader.** Casual reads → replicas.
-> - **Monitor lag**, and drop lagging replicas from the pool.
+> - **Read-your-writes:** own data from the leader, pin-after-write, or **LSN tokens**.
+> - **Monotonic reads:** keep a user on **one replica**.
+> - **Money and auth reads → the leader.** Casual reads → replicas.
+> - **Monitor lag** and auto-eject laggards.
 
 ## 🧪 Feynman check
 
-Explain the "posted photo disappeared" story, and two ways to make sure users always see their own posts immediately.
+Tell the "my address won't change" story, then give two ways to guarantee users always see their own edits immediately.
 
-⚠️ **Common confusion:** "Replication lag only matters for huge systems." Even ~100 ms of lag breaks "save, then immediately redirect to the page", which is one of the most common web flows.
+⚠️ **Common confusion:** "Lag only matters at huge scale." Even **100 ms** breaks the most common web flow there is, *save → redirect → show*, because the redirect lands faster than the replication stream.
 
 ## ⚡ Quick recall
 
 1. What is read-your-writes consistency?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-A guarantee that after you write something, your subsequent reads will reflect that write.
+A guarantee that after you write something, your subsequent reads reflect that write.
 </details>
 
 2. How do sticky replicas help?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Always reading from the same replica prevents "time going backwards" (monotonic reads) when replicas have different lags.
+Always reading from the same replica prevents "time going backwards" (monotonic reads) when replicas lag by different amounts.
 </details>
 
 3. Name two causes of replication lag spikes.
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Heavy write bursts or bulk jobs, long-running queries on the replica, network issues, and replica I/O or CPU saturation (any two).
+Any two of: write bursts or bulk jobs, long-running queries on the replica, network issues, replica I/O or CPU saturation.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Users edit their profile, get redirected, and see the old data. How do you fix it without abandoning read replicas?"**
+**Q. "Users edit their profile and see old data after the redirect. Separately, a nightly batch job makes replicas lag 10 minutes. Fix both without abandoning replicas."**
 <details><summary>Model answer</summary>
 
-- Route **reads of the user's own profile** to the leader, or pin that user to the leader for a few seconds after any write (a cookie or session flag).
-- Better at scale: return the write's **LSN/timestamp**, and route reads to a replica that has replayed past it (fall back to the leader).
-- Also check the **cache**: delete the cache key on write (lesson 031).
-- **Likely follow-up:** "What about other users seeing the change?" → eventual consistency is acceptable, typically within a second.
+- **The redirect problem (read-your-writes):**
+  - Route reads of **the user's own data** to the leader, or **pin** them to the leader for a few seconds after any write (cookie or session flag).
+  - At scale: return the write's **LSN/GTID**, send it back on the next read, and route to a replica that has **replayed past it** (falling back to the leader).
+  - Check the **cache** too: delete keys on write and re-populate from the primary (lesson 031).
+  - **Other** users can see the change eventually, typically within a second.
+- **The 10-minute batch lag:**
+  - **Chunk and throttle** the job: small transactions (e.g. 5k rows), short sleeps, and a pause whenever replica lag exceeds a threshold.
+  - Give heavy reads a **dedicated replica** excluded from the user pool.
+  - **Auto-eject** replicas over ~2 s of lag from the read pool.
+  - Schedule off-peak, and check the replica's I/O headroom.
+- **If every replica lags:** shift reads to the leader if capacity allows, degrade non-critical features (hide "recently viewed"), and page someone.
+- **Likely follow-up:** "Why not just synchronous replication?" → every write would pay a cross-AZ round trip, and a slow replica would stall all writes, which is too high a price for most read paths.
 </details>
 
-**Q2. "A nightly batch job causes replicas to lag by 10 minutes, and users see stale data. What do you do?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- **Throttle or chunk** the batch job (small transactions, pauses between chunks).
-- Run heavy reads on a **dedicated analytics replica** that's excluded from the user read pool.
-- **Automatically eject** replicas whose lag exceeds a threshold (e.g., 2 s) from the read pool, and route to the leader or healthy replicas.
-- Schedule the job at low-traffic times, and investigate replica I/O limits.
-- **Likely follow-up:** "What if all replicas lag?" → temporarily send reads to the leader (if capacity allows), degrade non-critical features, and alert.
-</details>
-
-> 📖 *Next, Pantry opens in Europe, and every European write crawls across the ocean.*
+> 📖 *Pantry opens in Europe, and every European write has to cross the Atlantic to a leader in Virginia and back before anyone gets a confirmation.*
 
 ---
 
