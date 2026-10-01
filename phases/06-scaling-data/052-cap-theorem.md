@@ -8,140 +8,150 @@
 
 ## 📖 Story
 
-At 2 pm, a construction crew cut the fibre between Pantry's two data centres. Both halves kept running, but they couldn't talk to each other. A customer in the east ordered the last portion of dumplings, and so did a customer in the west. Before I explain, I want you to decide: what should each side do?
+2:04 p.m. Somewhere under a city street, a construction crew's excavator bites through a bundle of fibre-optic cable. Sparks. A shrug. Lunch.
+
+Inside Pantry, the **East** data centre and the **West** data centre suddenly can't hear each other. Both are healthy and humming, serving customers. But every replication message between them now falls into a void.
+
+At 2:06 p.m. a customer in the East taps **"Buy"** on the **last portion** of a cook's famous dumplings. At 2:06 p.m. a customer in the West taps **"Buy"** on the same portion.
+
+Each side holds a copy of the stock count: `1`. Neither can ask the other what it just did.
+
+Before I explain anything, I want you to decide, right now, what each side should do. Sell? Refuse? Wait?
+
+Every answer costs something. That cost has a name.
 
 ## 🎯 One-sentence idea
 
-**When a network partition splits a distributed system, each side must choose: refuse some requests to stay consistent (CP), or keep answering with possibly stale data (AP). Partitions are unavoidable, so the real choice is C vs A during a partition.**
+**When a network partition splits a distributed system, each side must either refuse some requests to stay consistent (CP) or keep answering with possibly stale data (AP), and since partitions are unavoidable, the real choice is C vs A during a partition.**
 
 ## 🧸 Analogy
 
-Two **bank branches** that share account data by phone. The **phone line goes down** (a partition). A customer at branch A wants to withdraw $100.
+Two **bank branches** sharing balances by phone. **The line goes down.** A customer at branch A wants £100.
 
-- 🔒 **Choose Consistency (CP):** "Sorry, we can't confirm your balance with the other branch right now. Please try later." Correct, but **unavailable**.
-- 🟢 **Choose Availability (AP):** "Sure, here's $100." Always helpful, but if the customer's partner is withdrawing at branch B at the same moment, the account could go **negative**. The branches reconcile when the line comes back.
+- 🔒 **CP:** "We can't confirm your balance right now. Please try later." Correct, but **unavailable**.
+- 🟢 **AP:** "Here's £100." Helpful, but if a partner withdraws at branch B at the same moment, the account goes **negative**, and the branches reconcile later.
 
-You **can't** have both while the line is down.
+While the line is down, you **can't** have both.
 
 ## 🖼️ Visual
 
+*Diagram brief:* two nodes separated by a jagged red "partition" line. A write lands on the left side, and a read hits the right side, where a fork shows the two possible behaviours.
+
 ```mermaid
 flowchart LR
-    subgraph Side1["Partition side 1"]
-        N1[("Node 1<br/>x = 5")]
+    subgraph East["East side"]
+        N1[("Node E<br/>stock = 1")]
     end
-    subgraph Side2["Partition side 2"]
-        N2[("Node 2<br/>x = 5")]
+    subgraph West["West side"]
+        N2[("Node W<br/>stock = 1")]
     end
-    N1 -. "❌ network partition" .- N2
-    W["Client writes x = 7"] --> N1
-    R["Client reads x"] --> N2
-    N2 --> Q{"CP: reject/wait<br/>AP: return 5 (stale)"}
+    N1 -. "❌ fibre cut" .- N2
+    W1["Buy (East)"] --> N1
+    W2["Buy (West)"] --> N2
+    N2 --> Q{"CP: refuse / wait for majority<br/>AP: sell anyway → oversell, reconcile later"}
 ```
 
 ## 🔬 How it works
 
-- **C (Consistency)** in CAP = **linearizability**: every read sees the most recent write, as if there were one copy of the data. (Not the same as ACID's C!)
-- **A (Availability)** = every request to a **non-failed** node gets a (non-error) response.
-- **P (Partition tolerance)** = the system keeps working despite lost or delayed messages between nodes.
-- **Partitions happen** (switch failures, GC pauses, cross-region link cuts), so **P isn't optional**. The theorem says: **during a partition, pick C or A**.
-- **When there's no partition**, you can have both C and A. The trade-off then is **latency vs consistency** (PACELC, lesson 083).
-- **CP systems:** refuse writes/reads on the minority side, or wait for consensus. Examples: **ZooKeeper, etcd, HBase, Spanner** (with very rare unavailability), and MongoDB with majority writes/reads.
-- **AP systems:** keep serving and reconcile later (eventual consistency, conflict resolution). Examples: **Cassandra, DynamoDB (default), Riak, CouchDB, DNS**.
-- **It's per operation, not per product:** many databases let you tune it (Cassandra `QUORUM` vs `ONE`, DynamoDB strongly consistent reads), and one app can use CP for payments and AP for likes.
+- **CAP's C is linearizability:** every read sees the latest write, as if there were one copy (not ACID's C). **A** = every request to a non-failed node gets a non-error response. **P** = the system keeps operating despite lost or delayed messages.
+- **P is not optional.** Switch failures, cut cables, long GC pauses, and cloud network blips *will* happen, so the theorem really says: **during a partition, choose C or A.**
+- **CP systems** refuse or block on the **minority side** and keep a single truth through consensus or majority quorums: **etcd, ZooKeeper, HBase, Spanner**, MongoDB with majority read/write concerns.
+- **AP systems** keep answering everywhere and **reconcile later** (LWW, CRDTs, merges): **Cassandra at CL=ONE, DynamoDB's default reads, Riak, CouchDB, DNS**.
+- **It's a per-operation choice, not a product label.** Tune it (Cassandra `QUORUM` vs `ONE`, DynamoDB strongly consistent reads), and mix within one app. When there's **no** partition, the trade-off becomes **latency vs consistency** (PACELC, lesson 083).
 
 ## 🧩 Worked example
 
-**Choosing per feature in an e-commerce app:**
+**Maya's per-feature choices:**
 
-| Feature | During a partition… | Choice |
+| Pantry feature | During the partition… | Choice |
 |---|---|---|
-| Shopping cart | Let users keep adding items, merge later | **AP** |
-| Product reviews / likes | Stale counts are fine | **AP** |
-| Inventory at checkout | Don't sell what we don't have | **CP** (or reserve with a buffer) |
-| Payments / balances | Never double-spend | **CP** |
-| Leader election / config | Must have one truth | **CP** |
-| Product catalog browsing | Serve cached, stale is OK | **AP** |
+| Cart | Keep adding items, merge later | **AP** |
+| Likes, reviews | Stale counts are harmless | **AP** |
+| Last-portion stock at checkout | Never oversell | **CP** (or AP with a safety buffer) |
+| Payments, wallet | Never double-spend | **CP** |
+| Leader election, config | Exactly one truth | **CP** |
+| Menu browsing | Serve cached data | **AP** |
 
-**Cassandra tunable example (N=3 replicas):**
+**Cassandra, N=3 replicas:**
 
 ```
-Write CL=ONE, Read CL=ONE      → AP-ish: fast, may read stale
-Write CL=QUORUM, Read CL=QUORUM → overlapping majorities: reads see latest (while a quorum is reachable)
-During a partition leaving only 1 replica reachable → QUORUM ops fail (choosing C), ONE ops succeed (choosing A)
+W=ONE,  R=ONE     → AP-ish: always fast, may read stale
+W=QUORUM, R=QUORUM → overlapping majorities → read latest (while a majority is reachable)
+Partition leaves 1 replica reachable → QUORUM ops FAIL (choose C), ONE ops succeed (choose A)
 ```
+
+**The dumplings:** stock is **CP**, so only the side holding the majority of replicas sells. The other side shows *"Couldn't confirm. Try again in a moment."* Nobody gets a cancelled dinner at 7:40 p.m.
 
 ## ⚖️ Trade-offs
 
 | | CP | AP |
 |---|---|---|
-| During a partition | Some requests fail or wait | All nodes answer |
-| Data | Always the latest (linearizable) | May be stale, conflicts are possible |
-| Needs | Consensus, quorums | Conflict resolution, reconciliation |
-| Great for | Money, locks, inventory, config | Feeds, carts, counters, caching, DNS |
+| During a partition | Some requests fail or wait | Every node answers |
+| Data | Always the latest | May be stale, conflicts possible |
+| Machinery | Consensus, quorums | Conflict resolution, reconciliation |
+| Great for | Money, locks, inventory, config | Feeds, carts, counters, DNS |
 
 ## 🌍 Real world
 
-- **Eric Brewer** proposed CAP (2000), and Gilbert & Lynch proved it (2002). Brewer's later "CAP Twelve Years Later" clarified that it's about partition-time choices, and not "pick 2 of 3."
-- **Amazon's Dynamo** chose AP for the shopping cart ("always writable").
-- **Google Spanner** is CP but achieves very high availability through redundant networks. Partitions are rare, but it still chooses C when they happen.
+- **Eric Brewer** conjectured CAP in 2000, and **Gilbert & Lynch** proved it in 2002. Brewer's "CAP Twelve Years Later" stresses that it's a *partition-time* choice, not "pick 2 of 3."
+- **Amazon's Dynamo** chose AP for the cart: "always writable."
+- **Google Spanner** is CP, but its redundant private network makes partitions so rare that it's *effectively* highly available.
 
 ## 📌 Cheat card
 
-> - **Partitions happen → choose C or A during them.** "Pick 2 of 3" is misleading.
+> - **Partitions happen → choose C or A during them.** "Pick 2 of 3" misleads.
 > - CAP's **C = linearizability** ≠ ACID's C.
-> - **CP:** refuse or wait to stay correct (etcd, ZooKeeper, Spanner). **AP:** answer and reconcile later (Cassandra, Dynamo, DNS).
-> - **Choose per feature:** money and locks → CP. Feeds and carts → AP.
-> - No partition? The trade-off becomes **latency vs consistency** → PACELC.
+> - **CP:** refuse or wait to stay correct (etcd, ZooKeeper, Spanner). **AP:** answer and reconcile (Cassandra, Dynamo, DNS).
+> - **Choose per feature.** Money and locks → CP. Feeds and carts → AP.
+> - No partition → **latency vs consistency** (PACELC).
 
 ## 🧪 Feynman check
 
-Explain the two bank branches with a broken phone line, and why the bank can't be both "always helpful" and "always correct" until the line is fixed.
+Explain the two branches with a dead phone line, and why the bank can't be both "always helpful" and "always correct" until the line is fixed.
 
-⚠️ **Common confusion:** "We're CA because we don't have partitions." Any system with more than one machine talking over a network can have partitions. "CA" only really describes a single-node system.
+⚠️ **Common confusion:** "We're CA, because we don't have partitions." Any system where two machines talk over a network *can* be partitioned. "CA" really only describes a **single node**, and a single node can't survive its own failure.
 
 ## ⚡ Quick recall
 
 1. What does "C" mean in CAP?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 Linearizability: every read returns the most recent write, as if there were a single copy.
 </details>
 
 2. Why isn't "P" optional?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Networks can always drop or delay messages. A distributed system must decide how to behave when that happens.
+Networks can always drop or delay messages, so a distributed system must decide how to behave when that happens.
 </details>
 
 3. Give one CP and one AP system.
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-CP: etcd, ZooKeeper, Spanner, HBase. AP: Cassandra (at low consistency levels), DynamoDB (default), Riak, DNS.
+CP: etcd, ZooKeeper, Spanner, HBase. AP: Cassandra (low consistency levels), DynamoDB default reads, Riak, DNS.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Is your design CP or AP? Justify it."** (Asked about a social media feed.)
+**Q. "Is your social-media feed design CP or AP? Justify it, and explain how you'd still guarantee unique usernames."**
 <details><summary>Model answer</summary>
 
-- The feed is **AP**. Users should always get a feed, even if it's missing a post from a few seconds ago. Staleness is harmless, and unavailability hurts engagement.
-- But **some parts are CP**: account creation (unique usernames), auth tokens, and payments for ads or subscriptions.
-- Explain the mechanism: async replication and caches for the feed. A strongly consistent store or conditional writes for uniqueness.
-- **Likely follow-up:** "How do you guarantee unique usernames in an AP system?" → route username claims to a CP component (a consensus-backed store, or a conditional write on a single partition).
+- **The feed is AP.**
+  - Users should always get a feed, even one missing a post from seconds ago. Staleness is harmless, and an error page loses engagement.
+  - Mechanisms: async replication, cache-backed timelines, and serving stale data on dependency failure.
+- **Some operations are CP:** username and email uniqueness, auth tokens and permission changes, and payments for ads and subscriptions.
+- **Unique usernames inside an AP system:**
+  - Route claims to a **CP component**: a consensus-backed store (etcd-style), a strongly consistent table with a **conditional write** (`PUT if not exists`) on the username's partition, or a **single-leader** relational unique index.
+  - During a partition, the minority side **rejects** sign-ups ("try again shortly") instead of risking duplicates.
+- **A concrete failure walk-through:** DC1 and DC2 lose their link.
+  - A post written in DC1 **won't show in DC2's feeds** until the link heals (AP, converges later).
+  - A username claim in DC2 **fails fast** if DC2 can't reach a quorum (CP).
+- **Likely follow-up:** "What do users experience in each mode?" → CP: occasional errors or retries on one side. AP: briefly stale or out-of-order content, fixed automatically.
 </details>
 
-**Q2. "Explain CAP with a concrete failure scenario."**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- Two replicas in different datacenters, and the link between them fails.
-- A client writes x=7 to DC1. Another client reads x from DC2.
-- **CP:** DC2 can't confirm it has the latest value, so it returns an error or waits (or only the majority side serves writes).
-- **AP:** DC2 returns the old x=5. When the link heals, the replicas reconcile (LWW, merge, or conflict resolution).
-- **Likely follow-up:** "What does the user experience in each case?" → CP: errors or timeouts on one side. AP: possibly stale or conflicting data that is fixed later.
-</details>
-
-> 📖 *Next, Maya discovers that "consistent" isn't one thing. It's a whole menu.*
+> 📖 *The partition heals, and Maya's team immediately starts arguing about how "consistent" each feature needs to be, as if consistency were a menu rather than a switch.*
 
 ---
 
