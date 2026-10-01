@@ -5,7 +5,7 @@
 
 ## 📖 Chapter 1: One Laptop and a Big Dream
 
-Every great system starts small, and I love telling this part. Ours starts in Leo's kitchen, with a laptop running **Pantry**, a website where neighbours sell home-cooked meals, and with Maya, a junior engineer who has never designed a system before. In this chapter, I'll show you what Maya learned first: what really happens behind a click, how to measure speed and uptime honestly, and how to do the napkin math that tells you whether you need one server or a thousand.
+Every great system starts small, and I love telling this part. Ours starts in a small apartment kitchen, with a laptop running **Pantry**, a website where neighbours sell home-cooked meals, and with Maya, a junior engineer who has never designed a system before. In this chapter, I'll show you what Maya learned first: what really happens behind a click, how to measure speed and uptime honestly, and how to do the napkin math that tells you whether you need one server or a thousand.
 
 ## 🗺️ Phase map
 

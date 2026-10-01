@@ -10,187 +10,165 @@
 
 ## 📖 Story
 
-Pantry launched its own courier fleet. When a meal was ready, the nearest available courier had to be found within seconds among a million moving dots, and never assigned twice. I showed Maya how to turn a map into a grid of labelled squares. It's a trick I'll show you now.
+Pantry launches its own courier fleet: **one million couriers** across five continents, each phone reporting its location every four seconds.
+
+When a curry is ready in a Lisbon kitchen, Pantry must find **the nearest available courier**, from a million moving dots, within **a couple of seconds**. Maya's first query checks the distance from the kitchen to **every courier on Earth**: one million trigonometry calculations per dispatch, 1,700 dispatches per second. The database fans scream.
+
+Worse, on Friday night **two kitchens grab the same courier** within the same 30 ms. He accepts one order, the other kitchen's food goes cold on the counter, and a customer waits 50 minutes.
+
+I showed Maya how to **turn a map into a grid of labelled squares**. It's a trick that makes "what's near me?" almost free. Let me show you.
 
 ## 🎯 One-sentence idea
 
-**Finding "what's near me" requires turning 2D coordinates into something indexable, like geohash cells, quadtrees, or hexagons (H3/S2). Then you search the user's cell plus its neighbours. Ride-sharing adds a stream of fast-changing driver locations kept in memory, and a matching step that must never double-assign a driver.**
+**Finding "what's near me" means turning 2-D coordinates into something indexable (geohash cells, quadtrees, or H3/S2 cells) and searching the user's cell plus its neighbours, while ride-sharing adds a firehose of fast-changing locations held in memory and a matching step that must never double-assign a driver.**
 
 ## 🧸 Analogy
 
-A city map covered in a **grid of numbered squares**:
+A city map covered in a **grid of labelled squares**:
 
-- Every restaurant and every driver gets a **square label** (a geohash), like "9q8yy".
-- To find things near you, look in **your square and the 8 squares around it**. No need to check the whole city.
-- **Longer labels = smaller squares** (more precise). Squares with the same starting letters are **near each other**.
-- Drivers are like **people walking around**: they keep reporting their new square every few seconds, so you track them on a **whiteboard** (memory), not in a filing cabinet (disk).
+- Every courier and kitchen gets a **square label** (a geohash) like `eycs2`.
+- To find things near you, check **your square + the 8 around it**, not the whole city.
+- **Longer labels = smaller squares**, and squares sharing a prefix are **neighbours**.
+- Couriers keep **walking**, so track them on a **whiteboard** (memory), not in a filing cabinet (disk).
 
 ## 🖼️ Visual
 
-```
-Geohash precision (approx. cell size):
-  4 chars ≈ 39 km × 20 km     5 chars ≈ 4.9 km × 4.9 km
-  6 chars ≈ 1.2 km × 0.6 km   7 chars ≈ 153 m × 153 m
+*Diagram brief:* a 3×3 grid of geohash cells with "you" in the centre, all nine shaded as the search area. Beside it, the live system: courier pings flow into an in-memory geo store sharded by city, a matching service queries it, atomically reserves one courier, and writes the trip to a strongly consistent DB.
 
-Search = your cell + 8 neighbours (labels illustrative):
-┌───────┬───────┬───────┐
-│9q8yyj │9q8yym │9q8yyq │
-├───────┼───────┼───────┤
-│9q8yyh │ 9q8yyk│9q8yyn │  ← you are in 9q8yyk
-├───────┼───────┼───────┤
-│9q8yy5 │9q8yy7 │9q8yye │
-└───────┴───────┴───────┘
+```
+Geohash precision ≈ cell size
+4 chars ≈ 39 × 20 km   5 ≈ 4.9 × 4.9 km   6 ≈ 1.2 × 0.6 km   7 ≈ 153 × 153 m
+
+┌────────┬────────┬────────┐
+│eycs2kj │eycs2km │eycs2kq │
+├────────┼────────┼────────┤
+│eycs2kh │ eycs2kk│eycs2kn │  ← kitchen in eycs2kk: search all 9
+├────────┼────────┼────────┤
+│eycs2k5 │eycs2k7 │eycs2ke │
+└────────┴────────┴────────┘
 ```
 
 ```mermaid
 flowchart LR
-    D["🚗 Driver app<br/>location every 4 s"] --> LS["📍 Location service"]
-    LS --> RG[("⚡ Redis GEO / in-memory grid<br/>sharded by city/region<br/>driver → (lat, lng, geohash)")]
-    LS --> K(["📬 Kafka: location stream<br/>(analytics, ETA models)"])
-    R["🧍 Rider requests a ride"] --> MS["🤝 Matching service"]
-    MS -->|"nearby available drivers"| RG
-    MS -->|"offer to the best driver"| D
-    MS --> TDB[("🗄️ Trips DB<br/>(strongly consistent:<br/>one driver per trip)")]
+    D["🛵 Courier app<br/>ping every 4 s"] --> LS["📍 Location gateways"]
+    LS --> RG[("⚡ In-memory geo store<br/>Redis GEO / H3 grid<br/>sharded by city")]
+    LS --> K(["📬 Kafka: pings<br/>(tracking, ETA models, lake)"])
+    R["🍛 Order ready"] --> MS["🤝 Matching service"]
+    MS -->|"nearby available couriers"| RG
+    MS -->|"atomic reserve"| TDB[("🗄️ Courier status + trips<br/>(strongly consistent)")]
+    MS -->|"offer"| D
 ```
 
 ## 🔬 How it works
 
-### 1️⃣ Requirements
-- **Proximity (Yelp):** find businesses within radius r of a location, filter and rank them. The data changes rarely (businesses), and reads are heavy.
-- **Ride-sharing (Uber):** drivers send locations every ~4 s. Riders request rides → match with a nearby available driver quickly (< a few seconds). **A driver must never be assigned to two trips.** Live trip tracking.
-
-### 2️⃣ Estimates (ride-sharing)
-```
-1M active drivers × 1 update / 4 s = 250k location writes/s
-Riders: 100k ride requests/min at peak → ~1.7k matches/s
-Location state: 1M × ~100 B = 100 MB → fits in memory easily (sharded for throughput)
-```
-
-### 3️⃣ Geo-indexing options
-
-| Index | How | 👍 | 👎 |
-|---|---|---|---|
-| **Geohash** | Interleave lat/lng bits → base32 string. A shared prefix means nearby. | Simple, and works with any KV/B-tree (prefix queries) | Edge effects (neighbours can have different prefixes, so query 9 cells), and uneven density |
-| **Quadtree** | Recursively split cells with too many points into 4 | Adapts to density (dense cities get small cells) | An in-memory tree, and rebuilds or updates are more complex |
-| **S2 (Google) / H3 (Uber hexagons)** | Hierarchical cells on a sphere | Uniform cells (H3 hexagons have equidistant neighbours), and good for aggregation | A library dependency |
-| **R-tree / PostGIS** | Bounding-box tree | Rich spatial queries | Harder to shard at a massive write rate |
-
-### 4️⃣ Proximity search (the read path)
-1. Compute the user's geohash at a precision matching the radius (e.g., 6 chars for ~1 km).
-2. Query **that cell + 8 neighbours** (a prefix lookup).
-3. Filter by exact distance (haversine), apply the business filters, rank, and paginate.
-4. Too few results? Widen the search (a shorter prefix / larger radius).
-- For **static businesses:** precompute the geohash column + a B-tree index (or Elasticsearch `geo_point`), and cache the popular areas.
-
-### 5️⃣ Driver locations (the write path)
-- High write rate and **ephemeral** data, so keep it in **memory**: Redis GEO (`GEOADD`, `GEOSEARCH`) or a custom in-memory grid service, **sharded by city/region**.
-- Overwrite the latest position (idempotent, and the latest one wins). Don't persist every ping to the OLTP DB. Stream the pings to **Kafka** for analytics and ETA model training.
-- Driver status (available / on trip / offline) lives alongside the location.
-
-### 6️⃣ Matching (the consistency-critical part)
-1. Find candidate available drivers near the rider (the geo query).
-2. Rank by **ETA** (road-network routing, not straight-line distance), rating, and vehicle type.
-3. **Atomically reserve** the chosen driver: a conditional update (`status = available → offered`) in a strongly consistent store, or a single-owner matching service per region, so two riders can't grab the same driver.
-4. Send the offer (push/WebSocket). Timeout or decline → release the driver, and try the next one.
-5. Accept → create the trip (a DB transaction). Location updates now stream to the rider.
+- **Requirements and estimates:** **Yelp-style** search (static places, read-heavy) vs **Uber-style** dispatch. **1M couriers / 4 s = 250k location writes/s**, ~**1.7k matches/s** at peak, and the state is ~**100 MB** (it fits in RAM, and is sharded for throughput). **A courier must never be double-assigned.**
+- **Geo-indexing options:** **geohash** (interleave lat/lng bits → base32, prefix = proximity, works with any KV or B-tree), **quadtree** (splits dense areas into smaller cells, so it adapts to density), **H3/S2** (hierarchical cells on the sphere, where H3 hexagons have **equidistant neighbours**), and **R-tree/PostGIS** (rich queries, harder to shard at huge write rates).
+- **Proximity reads:** compute the cell at a radius-appropriate precision, query **the cell + 8 neighbours** (edge effects!), **filter by exact haversine distance**, rank, and **widen** the search if there are too few results. Static businesses: a geohash column + index (or ES `geo_point`) + caching of popular areas.
+- **Location writes:** ephemeral and huge, so keep them **in memory**, **sharded by city/region**, **overwriting the latest position** (idempotent: newest wins). **Never** write every ping to the OLTP DB. Stream them to **Kafka** for live tracking fan-out, ETA training, and the lake. Adapt the ping rate (idle vs on a trip).
+- **Matching, the consistency-critical part:**
+  1. Find nearby **available** candidates.
+  2. Rank by **road-network ETA** (not straight-line distance), rating, and vehicle.
+  3. **Atomically reserve** via a conditional update (`available → offered`) or a **single owner per region**.
+  4. Offer with a **15 s timeout** → decline or timeout → **release** and try the next candidate. Accept → create the trip transactionally.
 
 ## 🧩 Worked example
 
-**Redis GEO for nearby available drivers:**
-
 ```bash
-GEOADD drivers:sf:available -122.4194 37.7749 driver:17
-GEOSEARCH drivers:sf:available FROMLONLAT -122.4183 37.7750 BYRADIUS 2 km ASC COUNT 20 WITHDIST
+GEOADD couriers:lisbon:available -9.1393 38.7223 courier:17
+GEOSEARCH couriers:lisbon:available FROMLONLAT -9.1400 38.7210 BYRADIUS 2 km ASC COUNT 20 WITHDIST
+# ~0.3 ms, vs scanning 1M couriers worldwide
 ```
 
-**Atomic reservation (avoid double assignment):**
+**Atomic reservation, which ends the Friday double-grab:**
 
 ```sql
-UPDATE drivers SET status = 'offered', trip_offer = :trip_id, offer_expires = now() + interval '15 seconds'
-WHERE driver_id = :d AND status = 'available';
--- 1 row → reserved ✅   0 rows → someone else got them → try the next candidate
+UPDATE couriers
+SET status = 'offered', offer_order = :order_id, offer_expires = now() + interval '15 seconds'
+WHERE courier_id = :c AND status = 'available';
+-- 1 row → reserved ✅    0 rows → another kitchen won → try the next candidate
 ```
 
-**Geohash neighbour pitfall:**
+**The edge-cell trap:**
 
 ```
-User at the edge of cell 9q8yyk; the nearest restaurant is 50 m away in cell 9q8yym
-Querying only 9q8yyk would miss it → always include the 8 neighbours ✅
+Kitchen at the edge of eycs2kk; the nearest courier is 60 m away in eycs2km
+Query only eycs2kk → miss him. Query the cell + 8 neighbours → found ✅
 ```
+
+**Dispatch, before vs after:** 1M distance calculations → **~20 candidates from one Redis shard**, ETA-ranked through the routing service in ~30 ms, then reserved in ~2 ms. **Dispatch p99: 4 s → 180 ms**, with **zero double assignments**.
 
 ## ⚖️ Trade-offs
 
-| Decision | Choice | Trade-off |
+| Decision | Maya's choice | Trade-off |
 |---|---|---|
-| Driver location store | In-memory (Redis/grid), sharded by region | Fast and cheap, and ephemeral (acceptable) |
-| Index | Geohash (simple) / H3 (uniform) / quadtree (density-adaptive) | Simplicity vs accuracy vs complexity |
-| Distance | ETA via the road graph | Accurate, and more compute than straight-line distance |
-| Matching consistency | Strong (conditional update / single owner) | Slight latency, but no double booking |
-| Location history | Kafka → data lake | Kept for analytics without burdening the OLTP DB |
+| Location store | In-memory, sharded by region | Fast and cheap, and ephemeral (fine) |
+| Index | Geohash / H3 / quadtree | Simplicity vs uniform cells vs density adaptation |
+| Ranking | Road-graph ETA | Accurate, more compute |
+| Matching | Conditional reserve / single owner | A few ms, and no double booking |
+| History | Kafka → lake | Analytics without OLTP load |
 
 ## 🌍 Real world
 
-- **Uber** built **H3** (hexagonal hierarchical index) for pricing zones and supply/demand, and uses in-memory geo services with a ring-sharded design.
-- **Yelp and Google Maps** use geospatial indexes (Elasticsearch, S2 cells) for "near me" search.
-- **Lyft** and **DoorDash** run similar location + dispatch architectures.
+- **Uber** created **H3** for pricing zones and supply/demand, and runs in-memory geo services with ring sharding.
+- **Yelp and Google Maps** serve "near me" from geospatial indexes (Elasticsearch, S2 cells).
+- **Lyft and DoorDash** run similar location + dispatch architectures.
 
 ## 📌 Cheat card
 
-> - **Geohash:** a shared prefix = nearby. Search **the cell + 8 neighbours**, then filter by exact distance.
-> - **Quadtree** adapts to density. **H3/S2** give uniform hierarchical cells.
-> - **Moving objects → in-memory, sharded by region**, with the latest position overwriting the old one.
-> - **Matching must be strongly consistent** (a conditional reserve), so a driver is never double-assigned.
+> - **Geohash:** shared prefix = nearby. Search **the cell + 8 neighbours**, then filter by exact distance.
+> - **Quadtree** adapts to density. **H3/S2** = uniform hierarchical cells.
+> - **Moving objects → in memory, sharded by region, latest wins.**
+> - **Matching = strongly consistent reserve.** Never double-assign.
 > - Rank by **ETA**, not straight-line distance.
 
 ## 🧪 Feynman check
 
-Explain the city-grid analogy, why you check the 8 surrounding squares, and why moving drivers belong on a whiteboard rather than in a filing cabinet.
+Explain the grid of labelled squares, why you check the 8 surrounding squares, and why moving couriers belong on a whiteboard rather than in a filing cabinet.
 
-⚠️ **Common confusion:** "Store every location ping in the main database." 250k writes/s of data that's obsolete 4 seconds later is wasteful. Keep the **current state in memory**, and the **history in a stream or lake**.
+⚠️ **Common confusion:** "Store every location ping in the main database." That's **250k writes/s** of data that's obsolete four seconds later. Keep **current state in memory** and **history in a stream or lake**, and the database never notices the firehose.
 
 ## ⚡ Quick recall
 
 1. Why search neighbouring geohash cells too?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Nearby points can fall into adjacent cells with different prefixes (edge effects), so you'd miss close results otherwise.
+Nearby points can fall in adjacent cells with different prefixes (edge effects), so you'd miss close results otherwise.
 </details>
 
 2. What's the advantage of a quadtree over fixed geohash cells?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 It adapts cell size to density: small cells in dense cities, large cells in empty areas.
 </details>
 
-3. How do you prevent assigning one driver to two riders?
-<details><summary>Answer</summary>
+3. How do you prevent assigning one courier to two orders?
+<details><summary>Reveal Answer</summary>
 
-Reserve the driver atomically (a conditional status update or a single owner per driver/region) before offering, and release on timeout or decline.
+Reserve the courier atomically (a conditional status update or a single owner per region) before offering, and release on timeout or decline.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Design Yelp's 'restaurants near me' search."**
+**Q. "Design Yelp's 'restaurants near me', then handle 250k courier location updates per second, including New Year's Eve in one city."**
 <details><summary>Model answer</summary>
 
-- Businesses (~200M) are stored with lat/lng + a **geohash** column (or an Elasticsearch `geo_point`). The data rarely changes, so reads dominate.
-- Query: the geohash cell + neighbours at a radius-appropriate precision → filter by haversine distance + filters (open now, rating, category) → rank (distance, rating, relevance) → paginate.
-- Cache the results per (cell, filters) for popular areas, and use read replicas.
-- Reviews and photos go in separate services and storage.
-- **Likely follow-up:** "How about 'within the visible map area'?" → a bounding-box query (the geohash cells covering the box, or an R-tree / ES geo_bounding_box).
+- **Restaurants near me:**
+  - ~200M businesses with lat/lng + a **geohash** column (or an ES `geo_point`). The data changes rarely, so it's read-dominated.
+  - Query the **cell + 8 neighbours** at a radius-appropriate precision → **haversine** filter → business filters (open now, rating, cuisine) → rank (distance, rating, relevance) → paginate.
+  - **Cache** per (cell, filters) for popular areas, and use read replicas.
+  - Map viewport queries → the cells covering the **bounding box** (or ES `geo_bounding_box` / an R-tree).
+- **250k pings/s:**
+  - Couriers stream via persistent connections or light HTTP to **stateless location gateways**.
+  - Update an **in-memory geo store sharded by city/region** (Redis Cluster GEO or a custom H3 grid). **Overwrite, never append.**
+  - Publish to **Kafka** for live trip tracking (customers subscribed to their courier), ETA models, and history.
+  - **Adaptive ping rate:** slower when idle or stationary, faster on trips.
+- **New Year's Eve hotspot:** split the city into **H3 sub-regions** across more shards, raise the replica counts for read-heavy matching, and pre-scale the gateways.
+- **Likely follow-up:** "What if the geo shard dies?" → couriers re-report within 4 s, so the state **rebuilds itself from the next pings**. Replicas shorten the gap, and since the data is ephemeral, nothing permanent is lost.
 </details>
 
-**Q2. "Handle 250k driver location updates per second."**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- The driver apps send updates via a persistent connection or lightweight HTTP to **location gateways** (stateless, horizontally scaled).
-- Update the **in-memory geo store sharded by city/region** (Redis Cluster GEO or a custom grid service). Overwrite, never append.
-- Publish the pings to **Kafka** for trip tracking fan-out (riders subscribed to their driver), ETA models, and the history lake.
-- Reduce the update frequency when a driver is idle or stationary, and increase it during trips.
-- **Likely follow-up:** "A city's shard is hot (New Year's Eve)?" → split the city into sub-regions (H3 cells) across more shards.
-</details>
-
-> 📖 *Next, Pantry starts moving real money for millions of cooks.*
+> 📖 *Couriers find kitchens in milliseconds now, and Pantry steps into the most unforgiving domain of all: moving real money for millions of cooks across thirty countries, exactly once.*
 
 ---
 

@@ -8,64 +8,63 @@
 
 ## 📖 Story
 
-Pantry was global now, and data poured in every second: orders, clicks, courier pings. The finance team wanted nightly reports, while the fraud team wanted answers within 100 milliseconds. I explained to Maya the idea I'll explain to you: data can be processed in *piles* or in *streams*.
+Pantry is global now, and data pours in like a river that never stops: **orders, clicks, courier pings, card swipes**, 300,000 events a second from forty countries.
+
+Two teams arrive at Maya's desk on the same morning, wanting opposite things.
+
+**Finance:** *"We need exact revenue per country, per day, reconciled to the penny, every morning by 6 a.m."*
+
+**Fraud:** *"A stolen card was used **14 times in 90 seconds** across three cities last night. We need to catch that pattern **within 100 milliseconds**, before the 2nd charge, not in tomorrow's report."*
+
+One team wants a careful, complete count of the whole pile. The other wants a hand on the river's surface, feeling each drop as it passes.
+
+I explained to Maya what I'll explain to you: data can be processed in **piles**, or in **streams**.
 
 ## 🎯 One-sentence idea
 
-**Batch processing crunches a large, bounded pile of data on a schedule (cheap, simple, but results are hours old). Stream processing handles unbounded data continuously, event by event or in small windows (fresh results in seconds, but it has to handle time, ordering, and state carefully).**
+**Batch processing crunches a large, bounded pile of data on a schedule (cheap and simple, but hours old), while stream processing handles unbounded data continuously, event by event or in small windows (fresh in seconds, but you must manage time, ordering, and state carefully).**
 
 ## 🧸 Analogy
 
 **Doing laundry**:
 
-- 🧺 **Batch:** collect clothes all week, then do **one big load on Sunday**. It's efficient, but your favourite shirt is dirty until Sunday.
-- 🚿 **Stream:** wash each item **as soon as it's worn**. Always fresh, but you need the machine running constantly, and you must decide how to handle socks that arrive late (late events!).
+- 🧺 **Batch:** collect clothes all week and do **one big load on Sunday**. Efficient, but your favourite shirt stays dirty until Sunday.
+- 🚿 **Stream:** wash each item **as soon as it's worn**. Always fresh, but the machine never stops, and you must decide what to do with **socks that turn up late**.
 
 ## 🖼️ Visual
+
+*Diagram brief:* on the left, a static pile flowing through Map → Shuffle → Reduce into a morning report. On the right, a never-ending conveyor of events flowing through windowed, stateful operators with a watermark line sweeping across, emitting results every second.
 
 ```mermaid
 flowchart LR
     subgraph Batch["🧺 Batch (bounded)"]
-        D[("Data lake<br/>yesterday's files")] --> MR["Map → Shuffle → Reduce<br/>(Spark / MapReduce)"]
-        MR --> OUT1[("Daily report<br/>ready at 6 am")]
+        D[("Data lake<br/>yesterday's Parquet")] --> MR["Map → Shuffle → Reduce<br/>(Spark)"]
+        MR --> OUT1[("Daily revenue<br/>ready at 6 a.m.")]
     end
     subgraph Stream["🚿 Stream (unbounded)"]
-        K(["Kafka events"]) --> FL["Flink / Kafka Streams<br/>windows + state + watermarks"]
-        FL --> OUT2[("Live dashboard<br/>updated every second")]
+        K(["Kafka: card-swipes"]) --> FL["Flink<br/>keyed state + windows + watermarks"]
+        FL --> OUT2[("Fraud decision<br/>< 100 ms")]
     end
 ```
 
-**MapReduce word count:**
-
 ```
-Map:     "a b a" → (a,1) (b,1) (a,1)       "b c" → (b,1) (c,1)
-Shuffle: group by key → a:[1,1]  b:[1,1]  c:[1]
-Reduce:  sum → a:2  b:2  c:1
+MapReduce word count
+Map:     "a b a" → (a,1)(b,1)(a,1)      "b c" → (b,1)(c,1)
+Shuffle: a:[1,1]  b:[1,1]  c:[1]
+Reduce:  a:2  b:2  c:1
 ```
 
 ## 🔬 How it works
 
-- **Batch processing:**
-  - Input is **bounded** (files in S3/HDFS, a DB snapshot). A job reads it all, computes, and writes the output.
-  - **MapReduce model:** **map** (transform each record into key-value pairs) → **shuffle** (group by key across machines) → **reduce** (aggregate per key). It's fault-tolerant by re-running failed tasks.
-  - **Spark** keeps intermediate data in memory (a DAG of stages), so it's much faster than classic Hadoop MapReduce. It also offers SQL, DataFrames, and ML.
-  - ✅ Simple reasoning, cheap (spot instances), easy reprocessing, high throughput. ❌ **Latency = the schedule** (hourly or daily).
-- **Stream processing:**
-  - Input is **unbounded** (a Kafka topic). Processing is continuous, with **state** (counts, joins) kept in local stores and checkpointed.
-  - **Windows:** **tumbling** (fixed, non-overlapping: every minute), **sliding** (overlapping: the last 5 min every 10 s), **session** (grouped by activity gaps).
-  - **Event time vs processing time:** events arrive **late or out of order**. **Watermarks** say "we believe all events up to time T have arrived", so a window can close. There's also allowed lateness and side outputs for very late events.
-  - **Exactly-once state:** checkpoints (Flink's distributed snapshots) + transactional sinks or idempotent writes (lesson 060).
-  - ✅ Low latency (ms to s), real-time alerts. ❌ Complexity (time, state, ordering), and it's harder to reprocess (replay from Kafka).
-- **Architectures:**
-  - **Lambda:** a batch layer (accurate) + a speed layer (fast, approximate), merged at query time. Two codebases. 😩
-  - **Kappa:** **stream only**. Reprocess by replaying the log with new code. Simpler, and made popular by Kafka and Flink.
-  - Modern **lakehouses** blur the line (streaming ingest into Iceberg/Delta tables, with batch and streaming queries on the same data).
+- **Batch:** the input is **bounded** (files, a snapshot). **MapReduce** = **map** (record → key-value pairs) → **shuffle** (group by key across machines) → **reduce** (aggregate per key), and it's fault-tolerant by re-running failed tasks. **Spark** keeps the DAG of stages **in memory**, so it's far faster than Hadoop MapReduce, and adds SQL, DataFrames, and ML.
+- **Batch trade-off:** simple reasoning, cheap (spot instances, scheduled), easy reprocessing, massive throughput. But **latency = the schedule**.
+- **Stream:** the input is **unbounded** (a Kafka topic). Operators keep **keyed state** (counts, joins) in local stores, **checkpointed** for recovery. **Windows** are **tumbling** (fixed), **sliding** (overlapping), or **session** (gap-based).
+- **Event time vs processing time:** events arrive **late and out of order**. **Watermarks** declare "events up to T have probably arrived", so windows can close. **Allowed lateness** and **side outputs** handle stragglers. **Exactly-once state** = Flink checkpoints + transactional or idempotent sinks (lesson 060).
+- **Architectures:** **Lambda** (batch layer for accuracy + speed layer for freshness, merged at query time: two codebases 😩) vs **Kappa** (**stream only**, reprocess by **replaying the log**). **Lakehouses** (Iceberg/Delta) blur the line, with streaming ingest and batch and stream queries over the same tables.
 
 ## 🧩 Worked example
 
-**The same metric, two ways: "revenue per country".**
-
-Batch (Spark SQL, nightly):
+**Finance's metric, batch (Spark SQL, nightly):**
 
 ```sql
 SELECT country, SUM(amount) AS revenue
@@ -74,22 +73,27 @@ WHERE dt = '2026-10-01'
 GROUP BY country;
 ```
 
-Stream (Flink SQL, continuous 1-minute tumbling windows on event time):
+**The same metric live (Flink SQL, 1-minute tumbling windows on event time):**
 
 ```sql
-SELECT country,
-       TUMBLE_START(order_time, INTERVAL '1' MINUTE) AS window_start,
-       SUM(amount) AS revenue
-FROM orders_stream            -- Kafka source, WATERMARK FOR order_time AS order_time - INTERVAL '10' SECOND
+SELECT country, TUMBLE_START(order_time, INTERVAL '1' MINUTE) AS window_start, SUM(amount)
+FROM orders_stream      -- WATERMARK FOR order_time AS order_time - INTERVAL '10' SECOND
 GROUP BY country, TUMBLE(order_time, INTERVAL '1' MINUTE);
 ```
 
-**Late events with watermarks:**
+**Fraud's pattern, keyed state per card:**
 
 ```
-Window 12:00–12:01 closes when the watermark passes 12:01 (i.e., at ~12:01:10 with 10 s allowed delay)
-An event with order_time 12:00:50 arriving at 12:01:05 → counted ✅
-An event with order_time 12:00:50 arriving at 12:03:00 → too late → side output / update the result later
+key = card_id → state: last 5 min of {time, city, amount}
+on each swipe: count_90s > 5  OR  impossible_travel(last_city, city, Δt)  → DECLINE (≈ 40 ms)
+```
+
+**Late socks (watermarks):**
+
+```
+Window 12:00–12:01 closes when the watermark passes 12:01 (≈ 12:01:10 with a 10 s delay)
+event_time 12:00:50 arriving 12:01:05 → counted ✅
+event_time 12:00:50 arriving 12:03:00 → too late → side output → nightly batch corrects the total
 ```
 
 ## ⚖️ Trade-offs
@@ -97,77 +101,74 @@ An event with order_time 12:00:50 arriving at 12:03:00 → too late → side out
 | | Batch | Stream |
 |---|---|---|
 | Latency | Minutes–hours | Milliseconds–seconds |
-| Complexity | 🟢 Lower | 🔴 Higher (time, state, late data) |
-| Cost | 💲 Cheap (spot, scheduled) | 💲💲 Always-on clusters |
-| Reprocessing | Easy (re-run the job) | Replay from the log (needs retention) |
-| Accuracy | Exact on complete data | Approximate until the windows close |
-| Use for | Reports, ML training, backfills, billing | Fraud detection, alerting, live dashboards, recommendations |
+| Complexity | 🟢 Lower | 🔴 Time, state, late data |
+| Cost | 💲 Scheduled, spot | 💲💲 Always-on |
+| Reprocessing | Re-run the job | Replay the log (needs retention) |
+| Accuracy | Exact on complete data | Approximate until windows close |
+| Use for | Reports, ML training, billing, backfills | Fraud, alerting, live dashboards |
 
 ## 🌍 Real world
 
-- **Google MapReduce paper (2004)** → Hadoop → **Spark** (the batch standard).
-- **Apache Flink** powers real-time processing at Alibaba, Uber, Netflix, and others. **Kafka Streams** is embedded in services.
-- **Uber, LinkedIn** use Kappa-style architectures, and replay Kafka for reprocessing.
-- **Fraud detection** at card networks runs in real time, and chargeback analytics runs in batch.
+- **Google's MapReduce paper (2004)** → Hadoop → **Spark**, the batch standard.
+- **Apache Flink** runs real-time pipelines at Alibaba, Uber, and Netflix. **Kafka Streams** embeds streaming inside services.
+- **Card networks** decide fraud in real time, and analyse chargebacks in batch.
 
 ## 📌 Cheat card
 
-> - **Batch = the Sunday laundry** (bounded, cheap, delayed). **Stream = wash as you go** (unbounded, fresh, complex).
-> - MapReduce: **map → shuffle → reduce**. Spark = in-memory DAGs.
-> - Streams: **windows (tumbling, sliding, session)**, **event time + watermarks**, **checkpointed state**.
-> - **Lambda** (batch + speed layers) vs **Kappa** (stream only + replay).
-> - Freshness need → stream. Everything else → batch is simpler.
+> - **Batch = Sunday laundry** (bounded, cheap, delayed). **Stream = wash as you go** (unbounded, fresh, complex).
+> - **Map → shuffle → reduce.** Spark = in-memory DAGs.
+> - Streams: **windows · event time + watermarks · checkpointed keyed state**.
+> - **Lambda** (two layers) vs **Kappa** (stream + replay).
+> - **Freshness worth paying for → stream. Otherwise → batch.**
 
 ## 🧪 Feynman check
 
-Explain the laundry analogy, and what to do about a sock that shows up after you've already finished Sunday's load (a late event).
+Explain the laundry, and what to do with a sock that shows up after Sunday's load is already done.
 
-⚠️ **Common confusion:** "Streaming makes batch obsolete." Batch is still cheaper and simpler for most analytics, ML training, and backfills. Use streaming where **freshness has real value**.
+⚠️ **Common confusion:** "Streaming makes batch obsolete." Batch remains **cheaper and simpler** for most analytics, ML training, billing, and backfills, and it's often the **source of truth** that corrects streaming's approximations. Stream where **freshness has real value**.
 
 ## ⚡ Quick recall
 
 1. What are the three phases of MapReduce?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 Map, shuffle (group by key), reduce.
 </details>
 
 2. What does a watermark do in stream processing?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-It signals that events up to a certain event time are believed complete, so windows can be closed and emitted despite out-of-order arrival.
+It signals that events up to a given event time are believed complete, so windows can close despite out-of-order arrival.
 </details>
 
 3. Lambda vs Kappa architecture?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Lambda runs separate batch and streaming layers and merges them. Kappa uses only streaming, and reprocesses by replaying the log.
+Lambda runs separate batch and streaming layers and merges them. Kappa uses streaming only, reprocessing by replaying the log.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Design real-time fraud detection for card transactions."**
+**Q. "Design real-time card fraud detection, then make daily reports available hourly without losing accuracy."**
 <details><summary>Model answer</summary>
 
-- Transactions → **Kafka** → **Flink** job keyed by card/user.
-- Stateful features in windows: transactions per minute, distinct merchants per hour, distance from the last location (impossible travel), amount vs the user's average.
-- Score with rules + an ML model (features from an online feature store). Emit a decision in < 100 ms for authorization (or flag it for async review).
-- **Batch side:** train models on historical labelled data (chargebacks) daily in Spark, and backfill features.
-- Exactly-once state via checkpoints. Idempotent decisions per transaction ID.
-- **Likely follow-up:** "What if the stream job lags?" → fall back to a simpler rule-based decision to avoid blocking payments, and alert.
+- **Real-time fraud:**
+  - Swipes → **Kafka**, keyed by `card_id` → a **Flink** job with **keyed state** and windowed features: swipes per minute, distinct merchants per hour, **impossible travel** (distance/Δt from the last swipe), amount vs the card's typical spend.
+  - Score with **rules + an ML model** (features from an online feature store) → a decision within **< 100 ms**, inline with authorization, or flag it for async review.
+  - **Exactly-once state** via checkpoints, and **idempotent decisions per transaction ID**.
+  - **Batch side:** retrain models daily in Spark on labelled chargebacks, and backfill features.
+  - **Degradation:** if the stream job lags, fall back to a simple rule-based decision so payments never block, and alert.
+- **Hourly reports:**
+  - **Incremental batch:** process only the new partitions each hour (Spark Structured Streaming / incremental jobs over Iceberg/Delta).
+  - Or **streaming aggregation** into an OLAP store (ClickHouse/Druid/Pinot) for minute-fresh numbers.
+  - Optimize the batch too: partition pruning, columnar formats, more parallelism.
+  - **Accuracy:** a **nightly reconciliation** batch recomputes from the complete data (late events included), and **its output is the source of truth** that corrects the hourly numbers.
+- **Likely follow-up:** "Why not Lambda?" → two codebases computing the same metric drift apart. Prefer Kappa with replay, plus a reconciliation job where exactness matters.
 </details>
 
-**Q2. "Daily reports are too slow (ready at noon). The business wants them hourly. Options?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- **Incremental batch:** process only new partitions every hour (micro-batch), with Spark Structured Streaming or scheduled incremental jobs over Iceberg/Delta tables.
-- **Streaming aggregation** into an OLAP store (ClickHouse/Druid/Pinot) for near-real-time numbers.
-- Optimize the batch itself: partition pruning, columnar formats, and more parallelism.
-- Choose based on the cost vs freshness value.
-- **Likely follow-up:** "How do you ensure hourly numbers match the daily truth?" → a nightly reconciliation batch job that corrects late data (it becomes the source of truth).
-</details>
-
-> 📖 *Next, Leo asks Maya to design Pantry's own key-value store.*
+> 📖 *The rivers of data are tamed, and now Maya is asked to build something from first principles: a key-value store for shopping carts that must keep accepting writes even while a data centre burns.*
 
 ---
 
