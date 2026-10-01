@@ -8,148 +8,155 @@
 
 ## 📖 Story
 
-I watched Maya get promoted to senior engineer. Her first mission: figure out why the new chat database handled writes ten times faster than the orders database. To answer, she had to open up the engine itself and see how data actually reaches the disk. I'll open it up for you too.
+Maya's promotion to senior engineer comes with a puzzle instead of a cake.
+
+On the same hardware, the new **chat database** (Cassandra) swallows **120,000 writes per second** without breaking a sweat. The **orders database** (Postgres) starts gasping at **12,000**. Ten times the difference. Same disks. Same RAM. Same cloud.
+
+Reads tell the opposite story: the orders DB answers a point lookup in **0.3 ms**, while chat sometimes takes **8 ms** for a cold key.
+
+Something deep inside these engines is making completely different bets about how bytes should reach the disk. To answer, Maya has to stop treating databases as black boxes and **open up the engine itself**.
+
+I'll open it up for you too. It's one of the most satisfying "aha" moments in this whole guide.
 
 ## 🎯 One-sentence idea
 
-**Storage engines choose between updating data in place in a sorted tree (B-tree: great for reads) or appending writes to memory and merging sorted files in the background (LSM tree: great for writes). Both use a write-ahead log so a crash never loses acknowledged data.**
+**Storage engines either update data in place inside a sorted tree (B-tree: read-optimized) or append writes to memory and merge sorted files in the background (LSM tree: write-optimized), and both use a write-ahead log so a crash never loses an acknowledged write.**
 
 ## 🧸 Analogy
 
-Keeping a **phone book** up to date:
+Keeping a **phone book** current:
 
-- 📕 **B-tree:** a **well-organized binder**. Each new number is **inserted on the right page right away** (sometimes splitting a full page in two). Looking someone up is fast. Adding numbers means flipping to the right page every time (random writes).
-- 📝 **LSM tree:** you **jot new numbers on a sticky-note pad** (memory) as they come in, which is super fast. When the pad is full, you **sort it and file it as a mini-booklet**. Periodically, you **merge booklets** into bigger ones (compaction). Looking someone up may mean checking the pad and several booklets (slower reads, helped by Bloom filters).
-- 📜 **WAL:** before doing *anything*, you **write the change in a diary** first. If you spill coffee on the binder mid-edit, you re-apply the changes from the diary.
+- 📕 **B-tree:** a tidy **binder**. Every new number is **inserted on the right page immediately** (splitting full pages). Lookups are fast, and every write flips to some random page.
+- 📝 **LSM tree:** scribble new numbers on a **sticky-note pad** (memory). When it's full, **sort it into a mini-booklet**, and periodically **merge booklets** at midnight (compaction). Writes are lightning-fast, and lookups may check the pad plus several booklets.
+- 📜 **WAL:** before *any* change, **write it in a diary**. Spill coffee on the binder mid-edit? Replay the diary.
 
 ## 🖼️ Visual
 
+*Diagram brief:* two write paths side by side. The LSM path flows WAL → memtable → flushed SSTables → compaction across levels, with a Bloom-filter gate on reads. The B-tree path flows WAL → "find the page and modify it in place."
+
 ```mermaid
 flowchart TB
-    subgraph LSM["📝 LSM tree write path"]
-        W["Write"] --> WAL1["📜 WAL (append, fsync)"]
-        W --> MT["🧠 Memtable<br/>(sorted, in RAM)"]
+    subgraph LSM["📝 LSM write path"]
+        W["Write"] --> WAL1["📜 WAL (append + fsync)"]
+        W --> MT["🧠 Memtable (sorted, RAM)"]
         MT -->|"full → flush"| L0["SSTable L0"]
-        L0 -->|"compaction"| L1["SSTables L1 (bigger, sorted)"]
+        L0 -->|"compaction"| L1["SSTables L1 (sorted, bigger)"]
         L1 -->|"compaction"| L2["SSTables L2 …"]
         R["Read"] --> MT
-        R --> BF{"Bloom filter:<br/>maybe in this file?"}
+        R --> BF{"Bloom filter:<br/>key possibly here?"}
         BF --> L0
         BF --> L1
     end
     subgraph BT["📕 B-tree write path"]
         W2["Write"] --> WAL2["📜 WAL"]
-        W2 --> PG["Find page → update in place<br/>(split if full)"]
+        W2 --> PG["Find page → modify in place<br/>(split if full)"]
     end
 ```
 
 ## 🔬 How it works
 
-- **Write-ahead log (WAL / redo log / commit log):**
-  - Every change is **appended to a sequential log and fsynced** *before* it's acknowledged.
-  - On a crash: **replay the log** to restore committed changes (and roll back incomplete ones). This gives **atomicity + durability** (lesson 035).
-  - Sequential appends are fast, even on HDDs. It's also the basis of **replication** (ship the WAL to replicas, lesson 046) and **CDC** (lesson 031).
-- **B-tree (Postgres, MySQL InnoDB, most relational DBs):**
-  - Data lives in fixed-size **pages** (4–16 KB) in a balanced tree, and **updates happen in place**.
-  - ✅ Predictable, fast reads (3–4 page reads), efficient range scans, and one place per key.
-  - ❌ **Random writes**, page splits, and **write amplification** (a small change rewrites a whole page).
-- **LSM tree (Cassandra, RocksDB, LevelDB, ScyllaDB, HBase, Bigtable):**
-  - Writes go to the WAL + an in-memory sorted **memtable**. When it's full, it's **flushed** to an immutable sorted file (**SSTable**).
-  - **Compaction** merges SSTables in the background, dropping overwritten and deleted (tombstoned) data.
-  - **Reads:** check the memtable, then the SSTables newest → oldest. **Bloom filters** skip files that can't contain the key. Sparse indexes find the block.
-  - ✅ **Very high write throughput** (sequential I/O only) and great compression. ❌ Reads may touch several files (**read amplification**), compaction uses I/O and CPU (**space/write amplification**), and deletes are tombstones until compaction.
-- **Compaction strategies:** **size-tiered** (write-optimized, more space) vs **leveled** (read-optimized, more write I/O).
+- **Write-ahead log:** every change is **appended sequentially and `fsync`ed before the ACK**. On a crash, **replay** the committed changes and discard the incomplete ones, which gives **atomicity + durability** (lesson 035). The same log feeds **replication** (lesson 046) and **CDC** (lesson 031). **Group commit** batches fsyncs at high commit rates.
+- **B-tree (Postgres, InnoDB):** fixed **pages (4–16 KB)** in a balanced tree, **updated in place**. Point and range reads are **predictable (3–4 page reads)**, but writes are **random I/O** with page splits and **write amplification** (a 100-byte change rewrites an 8 KB page).
+- **LSM tree (RocksDB, Cassandra, ScyllaDB, HBase, Bigtable):** WAL + an in-memory **memtable** → flushed to immutable sorted **SSTables** → background **compaction** merges files and drops overwritten and **tombstoned** data. Writes are **purely sequential**, which means huge throughput and great compression.
+- **LSM reads:** check the memtable, then SSTables newest → oldest. **Bloom filters** skip files that **definitely** lack the key, and sparse indexes find the block. The costs are **read amplification**, **compaction** I/O and CPU, and **tombstones** lingering until compaction.
+- **The amplification triangle:** **read vs write vs space**. You can't minimize all three. **Size-tiered** compaction favours writes (more space), and **leveled** compaction favours reads and space (more write I/O).
 
 ## 🧩 Worked example
 
-**LSM lifecycle of a key:**
+**A key's life in an LSM:**
 
 ```
-t1: PUT user:42 = "Ada"      → WAL append + memtable
-t2: PUT user:42 = "Ada L."   → WAL append + memtable (overwrites in memory)
-t3: memtable full → flush SSTable-7: {user:42 → "Ada L.", ...}
-t4: DELETE user:42           → a tombstone in the memtable → later flushed to SSTable-9
-t5: GET user:42              → memtable? no → SSTable-9 has a tombstone → "not found"
-t6: compaction merges 7 + 9  → both entries dropped for good (after the grace period)
+t1: PUT user:42 = "Maya"        → WAL append + memtable
+t2: PUT user:42 = "Maya R."     → WAL append + memtable (overwritten in RAM)
+t3: memtable full → flush SSTable-7 {user:42 → "Maya R."}
+t4: DELETE user:42              → tombstone in memtable → flushed to SSTable-9
+t5: GET user:42                 → memtable miss → SSTable-9 tombstone → "not found"
+t6: compaction merges 7 + 9     → both entries gone for good (after the grace period)
 ```
 
-**Amplification cheat table:**
+**Maya's answer to the 10× puzzle:**
 
-| | B-tree | LSM (leveled) |
+| | Postgres (B-tree) | Cassandra (LSM, leveled) |
 |---|---|---|
-| Write amplification | Medium–high (page rewrites) | High (rewritten across levels), but sequential |
-| Read amplification | Low (1 tree path) | Higher (several levels, mitigated by Bloom filters) |
-| Space amplification | Some (fragmentation, fill factor) | Low–medium (depends on compaction) |
-| Best for | Read-heavy, transactional | Write-heavy, time series, logs |
+| A write does | WAL + random page writes on every index | WAL append + memtable insert (sequential) |
+| Write amplification | Page rewrites, per index | Rewritten across levels, but sequential |
+| Read amplification | Low: one tree path (0.3 ms) | Higher: several levels (Bloom filters help) |
+| Best for | Mixed OLTP, read-heavy | Write-heavy messages, events, metrics |
 
 ## ⚖️ Trade-offs
 
-| You gain | You pay | Use when |
+| Maya's choice | What she gains | What she pays |
 |---|---|---|
-| B-tree: fast point and range reads | Random write I/O | OLTP with mixed reads and writes |
-| LSM: massive write throughput, compression | Compaction overhead, read amplification, tombstones | Write-heavy (events, messages, metrics) |
-| WAL `fsync` every commit | Latency per commit | You can't lose acknowledged writes |
-| Group commit (batch fsyncs) | Slight latency increase | High commit rates |
+| B-tree engine | Fast point and range reads | Random write I/O |
+| LSM engine | Massive write throughput, compression | Compaction, read amplification, tombstones |
+| `fsync` on every commit | Zero acknowledged-write loss | Commit latency |
+| Group commit | High commit throughput | Slightly higher per-commit latency |
 
 ## 🌍 Real world
 
-- **RocksDB** (an LSM) underpins many systems: MyRocks at Facebook, CockroachDB, TiKV, Kafka Streams state stores.
-- **Cassandra/ScyllaDB** tombstone buildup is a classic production problem (reads slow down scanning over deleted data).
-- **Postgres** uses heap files + B-tree indexes + a WAL. `VACUUM` cleans up old row versions (lesson 082).
+- **RocksDB** powers MyRocks at Meta, CockroachDB's earlier storage, TiKV, and Kafka Streams state stores.
+- **Cassandra/Scylla tombstone buildup** is a classic outage pattern: reads scan through mountains of deletes.
+- **Postgres** = heap files + B-tree indexes + WAL, with `VACUUM` cleaning old versions (lesson 082).
 
 ## 📌 Cheat card
 
 > - **WAL first, always:** append + fsync → ack → apply. Crash → replay.
-> - **B-tree = binder** (update in place, read-optimized). **LSM = sticky notes → booklets → merge** (write-optimized).
-> - LSM pieces: **memtable → SSTables → compaction**, plus **Bloom filters** for reads, and **tombstones** for deletes.
-> - Amplification triangle: **read vs write vs space**. You can't minimize all three.
+> - **B-tree = binder** (in place, read-optimized). **LSM = sticky notes → booklets → merge** (write-optimized).
+> - LSM: **memtable → SSTables → compaction**, **Bloom filters** for reads, **tombstones** for deletes.
+> - **Read vs write vs space amplification**: pick your poison.
 
 ## 🧪 Feynman check
 
-Explain the binder vs sticky-notes analogy, and why a system storing billions of chat messages or sensor readings might prefer the sticky-notes approach.
+Explain the binder vs the sticky notes, and why a system storing billions of chat messages prefers the sticky notes.
 
-⚠️ **Common confusion:** "LSM trees are always faster." They're faster for **writes**. Point reads can be slower (several files), and **compaction storms** can hurt tail latency. Workload decides.
+⚠️ **Common confusion:** "LSM trees are just faster." They're faster at **writes**. Point reads can touch several files, and **compaction storms** can spike tail latency. The workload decides, not the hype.
 
 ## ⚡ Quick recall
 
 1. What does the WAL guarantee?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Committed changes survive crashes (durability), and incomplete ones can be rolled back (atomicity), because the log is written and fsynced before acknowledging.
+Committed changes survive crashes (durability), and incomplete ones are rolled back (atomicity), because the log is written and fsynced before acknowledging.
 </details>
 
-2. What's compaction in an LSM tree?
-<details><summary>Answer</summary>
+2. What is compaction in an LSM tree?
+<details><summary>Reveal Answer</summary>
 
-A background merge of sorted SSTable files that discards overwritten and deleted entries and reduces the number of files to search.
+A background merge of sorted SSTables that discards overwritten and deleted entries and reduces the number of files a read must check.
 </details>
 
 3. Why do LSM reads use Bloom filters?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-To quickly skip SSTables that definitely don't contain the key, reducing disk reads.
+To skip SSTables that definitely don't contain the key, avoiding unnecessary disk reads.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Why does Cassandra handle writes so much better than a typical relational DB?"**
+**Q. "Why does Cassandra handle writes so much better than a typical relational DB, and why does our LSM store show periodic latency spikes?"**
 <details><summary>Model answer</summary>
 
-- The LSM design turns writes into **sequential appends** (commit log + memtable), with no read-before-write and no in-place page updates.
-- It's leaderless (any replica accepts writes) with tunable consistency, so there's no single primary bottleneck.
-- The costs: compaction I/O, read amplification, tombstones, and limited query flexibility.
-- **Likely follow-up:** "What happens with lots of deletes?" → tombstones accumulate, reads scan through them, so tune `gc_grace_seconds` and compaction, and avoid delete-heavy patterns (use TTLs or time-bucketed partitions you can drop).
+- **Why writes fly:**
+  - **LSM writes are sequential appends** (commit log + memtable). There's **no read-before-write** and no in-place page updates, so even hard disks stream at full bandwidth.
+  - **Leaderless replication** with tunable consistency means no single-primary write bottleneck.
+  - The price: compaction I/O, read amplification, tombstones, and a query model shaped around partitions.
+- **Delete-heavy workloads:** tombstones accumulate and reads crawl through them. Tune `gc_grace_seconds` and compaction, and prefer **TTLs** or **time-bucketed partitions you can drop whole**.
+- **The periodic spikes, usual suspects:**
+  - **Compaction** stealing disk I/O and CPU (size-tiered bursts, a leveled backlog).
+  - **Write stalls:** too many L0 files, or the memtable flush can't keep up.
+  - **JVM GC pauses** (Cassandra).
+- **Fixes:**
+  - **Throttle compaction**, and move to **leveled** compaction for read-heavy tables.
+  - **NVMe** disks.
+  - Tune memtable size and L0 thresholds.
+  - Spread the write load across partitions.
+- **Diagnose by correlating** p99 with pending compactions, bytes compacted/s, L0 file count, and GC logs.
+- **Likely follow-up:** "When would you still pick a B-tree engine?" → mixed OLTP with rich secondary indexes, range scans, and transactions, where read latency predictability matters more than raw write throughput.
 </details>
 
-**Q2. "Your LSM-based store shows periodic latency spikes. What's likely?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- **Compaction** competing for disk I/O and CPU (size-tiered bursts or leveled backlog), **memtable flush stalls** (write stalls when L0 has too many files), and GC pauses.
-- Fixes: throttle compaction, move to leveled compaction for read-heavy workloads, faster disks (NVMe), tune memtable and L0 thresholds, and spread load.
-- **Likely follow-up:** "How would you detect it?" → correlate p99 latency with compaction metrics (pending compactions, bytes compacted/s, L0 file count).
-</details>
-
-> 📖 *Next, the orders table keeps growing, even though hardly any new orders are arriving.*
+> 📖 *The engine's secrets are out, and then Maya notices the orders table growing 40% in a month while its row count barely moves, as if it were filling up with ghosts.*
 
 ---
 

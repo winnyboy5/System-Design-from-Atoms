@@ -8,135 +8,141 @@
 
 ## 📖 Story
 
-Pantry's European customers were unhappy. Every page felt about 100 milliseconds slower since the team switched on "strong consistency everywhere." There was no outage and no cut cable, so why the cost? I told Maya what I wish someone had told me earlier: CAP only tells half the story.
+After the CAP lesson, the team took no chances: **"strong consistency everywhere."** Every write waits for a majority of replicas across three regions. Every read checks with the quorum.
+
+It works. Nothing breaks. No partitions, no conflicts, no ghosts.
+
+And yet European customers are quietly unhappy. Every tap on Pantry feels **~100 ms slower** than it used to. The menu loads a heartbeat late. "Add to cart" hangs just long enough to feel sticky. Conversion in Lisbon drops **4%**.
+
+No outage. No cut cable. No red on any dashboard. Just a constant, invisible tax on every request, like walking through water.
+
+Maya asks me: *"If nothing is broken, what are we paying for?"*
+
+I told her what I wish someone had told me earlier: **CAP only tells half the story.**
 
 ## 🎯 One-sentence idea
 
-**PACELC extends CAP: if there's a Partition, choose Availability or Consistency. Else (normal operation), choose Latency or Consistency. The second trade-off happens every single day, while partitions are rare.**
+**PACELC extends CAP: if there's a Partition, choose Availability or Consistency, and Else (normal operation) choose Latency or Consistency, and that second trade-off is paid on every single request, while partitions are rare.**
 
 ## 🧸 Analogy
 
-A **group chat to plan dinner**:
+A **group chat planning dinner**:
 
-- 🌩️ **Partition (P):** half the group loses signal. Do you **decide without them** (A) or **wait** until everyone's back (C)? That's CAP.
-- ☀️ **Else (E), everyone's online:** do you **decide fast** after the first 2 replies (**L**, low latency, but some may disagree later), or **wait for everyone to confirm** (**C**, consistent, but slower)? That's the part CAP forgot, and it happens **every** time you plan dinner.
+- 🌩️ **Partition:** half the group loses signal. Decide **without them** (A) or **wait** (C)? That's CAP.
+- ☀️ **Else, everyone is online:** decide after the **first two replies** (L: fast, someone may disagree later), or **wait for everyone to confirm** (C: right, but slow)? That choice happens **every time you plan dinner**, signal or not.
 
 ## 🖼️ Visual
+
+*Diagram brief:* a two-level decision tree. The first branch asks "partition?" and splits into A/C. The "no partition" branch splits into L/C, labelled "paid on every request."
 
 ```mermaid
 flowchart TD
     Q{"Network partition?"} -->|"Yes (P)"| PA{"Choose"}
     PA -->|"A"| PA1["Stay available,<br/>maybe inconsistent"]
     PA -->|"C"| PC1["Stay consistent,<br/>maybe unavailable"]
-    Q -->|"No (Else)"| EL{"Choose"}
-    EL -->|"L"| EL1["Low latency:<br/>answer from nearest replica,<br/>replicate async"]
-    EL -->|"C"| EC1["Consistency:<br/>coordinate replicas<br/>before answering (slower)"]
+    Q -->|"No (Else): EVERY request"| EL{"Choose"}
+    EL -->|"L"| EL1["Low latency:<br/>nearest replica,<br/>async replication"]
+    EL -->|"C"| EC1["Consistency:<br/>coordinate replicas first<br/>(round trips → slower)"]
 ```
 
 ## 🔬 How it works
 
-- **Why it matters:** strong consistency requires **coordination** (quorums or consensus, often across zones or regions), and coordination costs **round trips**, even when nothing is broken.
-- **Classifications (typical defaults):**
-
-| System | If Partition | Else | Label |
-|---|---|---|---|
-| Cassandra, Riak, DynamoDB (default) | A | L | **PA/EL** |
-| MongoDB (majority writes and reads) | C | C | **PC/EC** (roughly) |
-| Spanner, CockroachDB, etcd, ZooKeeper | C | C | **PC/EC** |
-| PNUTS (Yahoo) | C | L | **PC/EL** |
-| Most async-replicated SQL + read replicas | (depends on failover) | L | EL for replica reads |
-
-- **Tunable systems** let you choose per request: Cassandra `ONE` (EL) vs `QUORUM` (EC-ish). DynamoDB eventual vs strongly consistent reads.
-- **Latency math:** strong consistency across regions ≈ at least one cross-region round trip per write (~60–150 ms). Within a region across AZs ≈ 1–2 ms.
+- **Coordination costs round trips, always:** strong consistency needs quorum or consensus acknowledgements. Within a region across AZs that's ~**1–2 ms**. Across regions it's ~**60–150 ms per round trip**, even on a perfect day.
+- **Typical classifications:** **Cassandra / Riak / DynamoDB default = PA/EL** (available under partition, fast otherwise). **Spanner / CockroachDB / etcd / ZooKeeper = PC/EC**. **MongoDB with majority reads and writes ≈ PC/EC**. **Yahoo PNUTS = PC/EL**. **Async replicas = EL** for replica reads.
+- **Choose per operation, not per database:** Cassandra `ONE` (EL) vs `QUORUM`/`LOCAL_QUORUM` (EC-ish). DynamoDB eventually consistent (half the price) vs strongly consistent reads. Session guarantees can buy read-your-writes on top of EL.
+- **Shrink the EC penalty:** place leaders and quorums **near the users who write**, use **home regions** per user, serve **read-only snapshot reads** from local replicas at a safe timestamp (Spanner), and use **`LOCAL_QUORUM`** with async cross-region replication.
+- **Cost is part of it too:** stronger reads often cost more money (capacity units), not just milliseconds.
 
 ## 🧩 Worked example
 
-**The same read, three ways (3 replicas across US-East, US-West, EU):**
+**One read, three ways (replicas in US-East, US-West, EU; a client in Lisbon):**
 
 ```
-EL: read the nearest replica (US-East client) → ~1 ms   (may be slightly stale)
-EC (quorum): read 2 of 3 replicas → wait for the 2nd-closest (US-West) → ~70 ms
-EC (leader read in the EU): → ~90 ms, always the latest
+EL:  nearest replica (EU)                        → ~2 ms     (may be a second stale)
+EC:  quorum read 2 of 3 → wait for US-East       → ~75 ms
+EC:  leader read, leader in US-West              → ~140 ms   (always the latest)
 ```
 
-**Picking per feature (PACELC thinking):**
+**Maya's fix, per feature:**
 
-| Feature | Choice | Why |
+| Pantry feature | Choice | Why |
 |---|---|---|
-| Product page views | PA/EL | Fast and available, and stale is OK |
-| Shopping cart | PA/EL with merges | Always writable |
-| Inventory decrement at checkout | PC/EC | Correctness > latency |
-| User settings (read-your-writes) | EL + session guarantee | Fast, and the user sees their own change |
+| Menu and dish pages | **PA/EL** | Fast and available, and seconds of staleness are harmless |
+| Cart | **PA/EL** + CRDT merge | Always writable |
+| Stock decrement at checkout | **PC/EC** | Correctness > 75 ms |
+| User settings | **EL + read-your-writes session** | Fast, and the user still sees their own change |
+
+**Result:** Lisbon p50 back to **~40 ms** for browsing. Only checkout pays the consensus tax, where customers expect a short pause and correctness matters.
 
 ## ⚖️ Trade-offs
 
-| Choice | Gain | Cost |
+| Choice | What Maya gains | What she pays |
 |---|---|---|
-| EL | Low, predictable latency | Stale reads, conflicts |
-| EC | Always-fresh reads, simpler app logic | Latency ∝ distance to the quorum or leader |
+| EL | Low, predictable latency | Stale reads, conflict handling |
+| EC | Always-fresh reads, simpler logic | Latency ∝ distance to the quorum or leader |
 | PA | Uptime during splits | Divergence to reconcile |
-| PC | No divergence | Downtime on the minority side |
+| PC | No divergence | The minority side goes down |
 
 ## 🌍 Real world
 
-- **Daniel Abadi** proposed PACELC (2010/2012) to capture the latency trade-off CAP ignores.
-- **Spanner** reduces the EC latency penalty with TrueTime, leader placement, and read-only snapshot reads at local replicas (lesson 084).
-- **DynamoDB:** eventually consistent reads cost **half** as much as strongly consistent ones. Latency *and* cost are part of the trade-off.
+- **Daniel Abadi** proposed PACELC (2010/2012) to capture the latency trade-off CAP leaves out.
+- **Spanner** softens the EC penalty with TrueTime, careful leader placement, and local snapshot reads (lesson 084).
+- **DynamoDB** prices eventually consistent reads at **half** the cost of strong ones.
 
 ## 📌 Cheat card
 
 > - **PACELC:** if **P** → **A** or **C**. **E**lse → **L** or **C**.
-> - Mnemonic: "**P**artition? **A** or **C**. **E**lse? **L** or **C**."
-> - Partitions are rare, but **the latency vs consistency trade-off happens on every request**.
+> - "**P**artition? **A** or **C**. **E**lse? **L** or **C**."
+> - Partitions are rare, but **the ELC trade-off is paid on every request**.
 > - Dynamo-style = **PA/EL**. Spanner/etcd = **PC/EC**.
-> - Tune **per operation**: fast eventual reads for browsing, strong for money.
+> - **Tune per operation.**
 
 ## 🧪 Feynman check
 
-Explain the dinner-planning chat, and why "decide after 2 replies or wait for everyone" is a choice you make even when everyone has signal.
+Explain the dinner-planning chat, and why "decide after two replies or wait for everyone" is a choice you make even when everyone has perfect signal.
 
-⚠️ **Common confusion:** "CAP says we can be CA when there's no partition, so consistency is free." It's not free: **consistency always costs latency** from coordination. That's exactly what PACELC's "ELC" part points out.
+⚠️ **Common confusion:** "With no partition we're 'CA', so consistency is free." It isn't free: **consistency always costs coordination latency** (and often money). PACELC exists precisely to name that everyday price.
 
 ## ⚡ Quick recall
 
 1. What does the "ELC" part of PACELC say?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 Else (no partition), there's a trade-off between latency and consistency.
 </details>
 
-2. Classify Cassandra with CL=ONE in PACELC.
-<details><summary>Answer</summary>
+2. Classify Cassandra at CL=ONE in PACELC.
+<details><summary>Reveal Answer</summary>
 
 PA/EL.
 </details>
 
 3. Why does strong consistency cost latency even without failures?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Replicas must coordinate (quorum or consensus round trips) before answering, and the round trips grow with distance.
+Replicas must coordinate (quorum or consensus round trips) before answering, and those round trips grow with distance.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Classify your design using PACELC."**
+**Q. "Classify your design with PACELC, and explain why a global app might choose EL even for data that must eventually be correct."**
 <details><summary>Model answer</summary>
 
-- Break it down **per data type**: e.g., feed and profile reads are **PA/EL** (nearest replica, async replication, cache), and payments and inventory are **PC/EC** (a consensus or primary DB, synchronous quorum).
-- Justify each with the business impact of staleness vs slowness.
-- **Likely follow-up:** "Where would users notice the EC latency?" → only on the checkout/payment path, where a +50–100 ms delay is acceptable for correctness.
+- **Classify per data type, not per system:**
+  - Browsing, feeds, profiles: **PA/EL**. Nearest replica, async replication, caches. Staleness costs little, and slowness costs conversions.
+  - Carts and likes: **PA/EL with mergeable types** (CRDTs).
+  - Payments, inventory, uniqueness: **PC/EC**. A consensus or primary DB with synchronous quorums. A +50–100 ms delay on checkout is acceptable for correctness.
+- **Why EL for eventually-correct data:**
+  - Cross-continent consensus on every read and write adds **~100+ ms**, measurably hurting UX and revenue.
+  - Many workflows tolerate brief staleness as long as data **converges** and **conflicts resolve** (CRDTs, merges), with critical checks **deferred** to the moment that matters (validate stock at checkout, reconcile later).
+  - **Home-region writes** give most users local-latency writes, with async replication elsewhere.
+  - **Session guarantees** (read-your-writes, monotonic reads) hide most anomalies from the user.
+- **Likely follow-up:** "A user travels from Lisbon to New York?" → keep routing their writes to their home region (slightly slower abroad), or migrate the home region after a sustained move.
 </details>
 
-**Q2. "Why might a global app choose EL even for data that must eventually be correct?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- A cross-continent consensus on every read and write adds ~100+ ms, which hurts UX and conversions.
-- Many workflows tolerate brief staleness if they **converge** and **conflicts are resolvable** (CRDTs, merges), or if critical checks are **deferred** (validate at checkout, reconcile later).
-- Hybrid: EL for reads, with **home-region writes** (low latency for most users) and async replication elsewhere.
-- **Likely follow-up:** "What about a user who travels?" → route their writes to their home region (slightly slower abroad), or migrate their home region.
-</details>
-
-> 📖 *Next, two copies disagree about which update came first, and their clocks are lying.*
+> 📖 *The latency tax is under control, and then two data centres disagree about which menu edit came first, because one server's clock has been quietly running 200 milliseconds fast.*
 
 ---
 
