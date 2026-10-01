@@ -8,149 +8,159 @@
 
 ## 📖 Story
 
-A cook updated a dish to say "contains peanuts," but the cached page kept showing the old version to hundreds of customers. I want you to feel how serious that is. It isn't just stale. It's *dangerous*. Maya had run into one of the famously hard problems in computing: keeping copies honest. Let me show you how.
+4:12 p.m. A cook edits her satay dish and adds three words in bold: **"Contains peanuts."**
+
+She hits save. The database updates. Everything looks fine.
+
+But the dish page was cached. In Redis, at the CDN edge, in the in-process memory of 30 app servers. And for the next **ten minutes**, every one of those copies keeps serving the old page, **without the warning**, to hundreds of people deciding what to eat for dinner.
+
+Maya finds out when a support ticket arrives with a single line that makes her stomach drop:
+
+*"My son has a peanut allergy. Your site didn't say."*
+
+I want you to feel how serious that is. It isn't just stale data. It's **dangerous** data. Maya has run into one of the famously hard problems in computing: keeping copies honest. Let me show you how.
 
 ## 🎯 One-sentence idea
 
-**Invalidation is making sure cached copies don't lie after the real data changes. You can let copies expire (TTL), delete them when data changes (explicit invalidation), or version them so old copies are simply never asked for again.**
+**Invalidation keeps cached copies from lying after the real data changes, by letting copies expire (TTL), deleting them when data changes (explicit or event-driven invalidation), or versioning them so old copies are never asked for again.**
 
 > "There are only two hard things in Computer Science: cache invalidation and naming things." (Phil Karlton)
 
 ## 🧸 Analogy
 
-A **restaurant menu** printed and placed on every table (the caches):
+A **printed menu on every table** (the caches):
 
-- ⏳ **TTL:** reprint all menus **every Monday**, whether or not prices changed. Simple, but prices can be wrong for up to a week.
-- 📣 **Explicit invalidation:** whenever the chef changes a price, a waiter **collects the old menus** right away. Accurate, but you need to know where every menu is.
-- 🏷️ **Versioning:** new menus get a **new edition number** ("Menu v8"). Customers always ask for the latest edition, and old ones are simply ignored.
+- ⏳ **TTL:** reprint all menus **every Monday**. Simple, but wrong for up to a week.
+- 📣 **Explicit invalidation:** when the chef changes a dish, a waiter **collects the old menus immediately**. Accurate, if you know where every menu is.
+- 🏷️ **Versioning:** new menus get a **new edition number**, and customers always ask for the latest.
 
 ## 🖼️ Visual
 
+*Diagram brief:* a single write drops into the database, and a change-event "shockwave" ripples out to every copy: Redis, CDN, each server's L1, and the search index. Each one turns red, then gets deleted.
+
 ```mermaid
 flowchart LR
-    W["✏️ Write: price changed"] --> DB[("🗄️ DB")]
-    DB --> CDC["📡 Change event<br/>(app event or CDC)"]
+    W["✏️ Write: 'contains peanuts'"] --> DB[("🗄️ DB")]
+    DB --> CDC["📡 Change event<br/>(outbox or CDC)"]
     CDC --> I1["🗑️ Delete Redis key"]
-    CDC --> I2["🗑️ Purge CDN tag"]
-    CDC --> I3["📢 Broadcast: drop L1 caches"]
-    CDC --> I4["🔍 Update search index"]
+    CDC --> I2["🗑️ Purge CDN tag dish-42"]
+    CDC --> I3["📢 Broadcast: drop L1 copies"]
+    CDC --> I4["🔍 Re-index search doc"]
 ```
 
 ## 🔬 How it works
 
-- **TTL-based expiry:** the simplest, and a **safety net everywhere**. Staleness is bounded by the TTL. Pick it by asking "how stale is acceptable?" (seconds for prices, hours for profile pictures).
-- **Explicit invalidation (delete on write):** after updating the DB, **delete** the affected cache keys. Also delete *derived* keys (lists, aggregates, pages that contain the item). **Tracking the dependencies is the hard part.**
-- **Event-driven invalidation:** publish a change event (or use **CDC, change data capture**, which reads the DB's log, e.g., Debezium). Subscribers invalidate every cache: Redis, local L1, CDN, search.
-- **Versioned keys:** `product:42:v17`. Writes bump the version, and readers look up the current version first (or embed it in URLs, like hashed asset names). Old entries just age out.
-- **Race conditions to know:**
-  - **Stale set:** Reader A misses → reads the old value from the DB → (meanwhile, writer B updates the DB and deletes the key) → A writes the **old** value into the cache. That value is now stale until the TTL expires.
-  - Mitigations: **short TTLs**, **delayed double delete** (delete again ~1 s after the write), **leases/tokens** (Facebook's Memcache: only the holder of a valid lease may set), or **versioned values** (only set if newer).
-- **Replication lag trap:** you invalidate, the next read goes to a **lagging DB replica**, and it re-caches old data. Read from the primary right after a write, or delay the re-population.
+- **TTL is the safety net everywhere:** staleness is bounded by the TTL, and you choose it by asking "how wrong, for how long, is acceptable?" Seconds for allergens and prices, hours for avatars.
+- **Delete on write:** after the DB commit, **delete** the entity key *and every derived key* (lists, pages, aggregates). **Tracking those dependencies is the real difficulty.**
+- **Event-driven / CDC:** the app emits an event (transactional outbox, lesson 062), or **CDC** (Debezium) tails the DB's WAL and publishes every committed change. Subscribers invalidate Redis, L1 caches (via pub/sub), the CDN (surrogate keys), and search.
+- **Versioned keys:** `dish:42:v17`, or hashed asset URLs. Writes bump the version, readers ask for the current one, and old entries simply age out. No race on the key itself.
+- **The two classic traps:** the **stale-set race** (a slow reader re-caches an old value after the delete) and **replica-lag re-caching** (the post-delete miss reads a lagging replica). Fix them with **leases** (Meta's Memcache), **version-checked sets**, **delayed double delete**, or **reading from the primary** right after a write.
 
 ## 🧩 Worked example
 
-**The stale-set race, step by step:**
+**The stale-set race:**
 
 ```
-t0  Cache: (empty)          DB: price=10
-t1  Reader A: cache miss → reads DB → gets 10
-t2  Writer B: UPDATE price=12 → DELETE cache key
-t3  Reader A: SET cache price=10          ← stale! cached until TTL
+t0  Cache: (empty)              DB: allergens=""
+t1  Reader A: miss → reads DB → gets ""          (slow request…)
+t2  Writer:  UPDATE allergens="peanuts" → DELETE dish:42
+t3  Reader A: SET dish:42 = ""     ← stale, and dangerous, until the TTL
 ```
 
-**Fix with a delayed double delete:**
+**Fixes:**
 
 ```python
-def update_price(pid, price):
-    db.execute("UPDATE products SET price=%s WHERE id=%s", price, pid)
-    redis.delete(f"product:{pid}")
-    schedule_in(seconds=1, fn=lambda: redis.delete(f"product:{pid}"))  # catches t3-style races
+def update_dish(dish_id, fields):
+    db.execute("UPDATE dishes SET … WHERE id=%s", dish_id)
+    redis.delete(f"dish:{dish_id}")
+    schedule_in(seconds=1, fn=lambda: redis.delete(f"dish:{dish_id}"))   # delayed double delete
+    cdn.purge(tag=f"dish-{dish_id}")
+    pubsub.publish("invalidate", f"dish:{dish_id}")                      # L1 caches on all 30 servers
 ```
 
-**Fix with version-checked sets (a Lua script / compare-and-set):**
-
 ```
-Value stored as {version: 17, data: ...}
-Only SET if the incoming version > the stored version
+Version-checked set: value = {version: 17, data: …}
+Lua script: SET only if incoming.version > stored.version
 ```
 
-**Invalidating derived data:** updating product 42 must also invalidate:
-- `product:42`
-- `category:kitchen:page:1` (the list shows its price)
-- `search results containing 42` (usually handled by a short TTL, since tracking them all is impractical)
-- CDN page `/products/42` (purge by the surrogate key `product-42`)
+**Derived keys for dish 42:** `dish:42`, `cook:7:menu`, `top:london:19h`, CDN `/dishes/42` (surrogate key `dish-42`), and search results (short TTL + re-index).
+
+**Maya's policy:** **safety-critical fields (allergens, price) → TTL ≤ 30 s + event invalidation + CDN tag purge**. Cosmetic fields → TTL 10 min.
 
 ## ⚖️ Trade-offs
 
-| Approach | Gain | Cost | Use when |
-|---|---|---|---|
-| TTL only | Dead simple | Stale for up to the TTL | Staleness is tolerable |
-| Delete on write | Fresh quickly | Must know all affected keys, races | Entities with clear keys |
-| Event/CDC-driven | Decoupled, covers many caches | Infrastructure, eventual (ms–s delay) | Many services and caches |
-| Versioned keys | No races on the key itself, and easy rollback | Extra lookup or indirection | Assets, config, immutable data |
-| No cache | Always correct | Load and latency | Correctness-critical reads (balances, checkout) |
+| Approach | What Maya gains | What she pays |
+|---|---|---|
+| TTL only | Dead simple | Stale for up to the TTL |
+| Delete on write | Fresh within milliseconds | Must know every affected key, races |
+| Event / CDC-driven | Covers every cache, decoupled | Infrastructure, ms–s of lag |
+| Versioned keys | No races on the key, easy rollback | An extra lookup or indirection |
+| No cache | Always correct | Load and latency |
 
 ## 🌍 Real world
 
-- **Facebook's "Scaling Memcache"** paper: invalidations flow from the MySQL replication stream (the `mcsqueal` daemons), with leases to avoid stale sets and thundering herds.
-- **Debezium + Kafka** is a popular CDC pipeline for keeping caches and search indexes in sync.
-- **Fastly/Cloudflare surrogate keys** let you purge every page tagged `product-42` in one call.
+- **Meta's "Scaling Memcache at Facebook":** invalidations flow from the MySQL replication stream (the `mcsqueal` daemons), with **leases** preventing stale sets and herds.
+- **Debezium + Kafka** is the standard CDC pipeline for keeping caches and search in sync.
+- **Fastly and Cloudflare surrogate keys** purge every page tagged `dish-42` in one call.
 
 ## 📌 Cheat card
 
-> - Three tools: **TTL (time), delete on write (events), versioning (new names)**.
-> - **Always have a TTL** as the safety net, even with explicit invalidation.
+> - Three tools: **TTL (time) · delete on write (events) · versioning (new names)**.
+> - **Always keep a TTL** as the safety net.
 > - **Delete, don't set**, on write.
-> - Watch for **stale-set races** and **replica-lag re-caching**. Fix them with leases, versioned sets, or delayed double delete.
+> - Beware **stale-set races** and **replica-lag re-caching** → leases, versioned sets, delayed double delete.
 > - **Derived data** (lists, pages, search) is where invalidation bugs hide.
 
 ## 🧪 Feynman check
 
-Explain the three menu strategies, and describe the race where a slow reader puts an old price back into the cache.
+Explain the three menu strategies, and walk through the race in which a slow reader puts the old, peanut-free page back into the cache.
 
-⚠️ **Common confusion:** "We invalidate on write, so the cache is always consistent." Caches are **eventually consistent** with the DB. There are always small windows (races, lag, failed deletes). Design for bounded staleness, and read from the source of truth where it truly matters.
+⚠️ **Common confusion:** "We invalidate on write, so the cache is always consistent." Caches are **eventually consistent** with the DB: there are always small windows from races, lag, and failed deletes. Design for **bounded** staleness, and read the **source of truth** where being wrong can hurt someone.
 
 ## ⚡ Quick recall
 
-1. Why keep a TTL even if you invalidate on writes?
-<details><summary>Answer</summary>
+1. Why keep a TTL even when you invalidate on every write?
+<details><summary>Reveal Answer</summary>
 
-A safety net: missed invalidations (bugs, races, failed deletes) will eventually self-heal when the entry expires.
+It's a safety net. Missed invalidations (bugs, races, failed deletes) heal themselves when the entry expires.
 </details>
 
 2. What is CDC in the context of caching?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Change Data Capture: reading the DB's change log to emit events that trigger cache invalidation or updates, without changing app code.
+Change Data Capture: tailing the DB's change log to emit events that trigger cache invalidation or updates, without touching app code.
 </details>
 
 3. How can a lagging read replica break invalidation?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-After deleting the key, the next miss reads the replica, which doesn't have the write yet, so the old value is re-cached.
+After the delete, the next miss reads a replica that doesn't have the write yet, and re-caches the old value.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Users update their profile photo, but still see the old one for minutes. Walk me through the causes and fixes."**
+**Q. "Keep a Redis cache, 30 in-process L1 caches, an Elasticsearch index, and a CDN in sync with a Postgres source of truth, with stale allergen info visible for no more than 5 seconds."**
 <details><summary>Model answer</summary>
 
-- **Layers:** browser cache, CDN (long TTL on the image URL), Redis profile cache, and maybe replica lag.
-- **Fixes:** give each new photo a **new URL** (versioned/hashed file name), so the browser and CDN naturally fetch the new one without purges. **Delete** the profile cache key on update. Read your own profile from the primary (**read-your-writes**, lesson 047).
-- **Likely follow-up:** "Other users still see the old photo?" → acceptable eventual consistency within the TTL, or push an event to invalidate their feeds' cached author info.
+- **Capture every change reliably:** **CDC** (Debezium reading the Postgres WAL) → Kafka, one topic per table. It catches *every* committed change, including admin scripts and migrations, and it's replayable. (A **transactional outbox** is the app-level alternative.)
+- **Fan-out consumers, all idempotent:**
+  1. **Redis invalidator:** DEL entity and derived keys.
+  2. **L1 invalidation:** publish on Redis pub/sub so all 30 servers drop their local copies. **L1 TTL ≤ 5 s** as a backstop in case a message is missed.
+  3. **CDN purger:** purge by surrogate key `dish-{id}`. Purges propagate globally in about a second.
+  4. **Search indexer:** upsert the document.
+- **Close the races:**
+  - **Version-checked sets** (only cache a value whose `updated_at`/version is newer than the stored one) to kill stale-set races.
+  - **Read the primary** for re-population right after a change, to avoid replica-lag re-caching.
+- **Meet the 5 s bound:**
+  - CDC lag is typically < 1 s. Monitor consumer lag and alert at 2 s.
+  - Safety-critical fields get **short TTLs** on every layer anyway.
+  - For the checkout and allergy confirmation step, **read the source of truth**, never the cache.
+- **Likely follow-up:** "Users change their photo and still see the old one?" → give each upload a **new versioned URL**, so the browser and CDN fetch it naturally with no purge, and serve the uploader's own profile from the primary (**read-your-writes**, lesson 047).
 </details>
 
-**Q2. "How do you keep a Redis cache, an Elasticsearch index, and a CDN in sync with a Postgres source of truth?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- **CDC** (Debezium reading the Postgres WAL) → **Kafka** topic per table → consumers: a cache invalidator (delete keys), a search indexer (upsert docs), and a CDN purger (surrogate keys).
-- It's reliable (it captures every committed change, even from scripts), decoupled, and replayable.
-- Add TTLs everywhere as a safety net, and make consumers **idempotent**.
-- Alternative: the **transactional outbox** pattern from app code (lesson 062).
-- **Likely follow-up:** "What's the lag?" → typically ms to seconds, so it's eventual consistency. Critical reads go to the source.
-</details>
-
-> 📖 *Next, at 8 pm sharp, the most popular cache entry expires, and ten thousand requests stampede.*
+> 📖 *Next, at 8 p.m. sharp, the most popular cache entry in Pantry expires, and ten thousand requests stampede into the database at once.*
 
 ---
 
