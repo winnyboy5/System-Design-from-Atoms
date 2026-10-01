@@ -8,17 +8,27 @@
 
 ## 📖 Story
 
-Leo burst in with news: a food festival wanted to feature Pantry, which could mean millions of visitors. "Do we need a data centre?!" Maya grabbed a napkin. This is the moment I most want you to master: she didn't need exact answers, only the right *order of magnitude*. Watch how she did it in two minutes. You'll do the same by the end of this lesson.
+The email arrives at 4:12 p.m. A city food festival wants to feature Pantry on its homepage. Estimated reach: **two million people** over one weekend.
+
+Maya's stomach drops. Her entire company runs on one laptop. Does she need a data centre? A hundred servers? A miracle?
+
+The festival needs an answer by five.
+
+She doesn't open a spreadsheet. She grabs a paper napkin from the takeout bag and a pen that's almost out of ink. Two minutes of rounded numbers, scribbled in the margins.
+
+This is the moment I most want you to master. She didn't need exact answers. She needed the right **order of magnitude**, fast. Watch her do it.
 
 ## 🎯 One-sentence idea
 
-**Rough math, done in 2 minutes with rounded numbers, tells you whether you need 1 server or 1,000, and 1 GB or 1 PB. That decides the shape of the design.**
+**Two minutes of rough math with rounded numbers tells you whether you need 1 server or 1,000, and 1 GB or 1 PB, and that decides the shape of the whole design.**
 
 ## 🧸 Analogy
 
-Planning a party. You don't count every chip. You think: *"30 people × ~3 slices each ≈ 90 slices ≈ 11 pizzas. Buy 12."* Close enough to be right, fast enough to be useful. Same with systems: **order of magnitude beats precision**.
+Planning a party. You don't count every chip. You think: *"30 people × ~3 slices ≈ 90 slices ≈ 11 pizzas. Buy 12."* It's close enough to be right and fast enough to be useful. Systems work the same way: **order of magnitude beats precision**.
 
 ## 🖼️ Visual
+
+*Diagram brief:* a napkin-style pipeline of five boxes, each turning the previous number into the next: daily users → actions → QPS → storage → machine count.
 
 ```mermaid
 flowchart LR
@@ -30,115 +40,105 @@ flowchart LR
 
 ## 🔬 How it works
 
-- **Round aggressively.** 86,400 s/day → **10⁵**. 365 days → **400** if you like.
-- **Use powers of 10** and add exponents: 3 × 10⁸ × 2 × 10³ = 6 × 10¹¹.
-- **QPS** = (users × actions per day) ÷ 10⁵. **Peak ≈ 2–3× average.**
-- **Storage** = size per item × items per day × retention days × **3 replicas**.
-- **Bandwidth** = QPS × payload size.
-- **Machines** = peak QPS ÷ what one machine handles (about 10k simple req/s for an app server, 100k+ for Redis).
-- **State your assumptions out loud.** Being wrong with clear assumptions is fine. Being vague isn't.
+- **Round without mercy:** 86,400 s/day → **10⁵**, and a year → **3 × 10⁷ s**. Work in powers of ten and add the exponents.
+- **QPS** = (users × actions/day) ÷ 10⁵. **Peak ≈ 2–3× average**, and launches and festivals can be 10×.
+- **Storage** = bytes per item × items/day × retention days × **3 replicas**. **Bandwidth** = QPS × payload size.
+- **Machines** = peak QPS ÷ per-node capacity (≈ **10k simple req/s** for an app server, **100k+ ops/s** for Redis, **thousands of writes/s** for one SQL primary).
+- **Always end with "so this means…"**: the number exists only to drive a design decision. State your assumptions out loud.
 
 ## 🧩 Worked example
 
-**Design estimate: a photo-sharing app.**
-
-Assumptions: **10M DAU**, each uploads **0.2 photos/day** and views **50 photos/day**. Photo = **500 KB** (compressed), metadata = **1 KB**. Keep for **5 years**.
+**Maya's napkin for the festival weekend:**
 
 ```
-Uploads/day    = 10M × 0.2       = 2M/day
-Write QPS      = 2M ÷ 10⁵        = 20/s      (peak ~60/s)       → tiny!
-Views/day      = 10M × 50        = 500M/day
-Read QPS       = 500M ÷ 10⁵      = 5,000/s   (peak ~15,000/s)   → read-heavy (250:1)
-
-Photo storage/day = 2M × 500 KB  = 1 TB/day
-5 years           = 1 TB × 365 × 5 ≈ 1.8 PB   (×3 replicas ≈ 5.5 PB, or let S3 handle durability)
-Metadata          = 2M × 1 KB × 365 × 5 ≈ 3.65 TB  → fits a sharded SQL/NoSQL DB
-
-Bandwidth out  = 5,000 × 500 KB  = 2.5 GB/s average   → must use a CDN
-Cache (20% of daily views' unique metadata) → small, easily fits in Redis
+Visitors         = 2M over 2 days      → 1M/day
+Page views       = 1M × 10 pages       = 10⁷/day
+Avg QPS          = 10⁷ ÷ 10⁵           = 100/s
+Peak QPS         = ×10 (festival spike) = 1,000/s
+Orders           = 1M × 2% conversion  = 20,000/day ≈ 0.2 writes/s avg, ~5/s peak
+Page size        = 200 KB (with images)
+Egress at peak   = 1,000 × 200 KB      = 200 MB/s ≈ 1.6 Gbps
 ```
 
-**What the numbers tell us:**
+**So this means:**
 
-1. Writes are trivial, and **reads dominate** → cache + CDN.
-2. **Photos go in object storage**, not the database.
-3. 2.5 GB/s egress → a **CDN is mandatory**, both for cost and speed.
+1. 1,000 req/s at peak → **a few app servers behind a load balancer**, not a data centre.
+2. Writes are tiny → **one Postgres primary** handles them easily.
+3. **1.6 Gbps** of images would choke a home connection → **put images on a CDN**, today.
+
+Her reply to the festival: *"Yes."*
 
 ## ⚖️ Trade-offs
 
-| You gain | You pay | Use it when |
+| Maya's choice | What she gains | What she pays |
 |---|---|---|
-| Fast, rough estimate | Could be off by 2–3× | Always, as a first step |
-| Detailed capacity model | Time | Real production planning |
-| Over-provisioning | Money | Unknown growth, launch events |
+| A 2-minute estimate | A fast, defensible direction | Could be off by 2–3× |
+| A detailed capacity model + load test | Real confidence | Days of work |
+| Over-provisioning for the event | Survives surprises | Money spent on idle machines |
 
 ## 🌍 Real world
 
-- **Capacity planning** at real companies starts exactly like this, then gets refined with load tests.
-- **Interviewers** use estimation to see if you can connect numbers to design choices. The *conclusion* matters more than the arithmetic.
+- **Capacity planning** at Google, Meta, and AWS starts exactly like this, and is then refined with load tests and production telemetry.
+- **Interviewers** use estimation to check whether you can link numbers to design choices. The *conclusion* matters far more than the arithmetic.
 
 ## 📌 Cheat card
 
 > - **1 day ≈ 10⁵ s** · **1M/day ≈ 12/s** · **1 year ≈ 3 × 10⁷ s**
-> - **Peak = 2–3× avg** · **Replicas × 3** · **Cache the hot 20%**
+> - **Peak = 2–3× average** (10× for events) · **× 3 replicas** · **cache the hot 20%**
 > - **KB 10³ · MB 10⁶ · GB 10⁹ · TB 10¹² · PB 10¹⁵**
-> - One app server ≈ **10k req/s** · Redis ≈ **100k+ ops/s** · a DB ≈ **thousands of writes/s**
-> - **Always end with "so this means…"** and the design implication.
+> - App server ≈ **10k req/s** · Redis ≈ **100k+ ops/s** · SQL primary ≈ **thousands of writes/s**
 > - More tricks: [ESTIMATION-TRICKS.md](../../cheatsheets/ESTIMATION-TRICKS.md)
 
 ## 🧪 Feynman check
 
-Estimate out loud: *"How many requests per second does a service with 50 million daily users, each making 20 requests, receive?"* Then explain what that number means for the design.
+Out loud, estimate the QPS for **50M daily users making 20 requests each**, then say what that number means for the design.
 
 <details><summary>Check your math</summary>
 
-50M × 20 = 10⁹/day → ÷ 10⁵ = **10,000 QPS average**, ~30,000 peak. That means multiple app servers behind a load balancer, and almost certainly a cache.
+50M × 20 = 10⁹/day ÷ 10⁵ = **10,000 QPS average**, ~30,000 at peak. So you need multiple stateless app servers behind a load balancer, and almost certainly a cache.
 </details>
 
-⚠️ **Common confusion:** Spending 10 minutes on precise math. Interviewers want **2–3 minutes** and rounded numbers, and then the **design implication**.
+⚠️ **Common confusion:** Spending ten minutes on precise arithmetic. Interviewers want **2–3 minutes**, rounded numbers, and then the **design implication**. A precise answer with no "so this means" scores lower than a rough one with a clear decision.
 
 ## ⚡ Quick recall
 
 1. 100M requests/day ≈ how many per second?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-~1,200 QPS (10⁸ ÷ 10⁵ = 1,000, and the precise figure is ~1,157).
+≈ **1,000 QPS** (10⁸ ÷ 10⁵). The precise figure is ~1,157.
 </details>
 
 2. 1 billion items × 1 KB each = ?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 10⁹ × 10³ = 10¹² bytes = **1 TB**.
 </details>
 
 3. Why multiply storage by 3?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 Most storage systems keep 3 replicas for durability and availability.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Estimate the storage needed for a chat app with 100M DAU, each sending 40 messages/day of about 100 bytes, kept for 2 years."**
+**Q. "Estimate the storage and write throughput for a chat app with 100M DAU, each sending 40 messages a day of about 100 bytes, kept for 2 years. What does that tell you about the database?"**
 <details><summary>Model answer</summary>
 
-- Messages/day = 100M × 40 = **4 × 10⁹**.
-- Bytes/day = 4 × 10⁹ × 100 B = **400 GB/day** (add ~2× for metadata/indexes → ~800 GB).
-- 2 years ≈ 800 GB × 730 ≈ **~580 TB**, × 3 replicas ≈ **~1.7 PB**.
-- Write QPS = 4 × 10⁹ ÷ 10⁵ = **40,000/s avg**, ~100k+ peak → a write-optimized, horizontally scalable store (e.g., Cassandra).
-- **Likely follow-up:** "How would you reduce storage cost?" → compression, tiering old messages to cheaper storage, TTL/retention policies.
+- **Messages/day** = 100M × 40 = **4 × 10⁹**.
+- **Bytes/day** = 4 × 10⁹ × 100 B = **400 GB**. Roughly double it for metadata and indexes → **~800 GB/day**.
+- **Two years** ≈ 800 GB × 730 ≈ **~580 TB**, × 3 replicas ≈ **~1.7 PB**.
+- **Write QPS** = 4 × 10⁹ ÷ 10⁵ = **40,000/s average**, so **~100k+/s at peak**.
+- **So this means:**
+  - That is far beyond a single SQL primary. You need a **horizontally scalable, write-optimized store** (e.g. Cassandra or another LSM-based system), partitioned by `conversation_id`.
+  - Recent messages are hot, so add **tiered storage**: SSD for the last ~30 days, cheap object storage for the rest.
+  - **Compression** (~3–5× on text) and **retention TTLs** cut cost.
+- **Likely follow-up:** "What read QPS would you expect?" → reads are often 5–10× writes for chat (scrollback, multiple devices), so 200k–400k/s. That calls for a cache of recent conversations in front of the store.
 </details>
 
-**Q2. "Does this service need a cache? Use numbers."**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- Compute **read QPS at peak** and compare it with what the DB handles (a few thousand to tens of thousands of simple reads/s per node).
-- If peak reads ≫ DB capacity, or latency targets are tighter than DB latency, then **yes**.
-- Size the cache: hot set ≈ 20% of daily accessed data × object size. Check that it fits in RAM (tens to hundreds of GB is fine across a cluster).
-- **Likely follow-up:** "What hit rate do you need?" → if the DB can take 5k QPS and the load is 50k, you need ≥ 90% hits.
-</details>
-
-> 📖 *The numbers looked manageable, until Leo asked, "And what if the server goes down?"*
+> 📖 *The numbers say one laptop can almost cope, until Maya asks herself what happens the second that laptop's power cable gets kicked out of the wall.*
 
 ---
 
