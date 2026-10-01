@@ -8,53 +8,58 @@
 
 ## 📖 Story
 
-A worker crashed after sending an email but before marking it done, so the customer got it twice. Another worker marked a message done *before* crashing, so that customer got nothing. I'll show you the three promises a messaging system can make, and which one I'd trust with your customers.
+Two bug reports, one morning, and they look like mirror images.
+
+**Report one:** a customer received the cook's payout confirmation **twice**. The worker had sent the email, and then, a hair's breadth before telling the broker *"done"*, it was OOM-killed. The broker, never hearing "done", handed the message to another worker, who sent it again.
+
+**Report two:** a cook's **payout notification never arrived at all**. A different worker had been written to say *"done"* **first**, then do the work. It said "done", started sending, and crashed. The broker, satisfied, deleted the message. **Gone.**
+
+One worker acknowledged too late, the other too early. One duplicated, the other vanished.
+
+Maya realizes there's no third option hiding where messages arrive exactly once by magic.
+
+I'll show you the three promises a messaging system can make, and the one I'd trust with your customers' money.
 
 ## 🎯 One-sentence idea
 
-**Messaging systems can promise at-most-once (may lose messages, never duplicates), at-least-once (never loses, may duplicate), or "exactly-once" (which in practice means at-least-once delivery plus idempotent or transactional processing, so the effect happens once).**
+**Messaging systems can promise at-most-once (may lose, never duplicates), at-least-once (never loses, may duplicate), or "exactly-once", which in practice means at-least-once delivery plus idempotent or transactional processing so the *effect* happens once.**
 
 ## 🧸 Analogy
 
-Sending a **birthday card** by mail:
+A **birthday card** in the post:
 
-- 📭 **At-most-once:** you post it **once** and never check. It might get lost, and you'll never know. But the friend will never get two.
-- 📬📬 **At-least-once:** you keep sending it **until your friend confirms**. If their "thanks!" text gets lost, you send **another**. They'll definitely get it, maybe twice.
-- ✅ **Exactly-once (effectively):** you keep sending until confirmed, **and** your friend **ignores duplicates** because the cards are numbered ("I already have card #17").
+- 📭 **At-most-once:** post it **once** and never check. It might get lost, but never arrives twice.
+- 📬📬 **At-least-once:** keep posting it **until your friend confirms**. If their "thanks!" text is lost, you post another, so they might get two.
+- ✅ **Effectively-once:** keep posting until confirmed, and your friend **ignores duplicates** because the cards are numbered ("I already have card #17").
 
 ## 🖼️ Visual
+
+*Diagram brief:* three lanes, each with a timeline showing exactly *where* the ack sits relative to the work and *where* the crash happens, with the outcome stamped at the end: LOST, DUPLICATE, or ONCE.
 
 ```mermaid
 flowchart TD
     subgraph AMO["📭 At-most-once"]
-        A1["Ack/commit BEFORE processing"] --> A2["Crash during processing → message lost"]
+        A1["Ack BEFORE processing"] --> A2["💥 crash mid-work → message LOST"]
     end
     subgraph ALO["📬 At-least-once"]
-        B1["Process, THEN ack/commit"] --> B2["Crash after processing, before ack → redelivered → duplicate"]
+        B1["Process, THEN ack"] --> B2["💥 crash before ack → redelivered → DUPLICATE"]
     end
     subgraph EO["✅ Effectively-once"]
-        C1["At-least-once delivery"] --> C2["+ idempotent consumer / dedup by ID<br/>or transactional read-process-write"]
+        C1["At-least-once delivery"] --> C2["+ dedup by message ID in the SAME transaction<br/>as the state change → effect happens ONCE"]
     end
 ```
 
 ## 🔬 How it works
 
-- **The key question: when do you acknowledge (or commit the offset)?**
-  - **Before** processing → **at-most-once** (a crash loses the message).
-  - **After** processing → **at-least-once** (a crash before the ack → redelivery → a duplicate).
-- **Why true exactly-once *delivery* is impossible in general:** the sender can't distinguish "the message was lost" from "the ack was lost" (the Two Generals problem). So it must either risk loss or risk duplicates.
-- **How systems get "exactly-once" effects:**
-  - **Idempotent consumers:** dedupe by message ID, unique constraints, conditional updates (lesson 055).
-  - **Transactional processing:** store the result **and** the consumed offset/message ID in the **same transaction** (e.g., in your DB).
-  - **Kafka exactly-once semantics (EOS):** an idempotent producer + transactions that atomically write the output messages and commit the input offsets, *within Kafka*. External side effects (emails, payments) still need idempotency.
-- **Producer side:** retries after a timeout can create duplicates too, so use an **idempotent producer** (sequence numbers), or include an event ID that consumers dedupe on.
-- **Which to choose:**
-  - **At-most-once:** metrics, logs, telemetry, real-time location pings (the next update replaces it).
-  - **At-least-once + idempotency:** almost everything important (orders, payments, emails, inventory). **This is the default answer.**
+- **Everything hinges on *when* you ack** (or commit the offset). Ack **before** processing → **at-most-once**. Ack **after** → **at-least-once**.
+- **Exactly-once *delivery* is impossible in general.** The sender can't tell "the message was lost" from "the ack was lost" (the **Two Generals problem**), so it must choose between risking loss and risking duplicates.
+- **Exactly-once *effect* is achievable:** **idempotent consumers** (dedupe by message ID, unique constraints, conditional updates, lesson 055), or **transactional processing** that stores the result **and** the consumed message ID/offset **in one transaction**.
+- **Kafka EOS** combines an idempotent producer (sequence numbers) with transactions that atomically write outputs and commit input offsets, **within Kafka**. External side effects (emails, payments, other DBs) still need their own idempotency.
+- **Pick per data:** **at-most-once** for metrics, telemetry, and location pings (the next one replaces it). **At-least-once + idempotency** for everything that matters. **That's the default answer.**
 
 ## 🧩 Worked example
 
-**At-least-once consumer with transactional dedup (Postgres):**
+**Wallet credits, effectively-once (Postgres inbox):**
 
 ```python
 def handle(msg):
@@ -63,30 +68,20 @@ def handle(msg):
             "INSERT INTO processed_messages(id) VALUES (%s) ON CONFLICT DO NOTHING",
             msg.id).rowcount
         if inserted == 0:
-            return                      # duplicate → already applied, skip
-        db.execute("UPDATE accounts SET balance = balance + %s WHERE id = %s",
-                   msg.amount, msg.account_id)
-    consumer.commit(msg)                # ack after the DB commit → at-least-once, effect once ✅
+            return                           # duplicate → already applied
+        db.execute("INSERT INTO ledger(account_id, amount, ref) VALUES (%s,%s,%s)",
+                   msg.cook_id, msg.amount, msg.id)
+    consumer.commit(msg)                     # ack AFTER the DB commit
 ```
 
-**The failure timeline this protects against:**
-
 ```
-1. Consumer processes message #88 (balance +$50) and commits the DB transaction
-2. 💥 crashes before acking the broker
+1. Worker applies message #88 (+£50) and commits the DB transaction
+2. 💥 crash before the broker ack
 3. Broker redelivers #88
-4. INSERT processed_messages(88) → conflict → skip → balance stays correct ✅
+4. INSERT processed_messages(88) → conflict → skip → balance still correct ✅
 ```
 
-**Kafka read-process-write with EOS (conceptual):**
-
-```
-begin transaction
-  read from input topic
-  write results to output topic
-  send input offsets to the transaction
-commit transaction   → outputs + offsets become visible atomically
-```
+**Kafka read-process-write (EOS):** `begin txn → consume → produce outputs → sendOffsetsToTransaction → commit`. Outputs and offsets become visible **atomically**.
 
 ## ⚖️ Trade-offs
 
@@ -94,72 +89,70 @@ commit transaction   → outputs + offsets become visible atomically
 |---|---|---|---|---|
 | At-most-once | ⚠️ Possible | ❌ Never | Cheapest | Metrics, telemetry, presence |
 | At-least-once | ❌ Never | ⚠️ Possible | Retries | Default for business events |
-| Effectively-once | ❌ | ❌ (effect) | Idempotency storage / transactions | Money, orders, inventory |
+| Effectively-once | ❌ | ❌ (in effect) | Dedup storage, transactions | Money, orders, inventory |
 
 ## 🌍 Real world
 
-- **SQS standard, RabbitMQ, Kafka (default)** → at-least-once.
-- **Kafka EOS** (since 0.11), used by Kafka Streams, Flink sinks, and others.
-- **Stripe, payment networks** → idempotency keys make retries safe end to end.
-- **UDP metrics (StatsD)** → at-most-once by design.
+- **SQS standard, RabbitMQ, and Kafka (by default)** are at-least-once.
+- **Kafka EOS** (since 0.11) underpins Kafka Streams and Flink's exactly-once sinks.
+- **Stripe** makes payment retries safe end to end with idempotency keys.
+- **StatsD over UDP** is at-most-once by design.
 
 ## 📌 Cheat card
 
 > - **"Most may lose, least may duplicate, exactly is a myth (without idempotency)."**
-> - **Ack before processing → at-most-once. Ack after → at-least-once.**
+> - **Ack before → at-most-once. Ack after → at-least-once.**
 > - **Default: at-least-once + idempotent consumers = effectively-once.**
-> - Dedupe with **message IDs + unique constraints**, in the **same transaction** as the effect.
-> - External side effects (email, payment) need their **own idempotency keys**.
+> - Dedupe in the **same transaction** as the effect.
+> - External effects need their **own idempotency keys**.
 
 ## 🧪 Feynman check
 
-Explain the birthday-card analogy, and why "exactly-once delivery" is impossible while "exactly-once effect" is achievable.
+Explain the numbered birthday cards, and why "exactly-once delivery" is impossible while "exactly-once *effect*" is perfectly achievable.
 
-⚠️ **Common confusion:** "Kafka has exactly-once, so my whole pipeline is exactly-once." Kafka EOS covers Kafka-to-Kafka processing. Writes to external databases, emails, and API calls need idempotency or transactional outbox/inbox patterns.
+⚠️ **Common confusion:** "Kafka has exactly-once, so my whole pipeline is exactly-once." Kafka EOS covers **Kafka → Kafka** processing. The moment your consumer writes to Postgres, sends an email, or calls Stripe, you're outside its guarantee, and you need idempotency or the outbox/inbox patterns.
 
 ## ⚡ Quick recall
 
-1. If a consumer commits its offset before processing and then crashes, what happens?
-<details><summary>Answer</summary>
+1. A consumer commits its offset before processing and then crashes. What happens?
+<details><summary>Reveal Answer</summary>
 
 The message is lost (at-most-once).
 </details>
 
 2. Why can't a network guarantee exactly-once delivery?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 The sender can't tell whether the message or the acknowledgement was lost, so it must either resend (risking duplicates) or not (risking loss).
 </details>
 
-3. What's the standard recipe for "exactly-once" business effects?
-<details><summary>Answer</summary>
+3. What's the standard recipe for exactly-once business effects?
+<details><summary>Reveal Answer</summary>
 
-At-least-once delivery + idempotent processing (dedupe by message ID, ideally in the same transaction as the state change).
+At-least-once delivery + idempotent processing, deduplicating by message ID in the same transaction as the state change.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Design a system that credits user wallets from payment events delivered by Kafka. Credits must never be doubled or lost."**
+**Q. "Credit wallets from payment events delivered by Kafka so credits are never doubled or lost. Also: what semantics would you use for live courier location pings?"**
 <details><summary>Model answer</summary>
 
-- **At-least-once** consumption (commit offsets after the DB commit).
-- In one DB transaction: insert the `payment_event_id` into a **unique** `processed_events` table, **and** insert a ledger entry and update the balance. Duplicates hit the unique constraint and are skipped.
-- **Ledger** entries are append-only, with unique references, and balances are derived or verified.
-- Producer: idempotent (event IDs are stable across retries).
-- Reconciliation job compares against the payment provider's records.
-- **Likely follow-up:** "What if the DB is down?" → stop consuming (don't commit offsets), and the backlog waits in Kafka (retention covers the outage).
+- **Wallet credits:**
+  - **At-least-once** consumption: commit offsets **after** the DB transaction commits.
+  - **One DB transaction:** insert `payment_event_id` into a **unique** `processed_events` table, append a **ledger entry** (unique `ref`), and update or derive the balance. Duplicates hit the unique constraint and are skipped.
+  - **Producer:** idempotent producer, with **stable event IDs** across retries.
+  - **DB outage:** stop consuming (don't commit). The backlog waits safely in Kafka within retention.
+  - **Safety net:** nightly **reconciliation** against the payment provider's settlement data.
+- **Courier pings:**
+  - **At-most-once / best-effort** (UDP, MQTT QoS 0, or WebSocket without acks). A newer ping arrives within seconds, so retrying a stale position is wasted work.
+  - Store as **overwrite-latest** in Redis (idempotent: the newest timestamp wins), and **ignore out-of-order** pings by sequence number or timestamp.
+  - **But** trip start/end events drive **billing**, so they're at-least-once + idempotent.
+- **Likely follow-up:** "Where exactly do you put the dedup check, before or after the side effect?" → **in the same transaction** as the side effect when it's a DB write. For external calls, pass an idempotency key to the provider and record the outcome.
 </details>
 
-**Q2. "For a live location-tracking feature, which delivery semantics would you use?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- **At-most-once** (or best-effort) for location pings: a newer update arrives within seconds, so retrying stale positions is pointless.
-- Use UDP or MQTT QoS 0, or just overwrite the latest position in Redis (idempotent, and the latest one wins).
-- But **trip start/end events** (billing) must be at-least-once + idempotent.
-- **Likely follow-up:** "How do you handle out-of-order pings?" → include timestamps or sequence numbers, and ignore older ones.
-</details>
-
-> 📖 *Next, New Year's Eve arrives, and orders pour in faster than the kitchens can handle.*
+> 📖 *Messages are honest now, and then New Year's Eve arrives, orders pour in three times faster than kitchens can cook, and the queue starts growing without end.*
 
 ---
 

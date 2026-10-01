@@ -8,152 +8,157 @@
 
 ## 📖 Story
 
-At 7 pm, 50,000 orders arrived in ten minutes. Each checkout waited for the confirmation email, the kitchen printer, the loyalty points, and the analytics, so the slowest one set the pace for everyone. I asked Maya the question I'll ask you now: does the customer really need to wait for all of that?
+7:00 p.m. The dinner rush hits like a wave breaking over a seawall: **50,000 orders in ten minutes.**
+
+And every single checkout is a **relay race with five runners**, each one waiting for the previous:
+
+1. Save the order (20 ms).
+2. Send the confirmation email (**1.8 s**, the email provider is struggling tonight).
+3. Print the ticket in the cook's kitchen (400 ms).
+4. Award loyalty points (150 ms).
+5. Record analytics (90 ms).
+
+The customer stares at a spinner for **2.5 seconds**. Then the email provider stalls completely, and **checkout dies with it**. Orders fail because a *thank-you email* couldn't be sent.
+
+It's like a restaurant where the waiter refuses to take your order until the dishwasher, the accountant, and the marketing team have all signed off.
+
+I asked Maya the question I'll ask you now: **does the customer really need to wait for all of that?**
 
 ## 🎯 One-sentence idea
 
-**Synchronous calls make the caller wait for the answer (simple, immediate, but it couples both sides' speed and uptime). Asynchronous messaging lets the caller hand off work and move on (resilient and spike-absorbing, but eventually consistent and harder to trace).**
+**Synchronous calls make the caller wait for the answer (simple and immediate, but they couple both sides' speed and uptime), while asynchronous messaging lets the caller hand off work and move on (resilient and spike-absorbing, but eventually consistent and harder to trace).**
 
 ## 🧸 Analogy
 
-- 📞 **Sync = a phone call.** You wait on the line until the other person answers and replies. If they're busy or away, **you're stuck**.
-- 📨 **Async = leaving a voicemail or email.** You say what you need and go on with your day. They handle it when they can, and they may notify you later. If they're on holiday, the message **waits safely**.
+- 📞 **Sync = a phone call.** You wait on the line. If they're busy, **you're stuck**.
+- 📨 **Async = voicemail.** You leave the message and get on with your day. It **waits safely** until they're back.
 
-Ordering at a restaurant is async: the waiter **puts a ticket on the rail** and goes to serve other tables, and doesn't stand in the kitchen waiting for your pasta.
+A restaurant waiter **clips a ticket on the rail** and goes back to the tables. They don't stand in the kitchen watching your pasta boil.
 
 ## 🖼️ Visual
 
+*Diagram brief:* two timelines. In the sync timeline, the user's bar stretches across every downstream call. In the async timeline, the user's bar ends after the order is saved, and the rest happens later through a queue.
+
 ```mermaid
 sequenceDiagram
-    participant U as User
+    participant U as Customer
     participant O as Order service
     participant E as Email service
     participant Q as Queue
-    Note over U,E: ⏳ Synchronous: the user waits for everything
+    Note over U,E: ⏳ Synchronous: the customer waits for everything
     U->>O: Place order
-    O->>E: Send confirmation email (slow, 2 s)
+    O->>E: Send email (1.8 s)
     E-->>O: done
-    O-->>U: ✅ Order placed (after 2+ s)
-    Note over U,Q: ⚡ Asynchronous: the user waits only for what matters
+    O-->>U: ✅ Placed (after 2.5 s)
+    Note over U,Q: ⚡ Asynchronous: the customer waits only for what matters
     U->>O: Place order
-    O->>Q: enqueue "send email"
-    O-->>U: ✅ Order placed (50 ms)
+    O->>Q: publish OrderPlaced
+    O-->>U: ✅ Placed (≈ 120 ms)
     Q->>E: deliver when ready
 ```
 
 ## 🔬 How it works
 
-- **Synchronous (request/response):** HTTP/REST, gRPC. The caller **blocks** until it gets a response or a timeout.
-  - ✅ Simple mental model, immediate results, easy error handling.
-  - ❌ **Temporal coupling:** both sides must be up at the same time. Latency **adds up** along call chains, and failures **cascade**.
-- **Asynchronous (messaging):** queues, pub/sub, event streams. The caller **sends a message and returns**.
-  - ✅ **Decoupling** (the producer doesn't care who processes it or when), **spike absorption** (the queue buffers bursts), **retries** built in, and independent scaling of consumers.
-  - ❌ **Eventual consistency** (the result isn't instant), harder debugging (tracing across queues), message ordering and duplicates, and the queue is one more system to run.
-- **What goes async?** Work the user **doesn't need to wait for**: emails and notifications, thumbnails and video transcoding, analytics events, search indexing, fraud checks (sometimes), report generation, and syncing to other services.
-- **What stays sync?** Things the user needs **right now** to continue: login, reading a page, validating a payment authorization, and checking stock at checkout.
-- **Async request–reply:** for long jobs, return **202 Accepted + a job ID**, and let the client poll `/jobs/{id}` or receive a webhook or push when it's done.
+- **Synchronous (HTTP, gRPC):** the caller blocks until a response or a timeout. It's simple and immediate, but brings **temporal coupling** (both sides must be up *now*): latencies **add**, availabilities **multiply**, and failures **cascade**.
+- **Asynchronous (queues, pub/sub, streams):** the caller publishes a message and returns. You get **decoupling**, **load levelling** (the queue absorbs bursts), built-in **retries**, and independent consumer scaling. You pay with **eventual consistency**, duplicates and ordering issues, and tracing that needs correlation IDs.
+- **Keep sync only for what the user needs to continue:** login, rendering a page, payment *authorization*, and the stock check at checkout.
+- **Move everything else async:** emails, notifications, kitchen tickets, loyalty, analytics, search indexing, thumbnails, reports, and syncing to other services.
+- **Long jobs use async request–reply:** **202 Accepted + job ID**, then the client polls `/jobs/{id}` or gets a webhook or push when it's done.
 
 ## 🧩 Worked example
 
-**Checkout flow, split sync/async:**
-
 ```
-SYNC (user waits, ~300 ms):
-  validate cart → reserve inventory → authorize payment → create order → respond "Order #123 confirmed"
+SYNC (customer waits, ~120–300 ms):
+  validate cart → reserve stock → authorize payment → insert order → "Order #123 confirmed"
 
-ASYNC (via events, seconds to minutes later):
-  OrderPlaced event →
-     • email service: send confirmation
-     • warehouse service: create pick list
-     • analytics: record sale
-     • recommendation service: update "bought together"
-     • loyalty service: award points
+ASYNC (OrderPlaced event, seconds later):
+  • email service        → confirmation email
+  • kitchen service      → print ticket
+  • loyalty service      → award points
+  • analytics            → record sale
+  • recommendations      → update "bought together"
 ```
-
-**Long-running job API:**
 
 ```http
-POST /v1/reports            → 202 Accepted  {"job_id": "r_789", "status": "queued"}
-GET  /v1/reports/r_789      → 200 {"status": "running", "progress": 40}
-GET  /v1/reports/r_789      → 200 {"status": "done", "url": "https://.../report.pdf"}
+POST /v1/reports          → 202 Accepted {"job_id":"r_789","status":"queued"}
+GET  /v1/reports/r_789    → 200 {"status":"running","progress":40}
+GET  /v1/reports/r_789    → 200 {"status":"done","url":"https://…/report.pdf"}
 ```
 
-**Latency and availability math:** order → email service (99.5% up, p99 2 s) **synchronously** means checkout availability ≤ 99.5% and p99 ≥ 2 s. Made async, checkout is unaffected by the email service's health.
+**The math:** with the email service (99.5% up, p99 2 s) on the sync path, checkout availability is **≤ 99.5%** and p99 is **≥ 2 s**. Off the path, checkout runs at **~120 ms p99**, and the email provider's bad night costs **zero orders**. The emails simply arrive a few minutes late.
 
 ## ⚖️ Trade-offs
 
 | | Sync | Async |
 |---|---|---|
-| User gets the result | Immediately | Later (or a job ID) |
+| User gets the result | Immediately | Later, or a job ID |
 | Coupling | Tight (both up, both fast) | Loose |
-| Traffic spikes | Hit every service directly | Absorbed by the queue |
-| Failure handling | Caller must handle it now | Retries, dead-letter queues |
+| Traffic spikes | Hit every service | Absorbed by the queue |
+| Failure handling | The caller must cope now | Retries, DLQs |
 | Consistency | Immediate | Eventual |
-| Debugging | Easier (one call stack) | Harder (needs tracing and correlation IDs) |
+| Debugging | One call stack | Needs tracing and correlation IDs |
 
 ## 🌍 Real world
 
-- **Amazon** checkout confirms the order quickly, and emails, shipping, and recommendations happen asynchronously.
-- **Uber, Netflix, LinkedIn** move huge event volumes through Kafka to decouple hundreds of services.
-- **Webhooks** (Stripe, GitHub) are async callbacks to your system.
+- **Amazon** confirms orders fast, and emails, fulfilment, and recommendations happen asynchronously.
+- **Uber, Netflix, and LinkedIn** decouple hundreds of services through Kafka.
+- **Webhooks** (Stripe, GitHub) are async callbacks into *your* system.
 
 ## 📌 Cheat card
 
 > - **Sync = phone call. Async = voicemail / a ticket on the rail.**
-> - **Keep sync only what the user must wait for.** Everything else goes async.
-> - Async gives you **decoupling, spike absorption, and retries**, and costs you **eventual consistency and tracing**.
+> - **Sync only what the user must wait for.** Everything else goes async.
+> - Async gives you **decoupling + load levelling + retries**, and costs you **eventual consistency + tracing**.
 > - Long jobs → **202 + job ID + poll/webhook**.
-> - **Sync chains multiply failure and add latency.** Keep them short.
+> - **Sync chains multiply failure.** Keep them short.
 
 ## 🧪 Feynman check
 
-Explain the phone call vs voicemail analogy, and decide for a food-delivery app: which steps must be sync, and which can be async?
+Explain phone call vs voicemail, then sort every step of a food-delivery checkout into "must be sync" and "can be async."
 
-⚠️ **Common confusion:** "Async makes things faster." Async makes the **caller** faster and more resilient. The total work still happens, and the *end-to-end* completion may even take longer. It moves waiting off the critical path.
+⚠️ **Common confusion:** "Async makes things faster." Async makes the **caller** faster and more resilient. The total work is the same, and end-to-end completion may even take *longer*. It moves waiting **off the critical path**.
 
 ## ⚡ Quick recall
 
 1. Name two benefits of async messaging.
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Decoupling (independent availability and scaling), spike absorption (buffering), built-in retries, faster user responses (any two).
+Any two of: decoupling, spike absorption, built-in retries, faster user responses.
 </details>
 
-2. What's a good API pattern for a job taking 5 minutes?
-<details><summary>Answer</summary>
+2. What's a good API pattern for a job that takes 5 minutes?
+<details><summary>Reveal Answer</summary>
 
-Return 202 Accepted with a job ID, then let the client poll a status endpoint or receive a webhook or push notification.
+Return 202 Accepted with a job ID, then let the client poll a status endpoint or receive a webhook or push.
 </details>
 
 3. Why do long synchronous call chains hurt availability?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Every service in the chain must be up, so availabilities multiply, and one slow service stalls all the callers.
+Every service must be up, so availabilities multiply, and one slow service stalls every caller upstream.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Our signup endpoint takes 3 seconds because it sends a welcome email, creates a CRM record, and provisions a sample project. Improve it."**
+**Q. "Signup takes 3 seconds because it sends a welcome email, creates a CRM record, and provisions a sample project. Fix it. And when would you NOT use async?"**
 <details><summary>Model answer</summary>
 
-- Keep sync only: validate, create the user row, and return a session (~100 ms).
-- Publish a `UserSignedUp` event (via the **outbox**, lesson 062) → independent consumers: email, CRM sync, sample-project provisioning.
-- Make the consumers **idempotent** and retryable, with dead-letter queues for poison messages.
-- The UI can show "setting up your workspace…" and update when provisioning completes (poll or push).
-- **Likely follow-up:** "What if the email service is down for an hour?" → messages wait in the queue and are delivered when it recovers. Signup is unaffected.
+- **Shrink the sync path:** validate → create the user row → issue a session → respond (**~100 ms**).
+- **Publish `UserSignedUp`** reliably via the **transactional outbox** (lesson 062), so the event can't be lost if the process dies after the commit.
+- **Independent consumers:** email, CRM sync, and sample-project provisioning, each **idempotent**, retried with backoff, with a **DLQ** for poison messages.
+- **UX:** "Setting up your workspace…" with a poll or push update when provisioning finishes.
+- **If the email service is down for an hour:** messages wait in the queue and drain on recovery. Signups are unaffected.
+- **When *not* to go async:**
+  - The caller **needs the result to proceed** (auth checks, data for rendering, price quotes).
+  - **Immediate strong consistency** is required (claiming the last seat must be answered now).
+  - Small systems where a broker's ops cost outweighs the benefit.
+  - Ultra-low-latency request/response, where queue hops add overhead.
+- **Mixing is normal:** a sync API that enqueues and returns 202, or a sync critical path with async side effects.
 </details>
 
-**Q2. "When would you NOT use async messaging?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- When the caller **needs the result to proceed** (authorization checks, reads for rendering, price calculation).
-- When **strong consistency** is needed immediately (e.g., reserving the last seat must be answered now).
-- In small systems, where a queue's operational cost outweighs its benefits.
-- For low-latency request/response, where queue hops add overhead.
-- **Likely follow-up:** "Can you mix them?" → yes: a sync API that internally enqueues work and returns 202, or sync for the critical path with async for side effects.
-</details>
-
-> 📖 *Next, Maya needs somewhere safe to put all that "later" work.*
+> 📖 *The "later" work is off the critical path, but now it needs somewhere safe to wait, because if the email service is down those messages can't just evaporate.*
 
 ---
 
