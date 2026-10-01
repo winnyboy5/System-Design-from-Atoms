@@ -8,140 +8,147 @@
 
 ## 📖 Story
 
-Cooking-video uploads are huge and slow, while menu clicks are tiny and quick. Simply taking turns had sent three giant uploads to one poor server while the others relaxed. When Maya showed me the graphs, I recognized them instantly. *How* the doorman picks a server matters as much as having a doorman at all.
+Maya pulls up the per-server CPU graphs and squints. Something is badly wrong.
+
+**Server 1: 98%**, a solid red wall. **Server 2: 11%.** **Server 3: 9%.**
+
+Pantry now lets cooks upload recipe videos. Each upload is a **10-second, 200 MB monster**. Menu clicks are **5-millisecond** sparrows. The load balancer is using **round robin**, politely taking turns, and by sheer bad luck three monsters in a row landed on Server 1. It's choking on video while its neighbours sit around doing nothing.
+
+It's like a supermarket where one cashier has three overflowing trolleys queued up and the next two lanes are empty, all because the store manager insists everyone take turns.
+
+When Maya showed me those graphs, I recognized them instantly. *How* the doorman picks a server matters as much as having one.
 
 ## 🎯 One-sentence idea
 
-**The algorithm decides which server gets the next request: take turns (round robin), pick the least busy (least connections), or always send the same key to the same server (hashing). Each fits a different kind of traffic.**
+**The algorithm decides who gets the next request: take turns (round robin), pick the least busy (least connections), sample two and take the better one (power of two choices), or send the same key to the same server (hashing), and each fits a different shape of traffic.**
 
 ## 🧸 Analogy
 
 Supermarket checkouts:
 
-- 🔁 **Round robin:** "Next customer to lane 1, next to lane 2, next to lane 3…" Fair if every cart is the same size.
-- 🧮 **Least connections:** "Go to the lane with the **shortest line**." Better when carts vary a lot.
-- 🏋️ **Weighted:** the express lane with the fast cashier gets 2× the customers.
-- #️⃣ **Hashing:** "Everyone with surname A–F uses lane 1," so regulars always see the same cashier, who remembers them (cache locality).
-- 🎲 **Power of two choices:** pick **2 random lanes** and join the shorter one. Nearly as good as checking every lane, and much cheaper.
+- 🔁 **Round robin:** lane 1, lane 2, lane 3, repeat. Fair only if every trolley is the same size.
+- 🧮 **Least connections:** join the **shortest line**.
+- 🏋️ **Weighted:** the fast cashier gets 2× the customers.
+- #️⃣ **Hashing:** surnames A–F always use lane 1, so the cashier remembers you (cache locality).
+- 🎲 **Power of two choices:** glance at **two random lanes** and pick the shorter one.
 
 ## 🖼️ Visual
 
+*Diagram brief:* a decision tree that starts from "what does your traffic look like?" and ends at the right algorithm.
+
 ```mermaid
 flowchart TD
-    Q{"What does your traffic look like?"} -->|"Similar requests,<br/>similar servers"| RR["🔁 Round robin"]
-    Q -->|"Servers differ in size"| W["🏋️ Weighted round robin"]
-    Q -->|"Requests vary a lot<br/>(some long, some short)"| LC["🧮 Least connections /<br/>least response time"]
-    Q -->|"Same user/key should hit<br/>the same server (cache, session)"| H["#️⃣ Hash / consistent hash"]
-    Q -->|"Huge fleets, many LBs"| P2["🎲 Power of two choices"]
+    Q{"What does your traffic look like?"} -->|"Uniform requests,<br/>uniform servers"| RR["🔁 Round robin"]
+    Q -->|"Servers differ in size<br/>or canary %"| W["🏋️ Weighted round robin"]
+    Q -->|"Request cost varies a lot"| LC["🧮 Least connections /<br/>least response time"]
+    Q -->|"Same key should hit<br/>the same server"| H["#️⃣ Consistent hash"]
+    Q -->|"Huge fleet, many LBs"| P2["🎲 Power of two choices"]
 ```
 
 ## 🔬 How it works
 
-- **Round robin:** cycle through servers in order. Stateless and simple. ❌ Ignores how busy each server actually is.
-- **Weighted round robin:** servers get traffic in proportion to their weight (a big box gets 3, a small one gets 1). Handy during migrations and canaries ("send 5% to v2").
-- **Least connections:** send to the server with the fewest active connections. ✅ Great for **long or uneven requests** (uploads, WebSockets).
-- **Least response time:** factor in latency too. It adapts to slow servers.
-- **Random:** surprisingly decent at scale, and needs no shared state.
-- **Power of two choices:** pick 2 random servers and choose the less loaded one. It gives **dramatically better balance than pure random** with almost no coordination, and it's used by Envoy and many others.
-- **IP hash / key hash:** `hash(client_ip or user_id) % N` → the same server each time. ✅ **Cache locality and stickiness**. ❌ Adding or removing a server reshuffles almost every key, so use **consistent hashing** (lesson 051) to move only about 1/N of the keys.
+- **Round robin / weighted round robin:** stateless cycling, blind to actual load. Weights handle mixed instance sizes and **canaries** ("5% to v2").
+- **Least connections / least response time:** route to the backend with the fewest in-flight requests (or the lowest latency). Ideal for **long or uneven work** like uploads and WebSockets, but it needs fresh per-backend state.
+- **Power of two choices (P2C):** sample 2 random backends and pick the less loaded one. The maximum load drops from **Θ(log n / log log n)** for pure random to **Θ(log log n)**, with no global coordination. That's why Envoy's "least request" uses it.
+- **Hash-based:** `hash(user_id)` → the same backend every time, for **cache locality and stickiness**. Plain `% N` remaps **~all** keys when N changes. **Consistent hashing** (lesson 051) moves only **~1/N**.
+- **Outlier detection** complements any algorithm: temporarily **eject** backends whose error rate or latency is far worse than their peers.
 
 ## 🧩 Worked example
 
-**3 servers, 6 requests: round robin vs least connections.**
-
-Request durations: `R1=10s, R2=1s, R3=1s, R4=10s, R5=1s, R6=1s`
+**Six requests, three servers.** Durations: `R1=10s, R2=1s, R3=1s, R4=10s, R5=1s, R6=1s`
 
 ```
-Round robin:         S1: R1(10s), R4(10s)   ← overloaded 😩
+Round robin:         S1: R1(10s), R4(10s)   ← 20 s of work, drowning 😩
                      S2: R2(1s),  R5(1s)
                      S3: R3(1s),  R6(1s)
 
-Least connections:   S1: R1(10s)            ← still busy with R1, so skipped
+Least connections:   S1: R1(10s)            ← busy, so skipped
                      S2: R2, R4(10s)
-                     S3: R3, R5, R6         ← spread by actual load 😌
+                     S3: R3, R5, R6         ← spread by real load 😌
 ```
 
-**Why plain modulo hashing hurts when scaling:**
+**Why modulo hashing bites when Maya adds a 4th cache node:**
 
 ```
-hash(key) % 3 → key "alice" = 7 % 3 = server 1
-Add a 4th server:
-hash(key) % 4 → key "alice" = 7 % 4 = server 3   ← moved!
-~75% of all keys move → cache miss storm
-Consistent hashing → only ~25% move
+hash("dish:42") = 7 → 7 % 3 = node 1
+                      7 % 4 = node 3   ← moved!
+With % N, ~75% of keys move → cache-miss storm on the DB.
+With consistent hashing, ~25% move.
 ```
 
 ## ⚖️ Trade-offs
 
-| Algorithm | Gain | Cost | Best for |
+| Algorithm | What Maya gains | What she pays | Best for |
 |---|---|---|---|
 | Round robin | Simplest, stateless | Blind to load | Uniform short requests |
-| Weighted RR | Handles mixed server sizes, canaries | Manual weights | Heterogeneous fleets, gradual rollouts |
-| Least connections | Adapts to uneven work | Must track connections | Long-lived or variable requests |
-| Least response time | Avoids slow servers | Needs latency tracking, can oscillate | Latency-sensitive services |
-| Power of two choices | Near-optimal, scalable | Slight randomness | Big fleets, distributed LBs |
-| Hash / consistent hash | Cache locality, stickiness | Hot keys → uneven load | Caches, sharded services, sessions |
+| Weighted RR | Mixed sizes, canaries | Manual weights | Heterogeneous fleets, rollouts |
+| Least connections | Adapts to uneven work | Needs connection tracking | Uploads, WebSockets |
+| Least response time | Avoids slow servers | Can oscillate | Latency-sensitive APIs |
+| Power of two choices | Near-optimal, no coordination | Slight randomness | Big fleets, many LBs |
+| Consistent hash | Cache locality | Hot keys → skew | Caches, sharded services |
 
 ## 🌍 Real world
 
-- **Nginx** defaults to round robin, and offers `least_conn`, `ip_hash`, and `hash ... consistent`.
-- **Envoy** offers round robin, least request (power of two choices), ring hash, and Maglev.
-- **Google's Maglev** is a consistent-hashing L4 load balancer used at Google's edge.
+- **Nginx** defaults to round robin, and offers `least_conn`, `ip_hash`, and `hash … consistent`.
+- **Envoy** offers round robin, least request (P2C), ring hash, and **Maglev**.
+- **Google's Maglev** is a consistent-hashing L4 balancer at Google's edge.
 
 ## 📌 Cheat card
 
-> - **Same-size work → round robin. Uneven work → least connections. Need affinity → consistent hash.**
-> - **Power of two choices** = pick 2 at random, take the better one. Cheap and excellent.
-> - **Weights** for different server sizes and canary percentages.
-> - **Modulo hashing reshuffles everything** when N changes → use **consistent hashing**.
+> - **Uniform → round robin. Uneven → least connections. Affinity → consistent hash.**
+> - **P2C:** pick 2 at random and take the better one. Cheap and excellent.
+> - **Weights** for different sizes and canary percentages.
+> - **`% N` reshuffles everything** → use consistent hashing.
+> - Add **outlier ejection** on top of any algorithm.
 
 ## 🧪 Feynman check
 
-Explain the supermarket lanes to a friend, and why "shortest line" beats "take turns" when some shoppers have 100 items and others have 1.
+Explain to a friend why "shortest line" beats "take turns" when some shoppers have 100 items and others have 1.
 
-⚠️ **Common confusion:** "Least connections is always best." It needs up-to-date state. With **many independent LBs** each seeing only part of the traffic, their views differ, so power-of-two-choices or random often works better in practice.
+⚠️ **Common confusion:** "Least connections is always best." With **many independent LBs**, each sees only its own slice of the connections, so their "least loaded" views disagree and they all **herd onto the same backend** at once. P2C's randomness breaks that herd.
 
 ## ⚡ Quick recall
 
-1. Which algorithm suits WebSocket connections that last hours?
-<details><summary>Answer</summary>
+1. Which algorithm suits WebSocket connections that last for hours?
+<details><summary>Reveal Answer</summary>
 
-Least connections (connections are long and uneven, and round robin would pile them up unevenly).
+Least connections. The connections are long and uneven, and round robin would pile them up unevenly.
 </details>
 
-2. What problem does consistent hashing solve compared with `hash % N`?
-<details><summary>Answer</summary>
+2. What does consistent hashing fix compared with `hash % N`?
+<details><summary>Reveal Answer</summary>
 
-When servers are added or removed, only about 1/N of keys move instead of nearly all of them.
+When servers are added or removed, only ~1/N of keys move instead of nearly all of them.
 </details>
 
 3. How would you send 5% of traffic to a new version?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Weighted routing: weight 5 for v2 and 95 for v1 (a canary release).
+Weighted routing: v2 weight 5, v1 weight 95 (a canary release).
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "You have a fleet of cache servers. How should requests be distributed to them?"**
+**Q. "You run 40 Redis cache nodes plus 200 API servers on mixed hardware, and some old boxes keep timing out. How do you balance traffic to each tier?"**
 <details><summary>Model answer</summary>
 
-- **Consistent hashing on the cache key**, so each key lives on one server (high hit rate), and adding or removing a server only remaps about 1/N of keys.
-- Use **virtual nodes** to even out the distribution. Handle **hot keys** with replication or a local L1 cache.
-- Round robin would scatter the same key everywhere and wreck the hit rate.
-- **Likely follow-up:** "What if one cache node dies?" → its keys map to the next node on the ring. Expect a temporary miss spike, so protect the DB (lesson 032).
+- **Cache tier: consistent hashing on the cache key.**
+  - Each key lives on exactly one node, so the hit rate stays high.
+  - Adding or removing a node remaps ~1/40 of keys, not all of them.
+  - Use **virtual nodes** (100–200 per node) for an even spread.
+  - Handle **hot keys** with local L1 caches or key splitting (lesson 032).
+  - When a node dies, its keys fall to ring neighbours → expect a miss spike, and protect the DB with single-flight.
+  - Round robin here would scatter each key everywhere and destroy the hit rate.
+- **API tier: least request with power of two choices**, so the work adapts to real load without coordination across many LB instances.
+  - **Weights** proportional to capacity on the older boxes, so they get less traffic.
+  - **Outlier detection:** eject any host whose 5xx rate or p99 is far above its peers (e.g. 5 consecutive errors → eject for 30 s, capped at 20% of the fleet).
+- **Long term:** standardize instance types, autoscale, and if the slowness comes from one noisy tenant, **isolate it with bulkheads** and rate limits (lesson 064).
+- **Likely follow-up:** "Why cap ejection at 20%?" → so a shared-dependency failure that makes *every* host look bad can't eject the whole fleet.
 </details>
 
-**Q2. "Some of our servers are much slower than others (older hardware). Requests time out there. What do you do?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- Short term: **weighted** balancing (less traffic to old boxes) or **least response time / least request**.
-- Add **outlier detection**: temporarily eject servers whose error rate or latency is far above their peers (Envoy supports this).
-- Long term: replace or rightsize the hardware, and autoscale on consistent instance types.
-- **Likely follow-up:** "What if the slowness is caused by one noisy tenant?" → isolate it with bulkheads or a separate pool, and rate-limit that tenant.
-</details>
-
-> 📖 *Next, Maya wants `/api` requests to go one way and `/images` requests another.*
+> 📖 *Traffic is balanced, but now Maya needs `/api` to go one way, `/videos` another, and chat a third, and her doorman can't read the requests.*
 
 ---
 

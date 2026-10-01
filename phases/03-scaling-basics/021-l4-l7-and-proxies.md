@@ -8,83 +8,84 @@
 
 ## 📖 Story
 
-Pantry now had an API, an image service, and a chat server, all behind pantry.com. Maya needed the front door to *read* each request and route it by its path. But some traffic, like the database's, doesn't even speak HTTP. I'll show you two kinds of doormen for two kinds of jobs, and how to tell which one you need.
+Pantry has grown three heads under one name. There's the **API**, the **video service**, and the **chat server**, all reachable only through `pantry.app`.
+
+Maya's load balancer sees every request as a sealed envelope addressed to port 443. It cannot tell a menu click from a 200 MB video upload from a chat socket. So it sprays them all at the same pool, and the API servers choke on video bytes they were never built to handle.
+
+She needs a doorman who can **open the envelope and read it**.
+
+But there's a twist. Her Postgres read replicas and a new IoT temperature sensor in the cooks' kitchens don't speak HTTP at all. For them, a doorman who reads letters is useless.
+
+Two kinds of doormen for two kinds of jobs. Let me show you how to tell which one you need.
 
 ## 🎯 One-sentence idea
 
-**An L4 load balancer routes by network address and port without reading the content (fast, dumb). An L7 load balancer reads the HTTP request and can route by URL, header, or cookie (smart, slower). A reverse proxy stands in front of servers, and a forward proxy stands in front of clients.**
+**An L4 load balancer routes by IP and port without reading content (fast, protocol-agnostic), an L7 load balancer reads the HTTP request and routes by path, header, or cookie (smart, heavier), and reverse proxies front servers while forward proxies front clients.**
 
 ## 🧸 Analogy
 
 A **mailroom**:
 
-- 📦 **L4 (transport layer):** the clerk looks only at the **address on the envelope** and forwards it. Very fast, never opens anything.
-- 📖 **L7 (application layer):** the clerk **opens the letter**, reads "this is an invoice" or "this is a job application", and routes it to accounting or HR. Slower, but much smarter.
-
-And:
-- 🛡️ **Reverse proxy** = the company's **receptionist**. Visitors talk to them, not to employees directly. *Protects and represents the servers.*
-- 🕵️ **Forward proxy** = **your assistant** who makes calls on your behalf. *Represents the clients* (e.g., a corporate web filter).
+- 📦 **L4:** the clerk reads only the **address on the envelope** and forwards it. Fast, and never opens anything.
+- 📖 **L7:** the clerk **opens the letter**, sees "invoice", and routes it to accounting. Slower, much smarter.
+- 🛡️ **Reverse proxy** = the company **receptionist**, who represents the servers.
+- 🕵️ **Forward proxy** = **your assistant** making calls for you, who represents the clients.
 
 ## 🖼️ Visual
+
+*Diagram brief:* top panel, an L4 box that only sees `IP:port` and splits connections blindly. Middle panel, an L7 box reading `/api`, `/videos`, `/ws` and routing each to its own pool. Bottom panel, forward vs reverse proxy, mirrored.
 
 ```mermaid
 flowchart LR
     subgraph L4["📦 L4: sees IP:port only"]
-        C1["Client"] -->|"TCP to 1.2.3.4:443"| N["NLB"]
-        N --> B1["Server A"]
-        N --> B2["Server B"]
+        C1["Client"] -->|"TCP to 1.2.3.4:5432"| N["NLB"]
+        N --> B1["PG replica A"]
+        N --> B2["PG replica B"]
     end
     subgraph L7["📖 L7: reads HTTP"]
-        C2["Client"] -->|"GET /api/orders"| A["ALB / Nginx / Envoy"]
-        A -->|"/api/*"| API["API servers"]
-        A -->|"/images/*"| IMG["Image service"]
-        A -->|"Header beta=true"| BETA["Beta version"]
+        C2["Client"] -->|"GET /api/orders"| A["ALB / Envoy / Nginx"]
+        A -->|"/api/*"| API["API pool"]
+        A -->|"/videos/*"| VID["Video service"]
+        A -->|"/ws/*"| WS["Chat gateways"]
     end
 ```
 
 ```mermaid
 flowchart LR
     subgraph Forward["🕵️ Forward proxy (for clients)"]
-        E1["Employee laptops"] --> FP["Corporate proxy"] --> I1["Internet"]
+        E1["Internal servers"] --> FP["Egress proxy"] --> I1["Internet APIs"]
     end
     subgraph Reverse["🛡️ Reverse proxy (for servers)"]
-        I2["Internet"] --> RP["Nginx / CDN / LB"] --> S["Your servers"]
+        I2["Internet"] --> RP["CDN / Nginx / LB"] --> S["Your servers"]
     end
 ```
 
 ## 🔬 How it works
 
-- **L4 load balancer (TCP/UDP):**
-  - Forwards packets or connections based on IP + port. It **doesn't decrypt or parse HTTP**.
-  - ✅ Very fast (millions of connections), protocol-agnostic (databases, gaming, MQTT), preserves end-to-end TLS.
-  - ❌ Can't route by path or header, can't retry per request, and has no HTTP-aware health checks.
-- **L7 load balancer (HTTP/gRPC):**
-  - Terminates the connection, **parses the request**, then opens its own connection to a backend.
-  - ✅ **Path/host/header routing**, TLS termination, auth checks, rewrites, compression, caching, per-request retries, gRPC balancing, WAF rules.
-  - ❌ More CPU per request, and it sees plaintext (so it must be trusted).
-- **Reverse proxy uses:** load balancing, TLS termination, caching, compression, **hiding backend topology**, WAF/security, serving static files.
-- **Forward proxy uses:** corporate filtering, anonymity, egress control ("our servers can only reach approved APIs"), caching for clients.
-- **A common layered pattern:** **L4 at the very edge** (cheap, absorbs floods) → **L7 behind it** (smart routing) → services.
+- **L4 (TCP/UDP):** forwards connections by IP + port. No HTTP parsing, and TLS can pass straight through. It handles **millions of connections** with little CPU, works for **any protocol** (Postgres, MQTT, game UDP), and can use **direct server return**. But it can't route by path or retry per request.
+- **L7 (HTTP/gRPC):** **terminates** the client connection, parses the request, and opens its own connection to a backend. It does **path/host/header/cookie routing**, TLS termination, auth, rewrites, compression, caching, per-request retries, and **per-RPC gRPC balancing**, at the cost of more CPU, plus it sees plaintext.
+- **Reverse proxy jobs:** load balancing, TLS, caching, compression, **hiding backend topology**, WAF, serving static files.
+- **Forward proxy jobs:** corporate filtering, **egress control** ("our servers may call only Stripe and S3"), anonymity, client-side caching.
+- **The layered pattern:** **L4 at the edge** (cheap, absorbs floods and SYN storms) → a fleet of **L7 proxies** (smart routing) → services.
 
 ## 🧩 Worked example
-
-**L7 routing rules for one domain serving many services:**
 
 ```nginx
 server {
   listen 443 ssl;
-  server_name shop.com;
+  server_name pantry.app;
 
-  location /api/      { proxy_pass http://api_pool; }
-  location /images/   { proxy_pass http://image_pool;  proxy_cache img_cache; }
-  location /ws/       { proxy_pass http://chat_pool;
-                        proxy_set_header Upgrade $http_upgrade;
-                        proxy_set_header Connection "upgrade"; }
-  location /          { root /var/www/static; }        # serve static files directly
+  location /api/     { proxy_pass http://api_pool; }
+  location /videos/  { proxy_pass http://video_pool; client_max_body_size 500m;
+                       proxy_request_buffering off; }      # stream uploads, don't buffer 200 MB
+  location /ws/      { proxy_pass http://chat_pool;
+                       proxy_set_header Upgrade $http_upgrade;
+                       proxy_set_header Connection "upgrade"; }
+  location /         { root /var/www/static; }
 }
 ```
 
-**When to pick L4 instead:** your Postgres read replicas, an MQTT broker for IoT, or a game server using UDP. None of them speak HTTP, so an L7 LB can't help.
+**Why gRPC needs L7:** gRPC multiplexes thousands of RPCs over **one long-lived HTTP/2 connection**. An L4 balancer pins that connection to one backend, so **100% of the RPCs hit one pod** while the others idle. An L7 proxy (Envoy) balances **each RPC** separately.
 
 ## ⚖️ Trade-offs
 
@@ -93,71 +94,75 @@ server {
 | Sees | IP, port, protocol | URL, headers, cookies, body |
 | Speed | 🚀 Very fast | Fast (more CPU) |
 | Routing smarts | Low | High |
-| TLS | Pass-through (or terminate) | Terminates |
+| TLS | Pass-through or terminate | Terminates |
 | Protocols | Any TCP/UDP | HTTP, gRPC, WebSocket |
-| Examples | AWS NLB, Maglev, LVS, HAProxy (TCP mode) | AWS ALB, Nginx, Envoy, HAProxy (HTTP mode), Traefik |
+| Examples | AWS NLB, Maglev, LVS, HAProxy TCP mode | AWS ALB, Envoy, Nginx, Traefik, HAProxy HTTP mode |
 
 ## 🌍 Real world
 
-- **AWS:** NLB = L4, ALB = L7. **Google:** Maglev (L4) in front of GFE (L7).
-- **Cloudflare, Fastly** are giant reverse proxies (CDN + WAF + L7 routing).
-- **Kubernetes Ingress controllers** (Nginx, Traefik, Envoy-based) are L7 reverse proxies.
+- **AWS:** NLB is L4, ALB is L7. **Google:** Maglev (L4) in front of GFE (L7).
+- **Cloudflare and Fastly** are planet-scale reverse proxies (CDN + WAF + L7 routing).
+- **Kubernetes Ingress controllers** are L7 reverse proxies.
 
 ## 📌 Cheat card
 
-> - **L4 = envelope address (fast, any protocol). L7 = opens the letter (smart HTTP routing).**
-> - Need path, header, or cookie routing, retries, or auth → **L7**. Need raw speed or non-HTTP → **L4**.
-> - **Reverse proxy protects servers. Forward proxy represents clients.**
-> - Common stack: **L4 edge → L7 routing → services**.
+> - **L4 = envelope address. L7 = opens the letter.**
+> - Path, header, or cookie routing, retries, auth → **L7**. Raw speed or non-HTTP → **L4**.
+> - **gRPC needs L7 (per-RPC) balancing.**
+> - **Reverse proxy fronts servers. Forward proxy fronts clients.**
+> - Common stack: **L4 edge → L7 fleet → services**.
 
 ## 🧪 Feynman check
 
-Explain the mailroom clerk who reads only envelopes versus the one who opens letters, and give one situation where each is the right clerk.
+Explain the clerk who reads only envelopes versus the one who opens letters, and give one job where each is the right clerk.
 
-⚠️ **Common confusion:** "Reverse proxy and load balancer are different things." They overlap heavily. A load balancer is usually a reverse proxy with multiple backends. Nginx can be both, at the same time.
+⚠️ **Common confusion:** "Reverse proxy and load balancer are different things." They overlap almost completely. A load balancer is usually a reverse proxy with multiple backends, and one Nginx process can be both at the same time.
 
 ## ⚡ Quick recall
 
-1. Can an L4 LB route `/api` and `/images` to different servers?
-<details><summary>Answer</summary>
+1. Can an L4 load balancer route `/api` and `/videos` to different servers?
+<details><summary>Reveal Answer</summary>
 
-No. It doesn't read HTTP paths. You need L7.
+No. It never reads HTTP paths. You need L7.
 </details>
 
 2. Give one use of a forward proxy.
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 Corporate web filtering, egress control for servers, anonymity, or client-side caching.
 </details>
 
-3. Why might you want L4 in front of L7?
-<details><summary>Answer</summary>
+3. Why put L4 in front of L7?
+<details><summary>Reveal Answer</summary>
 
-L4 is cheap and fast at absorbing huge connection volumes (and some DDoS), and spreads load across a fleet of L7 proxies that do the smart routing.
+L4 cheaply absorbs huge connection volumes (and some DDoS) and spreads them across a fleet of L7 proxies that do the expensive smart routing.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "You need to route mobile API traffic, web traffic, and WebSocket chat under one domain. What do you use?"**
+**Q. "Under one domain you serve a mobile API, browser traffic, WebSocket chat, and internal gRPC services. Design the proxy layers, and explain why you wouldn't use L7 everywhere."**
 <details><summary>Model answer</summary>
 
-- An **L7 load balancer / reverse proxy** (ALB, Envoy, Nginx) with **path-based rules**: `/api/*` → API pool, `/ws/*` → chat gateways (WebSocket upgrade support, least-connections), `/` → static/CDN.
-- TLS terminates at the L7 layer, and it adds `X-Forwarded-For` and request IDs for tracing.
-- Optionally put an L4 NLB or Anycast edge in front for scale and DDoS absorption.
-- **Likely follow-up:** "How do you route a canary by header?" → an L7 rule on `X-Canary: true`, or a weighted target group.
+- **Edge:** an **Anycast/L4** layer (NLB or a CDN edge) absorbs floods and terminates or passes TLS at scale.
+- **L7 routing tier** (ALB/Envoy/Nginx) with **path rules:**
+  - `/api/*` → API pool (least request).
+  - `/ws/*` → chat gateways (WebSocket upgrade, least connections, long idle timeouts).
+  - `/` → CDN/static.
+  - **Header rules** for canaries (`X-Canary: true` or weighted targets).
+  - It adds `X-Forwarded-For` and a **request ID** for tracing.
+- **Internal gRPC:** an **L7 proxy or sidecar** (Envoy/mesh) so each **RPC** is balanced, not each connection, plus retries, deadlines, and mTLS.
+- **Databases and non-HTTP:** an **L4** balancer or protocol-aware proxy (PgBouncer).
+- **Why not L7 everywhere:**
+  - **CPU and cost**: every request is parsed and TLS terminated.
+  - **Protocol limits**: Postgres, MQTT, and custom UDP aren't HTTP.
+  - **End-to-end encryption** rules may forbid decrypting in the middle.
+  - **Latency**: L4 can use **direct server return**, where responses (video!) bypass the LB entirely.
+- **Likely follow-up:** "What's direct server return?" → the L4 LB forwards the inbound packets, and the backend replies directly to the client using the shared VIP. Great for asymmetric, response-heavy traffic.
 </details>
 
-**Q2. "Why not always use L7?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- **Cost/CPU:** it parses every request and terminates TLS.
-- **Protocol limits:** non-HTTP protocols (databases, MQTT, custom TCP/UDP) need L4.
-- **End-to-end encryption** requirements may forbid terminating TLS in the middle.
-- **Latency:** an extra hop that does real work. L4 can even use direct server return.
-- **Likely follow-up:** "What's direct server return?" → the L4 LB forwards the request, and the backend responds directly to the client, bypassing the LB on the way back (great for heavy responses like video).
-</details>
-
-> 📖 *Next, every service is re-implementing login checks, and Maya wants one front desk for all of them.*
+> 📖 *Requests now land in the right place, but every one of Maya's services is re-checking logins and rate limits its own slightly broken way.*
 
 ---
 
