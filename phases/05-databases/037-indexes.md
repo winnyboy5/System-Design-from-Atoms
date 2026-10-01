@@ -8,162 +8,157 @@
 
 ## 📖 Story
 
-A loyal customer with 3,000 past orders opened "My orders," and it took eight seconds to load. Maya discovered that the database was reading every one of Pantry's 50 million orders just to find hers. I asked her to picture the index at the back of her old school textbook. Now I'll ask you to do the same.
+A loyal customer, someone with **3,000 orders** over three years, taps **"My orders."**
+
+The spinner spins. And spins. **Eight seconds.**
+
+Maya runs `EXPLAIN` on the query, and the answer comes back in two cold words: **`Seq Scan`**.
+
+To find this one customer's orders, Postgres is reading **every one of Pantry's 50 million orders**, row by row, page by page, from the first lasagna ever sold, checking each one: *is this hers? No. Is this hers? No.* It's a librarian searching for one book by walking every aisle and reading every spine.
+
+Meanwhile, other queries queue up behind the disk I/O it's hogging. The whole site slows.
+
+I asked Maya to picture the index at the back of her old school textbook. Now I'll ask you to do the same.
 
 ## 🎯 One-sentence idea
 
-**An index is a sorted lookup structure (usually a B-tree) that lets the database find matching rows without scanning the whole table. It makes reads dramatically faster, at the cost of extra storage and slower writes.**
+**An index is a sorted lookup structure (usually a B-tree) that lets the database jump to matching rows without scanning the whole table, making reads dramatically faster at the cost of extra storage and slower writes.**
 
 ## 🧸 Analogy
 
 The **index at the back of a textbook**:
 
-- Without it, to find "photosynthesis" you **read every page** (a full table scan).
-- With it, you look up "P → photosynthesis → pages 42, 97" and jump straight there.
-- But every time the book is edited, the **index must be updated too** (slower writes), and the index **takes pages** itself (storage).
-- An index on "page color" would be useless. Indexes help when they **narrow things down a lot** (selectivity).
+- Without it, you **read every page** to find "photosynthesis".
+- With it, "P → photosynthesis → pages 42, 97" and you jump straight there.
+- Every edit to the book must **update the index too** (slower writes), and the index **takes pages** (storage).
+- An index on "page colour" is useless. An index helps only when it **narrows things down** (selectivity).
 
 ## 🖼️ Visual
 
+*Diagram brief:* a short, wide tree. The root splits into a few branches, the branches into leaves, and one highlighted path drops three levels straight to a single row.
+
 ```mermaid
 flowchart TD
-    R["Root<br/>[ M ]"] --> A["[ D · H ]"]
-    R --> B["[ R · W ]"]
-    A --> L1["A B C"]
-    A --> L2["D E F G"]
-    A --> L3["H … L"]
-    B --> L4["M … Q"]
-    B --> L5["R … V"]
-    B --> L6["W … Z"]
-    L2 -.->|"leaf → row location"| ROW[("Row: 'Emma'")]
+    R["Root<br/>[ 5,000,000 ]"] --> A["[ 1M · 3M ]"]
+    R --> B["[ 7M · 9M ]"]
+    A --> L1["…"]
+    A --> L2["customer 42 → pages …"]
+    A --> L3["…"]
+    B --> L4["…"]
+    B --> L5["…"]
+    L2 -.->|"leaf → row location"| ROW[("Her 3,000 orders")]
 ```
 
-A B-tree with millions of rows is only **3–4 levels deep**, so a lookup is about 3–4 page reads instead of millions.
+A B-tree over 50M rows is only **3–4 levels deep**, so a lookup is **3–4 page reads instead of ~1M**.
 
 ## 🔬 How it works
 
-- **B-tree index** (the default in almost every relational database): sorted, balanced, O(log n) lookups. It supports **equality**, **ranges** (`BETWEEN`, `<`, `>`), **prefix** (`LIKE 'abc%'`), and **ORDER BY** without a sort.
-- **Hash index:** O(1) equality only. No ranges.
-- **Primary key / clustered index:** in some databases (MySQL InnoDB), the table itself is stored in primary-key order. Secondary indexes point to the primary key.
-- **Composite (multi-column) index** `(a, b, c)`: works for queries filtering on `a`, `a+b`, or `a+b+c` (the **leftmost prefix rule**), but *not* on `b` alone.
-- **Covering index:** includes all the columns a query needs, so the DB never touches the table ("index-only scan").
-- **Other types:** **GIN/inverted** (full-text, JSON, arrays), **GiST/R-tree** (geospatial), **partial** indexes (`WHERE status='active'`), and **expression** indexes (`lower(email)`).
-- **Costs:** every INSERT, UPDATE, or DELETE must update **every index** on the table. Indexes use disk and RAM. Too many indexes = slow writes.
-- **Selectivity:** an index on a column with few distinct values (`is_active`) rarely helps. The planner may prefer a full scan.
-- **Check with `EXPLAIN`:** see whether the database uses your index (`Index Scan`) or scans everything (`Seq Scan`).
+- **B-tree (the default):** sorted and balanced with a high fan-out (~hundreds of keys per 8 KB page), giving **O(log n)**. It serves **equality, ranges, prefix `LIKE 'abc%'`, and `ORDER BY`** without a sort. **Hash** indexes do equality only.
+- **Composite `(a, b, c)` obeys the leftmost-prefix rule:** it serves `a`, `a+b`, and `a+b+c`, but not `b` alone. Put **equality columns first, then range/sort columns**.
+- **Covering indexes** (`INCLUDE (total)`) hold every column the query needs → an **index-only scan**, with no table visit.
+- **Specialized types:** **GIN/inverted** (full text, JSONB, arrays), **GiST/R-tree** (geo), **partial** (`WHERE status='active'`), and **expression** (`lower(email)`).
+- **The bill:** every INSERT, UPDATE, or DELETE maintains **every** index, which costs write latency, disk, and buffer-pool RAM. Low-selectivity columns (`is_active`) rarely help. **`EXPLAIN ANALYZE`** is the source of truth.
 
 ## 🧩 Worked example
 
-**Table:** `orders` with 50M rows.
-
 ```sql
--- 🐢 Without an index: scans 50M rows (~seconds)
-EXPLAIN SELECT * FROM orders WHERE customer_id = 42 ORDER BY created_at DESC LIMIT 20;
--- Seq Scan on orders  (cost=0.00..1250000.00 rows=...)
+-- 🐢 Before: 50M-row sequential scan, ~8 s
+EXPLAIN ANALYZE
+SELECT * FROM orders WHERE customer_id = 42 ORDER BY created_at DESC LIMIT 20;
+-- Seq Scan on orders … actual time=8123 ms
 
--- 🚀 Composite index that matches filter + sort
-CREATE INDEX idx_orders_cust_created ON orders (customer_id, created_at DESC);
-
-EXPLAIN SELECT * FROM orders WHERE customer_id = 42 ORDER BY created_at DESC LIMIT 20;
--- Index Scan using idx_orders_cust_created (cost=0.56..80.12 rows=20)   ~1 ms
+-- 🚀 The index matches the filter AND the sort
+CREATE INDEX CONCURRENTLY idx_orders_cust_created ON orders (customer_id, created_at DESC);
+-- Index Scan using idx_orders_cust_created … actual time=0.9 ms
 ```
 
-**The leftmost-prefix rule with index `(customer_id, created_at)`:**
+**8,123 ms → 0.9 ms: ~9,000× faster.** `CONCURRENTLY` builds it without blocking writes.
 
-| Query filter | Uses index? |
+| Filter with index `(customer_id, created_at)` | Uses it? |
 |---|---|
-| `WHERE customer_id = 42` | ✅ |
-| `WHERE customer_id = 42 AND created_at > '2026-01-01'` | ✅ |
-| `WHERE created_at > '2026-01-01'` | ❌ (no leading column) |
+| `customer_id = 42` | ✅ |
+| `customer_id = 42 AND created_at > '2026-01-01'` | ✅ |
+| `created_at > '2026-01-01'` | ❌ no leading column |
 
-**Covering index to skip table lookups:**
-
-```sql
-CREATE INDEX idx_cover ON orders (customer_id, created_at) INCLUDE (total);
-SELECT created_at, total FROM orders WHERE customer_id = 42;   -- index-only scan
-```
-
-**Common index killers:**
+**Index killers:**
 
 ```sql
-WHERE lower(email) = 'a@b.com'     -- needs an expression index on lower(email)
-WHERE name LIKE '%smith'           -- a leading wildcard can't use a B-tree → full-text search
-WHERE created_at::date = '2026-10-01'  -- a function on the column → rewrite as a range
+WHERE lower(email) = 'a@b.com'          -- needs an expression index on lower(email)
+WHERE name LIKE '%smith'                -- a leading wildcard → full-text search instead
+WHERE created_at::date = '2026-10-01'   -- function on the column → rewrite as a range
 ```
 
 ## ⚖️ Trade-offs
 
-| You gain | You pay | Use it when |
+| Maya's choice | What she gains | What she pays |
 |---|---|---|
-| Fast lookups, ranges, sorting | Slower writes (index maintenance) | Columns in frequent WHERE, JOIN, ORDER BY |
-| Covering indexes → index-only reads | More storage | Hot, read-heavy queries |
-| Composite indexes | Order matters, and some queries can't use them | Multi-column filters |
-| Few indexes | Fast writes | Write-heavy tables (logs, events) |
+| An index on hot filters | 1,000×+ faster reads | Slower writes, more disk and RAM |
+| A covering index | Index-only reads | Even more storage |
+| A composite index | Serves filter + sort together | Column order matters |
+| Few indexes on a write-heavy table | Fast inserts | Slow ad-hoc reads |
 
 ## 🌍 Real world
 
-- **"Add an index" is the #1 fix for slow queries** in production. Always check `EXPLAIN` / `EXPLAIN ANALYZE`.
-- **pg_stat_statements** (Postgres) and the **slow query log** (MySQL) show which queries need indexes.
-- **Unused indexes** are a silent write tax. Periodically find and drop them.
+- **"Add the right index" is the #1 fix** for slow production queries.
+- **`pg_stat_statements`** and the MySQL **slow query log** reveal which queries need one.
+- **Unused indexes** are a silent write tax. Audit them with `pg_stat_user_indexes`.
 
 ## 📌 Cheat card
 
 > - Index = **the book's index**: find rows without reading every page.
-> - **B-tree** (default): equality + ranges + sort + prefix. **Hash**: equality only.
-> - **Composite index = leftmost prefix rule.** Put **equality columns first, then range/sort**.
+> - **B-tree:** equality + range + sort + prefix. **Hash:** equality only.
+> - **Leftmost prefix.** Equality columns first, then range/sort.
 > - **Covering index** → index-only scans.
-> - **Every index slows writes.** Index for your **real queries**, verified with **EXPLAIN**.
-> - Leading `%wildcard` or a function on the column → the index isn't used.
+> - **Every index taxes writes.** Design from real queries, and verify with **EXPLAIN ANALYZE**.
 
 ## 🧪 Feynman check
 
-Explain the textbook index analogy, why an index on "page colour" is useless, and why every edit to the book becomes slower.
+Explain the textbook index, why an index on "page colour" is useless, and why every edit to the book gets a little slower.
 
-⚠️ **Common confusion:** "Index every column just in case." Each index costs write speed and memory, and single-column indexes often can't serve multi-column queries well. **Design indexes from query patterns.**
+⚠️ **Common confusion:** "Index every column, just in case." Single-column indexes rarely serve multi-column queries well, and each one slows every write and eats buffer-pool memory that hot data needs. **Index the queries you actually run.**
 
 ## ⚡ Quick recall
 
 1. Can a B-tree index on `(a, b)` help `WHERE b = 5`?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-Generally no. It needs the leftmost column `a` (some DBs can do skip scans, but don't count on it).
+Generally no. It needs the leading column `a` (some databases can skip-scan, but don't count on it).
 </details>
 
 2. What's a covering index?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-An index containing every column a query needs, so the DB answers from the index alone without reading the table rows.
+An index containing every column a query needs, so the database answers from the index alone.
 </details>
 
 3. Why do indexes slow down writes?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
 Every insert, update, or delete must also update each index on the table.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "This query is slow: `SELECT * FROM messages WHERE chat_id = ? ORDER BY sent_at DESC LIMIT 50`. Fix it."**
+**Q. "`SELECT * FROM messages WHERE chat_id = ? ORDER BY sent_at DESC LIMIT 50` is slow. Fix it. Then: inserts into an events table have slowed down over months. What do you check?"**
 <details><summary>Model answer</summary>
 
-- Create a composite index `(chat_id, sent_at DESC)`. It matches the filter *and* the sort, so the DB reads just 50 index entries.
-- Select only the needed columns (and consider a covering index with `INCLUDE`).
-- Use **cursor pagination** (`AND sent_at < :last_seen`) for older pages instead of OFFSET.
-- Verify with `EXPLAIN ANALYZE`.
-- **Likely follow-up:** "The table has 10B rows?" → partition or shard by `chat_id` (or use a wide-column store keyed by chat_id + time).
+- **The read:**
+  - A composite index `(chat_id, sent_at DESC)` matches the filter **and** the sort, so the DB reads exactly 50 index entries, in order.
+  - Select only the needed columns. Consider `INCLUDE` for an index-only scan.
+  - Page with a **cursor** (`AND sent_at < :last_seen`), never `OFFSET`.
+  - Verify with `EXPLAIN ANALYZE`.
+  - At 10B+ rows: **partition or shard by `chat_id`**, or move to a wide-column store keyed `(chat_id, sent_at)`.
+- **Slow inserts, the checklist:**
+  - **Too many indexes:** each insert updates all of them, so drop unused ones.
+  - **Random primary keys (UUIDv4):** inserts land all over the B-tree, causing page splits, cache misses, and bloat. Use **time-ordered IDs** (UUIDv7/Snowflake), so inserts append to the right edge.
+  - **Bloat and vacuum lag** (Postgres), long-running transactions pinning old row versions, and lock contention.
+  - **Growth:** **partition by time** and drop old partitions instead of mass deletes.
+- **Likely follow-up:** "Why exactly do random UUIDs hurt?" → the B-tree's working set becomes the whole index rather than its hot right edge, so far more pages must stay in RAM, and every insert is a likely disk read plus a split.
 </details>
 
-**Q2. "Writes on our events table got slow over time. What would you check?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- **Too many indexes** (each insert updates all of them). Drop unused ones (check index usage stats).
-- **Random-key indexes** (e.g., UUIDv4 primary keys) cause page splits and cache misses. Prefer time-ordered IDs (UUIDv7/Snowflake).
-- **Table/index bloat**, autovacuum lag (Postgres), lock contention, and a big uncommitted transaction.
-- **Growth:** partition by time (drop old partitions instead of deleting rows).
-- **Likely follow-up:** "Why do random UUIDs hurt?" → inserts land all over the B-tree, the working set doesn't fit in memory, and there's more I/O and fragmentation.
-</details>
-
-> 📖 *Next, chat messages pile up by the billion, and the relational database starts to strain.*
+> 📖 *"My orders" loads in a millisecond now, but Pantry's chat messages have passed a billion rows, and the relational database starts to groan under a shape of data it was never built for.*
 
 ---
 

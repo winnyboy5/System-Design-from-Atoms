@@ -8,151 +8,159 @@
 
 ## 📖 Story
 
-Cooks uploaded recipe videos and photos, and Maya had been storing them inside the database. Backups now took nine hours, and the disk was almost full. I told her I'd done exactly the same thing on my first project. She needed a home built for big files: cheap, endless, and nearly impossible to lose.
+Pantry's cooks love the new feature: **recipe videos**. They upload them by the hundreds, 200 MB here, 600 MB there.
+
+Maya has been storing them the quick way: as `BYTEA` columns **inside Postgres**.
+
+Now the database is **4 TB**, and **3.7 TB of it is video**. The nightly backup takes **nine hours** and is still running when the morning rush begins. Every new read replica has to copy terabytes of video before it can serve a single query. The buffer pool, the RAM meant to hold hot rows like orders, keeps getting flushed by a single cooking clip. And the disk alarm reads **91% full**.
+
+It's like keeping all your furniture in the kitchen drawers. Technically it fits, and nothing else works.
+
+I told her I'd done exactly the same thing on my first project. She needs a home built for big files: **cheap, endless, and nearly impossible to lose.**
 
 ## 🎯 One-sentence idea
 
-**Object storage (S3, GCS, Azure Blob) stores files ("objects") by key in practically unlimited, very durable, cheap buckets. It's the right home for images, video, backups, and data lakes, and the wrong home for data you update in small pieces or query.**
+**Object storage (S3, GCS, Azure Blob) keeps whole files by key in practically unlimited, extremely durable, cheap buckets, which makes it the right home for images, video, backups, and data lakes, and the wrong home for data you edit in small pieces or query.**
 
 ## 🧸 Analogy
 
 A **giant warehouse of labelled boxes**:
 
-- You hand over a box and a **label** (`photos/user42/cat.jpg`), and the warehouse stores it **somewhere safe** (actually, copies in several buildings).
-- You can get the whole box back by its label, or replace it, or delete it.
-- You **can't** reach inside and change one page of a book in the box. You swap the whole box.
-- It's **cheap per shelf**, and it never runs out of shelves.
-
-Compare with a **filing cabinet with folders you edit in place** (a file system/block storage) or a **spreadsheet you query** (a database).
+- Hand over a box and a **label** (`videos/cook7/lasagna.mp4`), and copies are stored in several buildings.
+- Get it back by its label, replace it, or delete it.
+- You **can't** reach in and edit page 5. You swap the whole box.
+- **Cheap per shelf**, and it never runs out of shelves.
 
 ## 🖼️ Visual
 
+*Diagram brief:* the client asks the API for a signed ticket, then hands the box straight to the warehouse, completely bypassing the app servers. A "box arrived" bell triggers processing, and the CDN serves the result.
+
 ```mermaid
 sequenceDiagram
-    participant C as 📱 Client
+    participant C as 📱 Cook's phone
     participant API as 🖥️ API server
     participant S3 as 🪣 Object storage
     participant CDN as 🌍 CDN
-    C->>API: I want to upload cat.jpg
-    API-->>C: Pre-signed PUT URL (valid 10 min)
-    C->>S3: PUT cat.jpg directly (bytes skip your servers)
+    C->>API: I want to upload lasagna.mp4 (600 MB)
+    API-->>C: Pre-signed multipart URLs (valid 1 h)
+    C->>S3: PUT parts in parallel (bytes never touch the API)
     S3-->>API: Event: object created
-    API->>API: Save metadata row (owner, key, size) + enqueue thumbnail job
-    C->>CDN: GET image URL
+    API->>API: Insert metadata row + enqueue transcode job
+    C->>CDN: GET video URL
     CDN->>S3: fetch on cache miss
 ```
 
 ## 🔬 How it works
 
-- **Buckets + keys:** a flat namespace (`bucket/key`). "Folders" are just key prefixes.
-- **Objects are immutable-ish:** you **PUT whole objects** (or use multipart upload for big ones). There are no in-place partial edits.
-- **Durability:** replicated or erasure-coded across devices and availability zones. S3 advertises **11 nines** (99.999999999%) durability.
-- **Consistency:** S3 now offers **strong read-after-write consistency** for PUTs and DELETEs.
-- **Cost tiers:** hot (Standard), infrequent access, archive (Glacier), with **lifecycle rules** to move old objects automatically.
-- **Metadata goes in a database:** store the owner, size, content type, and permissions in your DB, with the object key pointing to the blob.
-- **Pre-signed URLs:** your API signs a time-limited URL, and clients **upload or download directly** to storage. Your servers never handle the bytes.
-- **Multipart upload:** split big files into parts (e.g., 5–100 MB), upload them in parallel, and retry failed parts only. Needed above ~100 MB (and required above 5 GB on S3).
-- **Event notifications:** "object created" → trigger thumbnailing, virus scans, and indexing (via queue or Lambda).
-- **Pair it with a CDN** for global, fast reads (lesson 023).
+- **Buckets + keys in a flat namespace:** "folders" are just prefixes. You **PUT/GET whole objects**, with no in-place partial edits (use range GETs to read slices).
+- **Durability and consistency:** data is replicated or **erasure-coded across AZs**. S3 is designed for **11 nines** of durability and offers **strong read-after-write** consistency.
+- **Blobs in storage, metadata in the DB:** the owner, size, type, status, and permissions live in a row whose `object_key` points at the blob.
+- **Pre-signed URLs + multipart:** the API signs a short-lived URL, and the client uploads or downloads **directly**. Large files go in **parallel parts** (5 MB–5 GB each, required above 5 GB), retrying only the failed parts.
+- **Events and lifecycle:** an "object created" event triggers transcoding, scanning, or indexing. **Lifecycle rules** move cold objects to infrequent-access or archive tiers and expire temp uploads. Put a **CDN** in front for reads (lesson 023).
 
 ## 🧩 Worked example
-
-**Generating a pre-signed upload URL (Python, boto3):**
 
 ```python
 url = s3.generate_presigned_url(
     "put_object",
-    Params={"Bucket": "user-photos", "Key": f"u/{user_id}/{uuid4()}.jpg",
-            "ContentType": "image/jpeg"},
-    ExpiresIn=600,                        # 10 minutes
-)
-# Return `url` to the client → the client PUTs the file bytes directly to S3
+    Params={"Bucket": "pantry-media", "Key": f"raw/{cook_id}/{uuid4()}.mp4",
+            "ContentType": "video/mp4"},
+    ExpiresIn=3600,
+)   # the client PUTs bytes straight to storage; the API never touches them
 ```
 
-**Storage choice cheat table:**
+**Maya's migration results:**
 
-| Data | Where | Why |
+| Metric | Video in Postgres | Video in S3 + CDN |
 |---|---|---|
-| Profile photos, videos | Object storage + CDN | Big blobs, cheap, durable |
-| Photo metadata (owner, tags) | Database | Queried, updated |
-| Database files | Block storage (EBS) | Random in-place writes |
-| Shared config files for servers | File storage (EFS/NFS) | POSIX file semantics |
-| Backups, logs, data lake | Object storage (+ archive tiers) | Cheap at massive scale |
+| DB size | 4 TB | **300 GB** |
+| Nightly backup | 9 h | **40 min** |
+| New replica bootstrap | ~12 h | **~1 h** |
+| Storage cost (3.7 TB) | SSD + replicas ≈ $1,500/mo | **≈ $85/mo** (~$0.023/GB) |
 
-**Cost intuition** (illustrative list prices): standard object storage is roughly **$0.02/GB-month**, so **1 PB ≈ $20k/month**. Archive tiers can be ~10–20× cheaper, with retrieval delays.
+| Data | Home | Why |
+|---|---|---|
+| Videos, photos | Object storage + CDN | Big blobs, cheap, durable |
+| Video metadata | Database | Queried and updated |
+| DB data files | Block storage (EBS) | Random in-place writes |
+| Shared config for servers | File storage (EFS/NFS) | POSIX semantics |
+| Backups, logs, data lake | Object storage + archive tiers | Cheap at massive scale |
 
 ## ⚖️ Trade-offs
 
-| | Object storage | Block storage | File storage | Database |
+| | Object | Block | File | Database |
 |---|---|---|---|---|
-| Access | HTTP API by key | Raw disk to one VM | Shared POSIX FS | Queries |
-| Partial updates | ❌ Whole object | ✅ | ✅ | ✅ |
-| Scale | ♾️ | Per volume (TBs) | Large | Varies |
+| Access | HTTP API by key | Raw disk, one VM | Shared POSIX | Queries |
+| Partial updates | ❌ | ✅ | ✅ | ✅ |
+| Scale | ♾️ | TBs per volume | Large | Varies |
 | Cost/GB | 💲 Lowest | 💲💲 | 💲💲💲 | 💲💲💲 |
-| Best for | Media, backups, lakes | DB and VM disks | Shared files | Structured data |
 
 ## 🌍 Real world
 
-- **Amazon S3** holds hundreds of trillions of objects. Its API has become a de-facto standard (MinIO, Cloudflare R2, Backblaze B2 are S3-compatible).
-- **Dropbox** moved its storage from S3 to its own system (Magic Pocket) at exabyte scale.
+- **Amazon S3** stores hundreds of trillions of objects, and its API is a de-facto standard (MinIO, Cloudflare R2, Backblaze B2).
+- **Dropbox** moved exabytes from S3 to its own **Magic Pocket** system.
 - **Data lakes** (Parquet on S3) underpin modern analytics (lesson 041).
 
 ## 📌 Cheat card
 
-> - **Object storage = labelled boxes in an infinite warehouse.** Whole-object PUT/GET by key.
-> - **Blobs in S3, metadata in a DB.**
-> - **Pre-signed URLs** → clients upload and download directly. Servers skip the bytes.
-> - **Multipart** for big files. **Lifecycle rules** for cost tiers.
-> - **11 nines durability.** Put a **CDN** in front for speed.
+> - **Labelled boxes in an infinite warehouse.** Whole-object PUT/GET by key.
+> - **Blobs in storage, metadata in the DB.**
+> - **Pre-signed URLs** → clients move the bytes directly.
+> - **Multipart** for big files, **lifecycle rules** for cost.
+> - **11 nines durability.** Put a **CDN** in front.
 
 ## 🧪 Feynman check
 
-Explain the labelled-box warehouse, why you can't "edit page 5 inside the box," and why you should let customers drop boxes off directly instead of carrying them through your office.
+Explain the warehouse of boxes, why you can't edit page 5 inside a box, and why customers should drop boxes off directly instead of carrying them through your office.
 
-⚠️ **Common confusion:** Storing images as BLOBs in the relational database. It bloats backups and replicas, wastes the buffer cache, and costs far more per GB. Put the blob in object storage, and the key in the DB.
+⚠️ **Common confusion:** "Durable means backed up." 11 nines protects against **hardware loss**, not against **you** deleting or overwriting objects. Turn on **versioning**, **object lock** for compliance, and **cross-region replication** for disaster recovery.
 
 ## ⚡ Quick recall
 
 1. What's a pre-signed URL?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-A time-limited, signed URL that lets a client upload or download a specific object directly from storage without having credentials.
+A time-limited, signed URL that lets a client upload or download one specific object directly, without holding storage credentials.
 </details>
 
 2. Why is multipart upload useful?
-<details><summary>Answer</summary>
+<details><summary>Reveal Answer</summary>
 
-It uploads large files in parallel parts, retries only failed parts, and supports very large objects.
+It uploads large files in parallel parts, retries only the failed parts, and supports very large objects.
 </details>
 
-3. Where should you keep an uploaded file's owner and tags?
-<details><summary>Answer</summary>
+3. Where should an uploaded file's owner and tags live?
+<details><summary>Reveal Answer</summary>
 
 In a database (metadata), with the object key referencing the file in object storage.
 </details>
 
 ## 🎤 Interview practice
 
-**Q1. "Design the upload flow for a photo-sharing app handling 1,000 uploads/s of 3 MB photos."**
+**Q. "Design the upload pipeline for a photo app handling 1,000 uploads/s of 3 MB photos, and explain why not just store files on the app servers."**
 <details><summary>Model answer</summary>
 
-- The client asks the API for a **pre-signed PUT URL** (auth, size and type limits) → **uploads directly to S3** (3 GB/s of bytes never touch the app servers).
-- An S3 event → queue → **workers** generate thumbnails and sizes, strip EXIF location data, and run moderation. They write the variants to S3.
-- Metadata row in the DB (`photo_id, owner, key, status=processing→ready`).
-- Serve through a **CDN**. Private photos use signed CDN URLs.
-- Storage: 3 MB × 1,000/s × 86,400 ≈ **260 TB/day** of originals, so use lifecycle tiering and consider compressing originals.
-- **Likely follow-up:** "What if the client uploads but never confirms?" → cleanup job for orphaned objects (a lifecycle rule on an `uploads/tmp/` prefix).
+- **Upload:**
+  - The client requests a **pre-signed PUT** (the API checks auth and enforces size and type limits).
+  - The client uploads **directly to object storage**, so ~**3 GB/s** of bytes never touch the app tier.
+  - The key carries a random prefix for spread and no PII.
+- **Processing:**
+  - An **object-created event** → a queue → workers generate sizes and WebP/AVIF variants, **strip EXIF GPS**, and run moderation.
+  - Variants are written back to storage.
+  - The metadata row moves `processing → ready`.
+- **Serving:** through a **CDN**, with **signed CDN URLs** for private photos.
+- **Capacity:** 3 MB × 1,000/s × 86,400 ≈ **260 TB/day** of originals → **lifecycle tiering**, and consider re-encoding originals.
+- **Hygiene:** a lifecycle rule expires orphaned objects under `uploads/tmp/` (clients that never confirm). Turn on versioning to protect against accidental deletes.
+- **Why not the app servers' disks:**
+  - They become **stateful** (no free scaling or replacement, lesson 018).
+  - Disks fill up, a disk failure loses data, and serving bytes wastes app CPU and bandwidth.
+  - Object storage brings durability, infinite scale, cost tiers, and CDN integration.
+- **Likely follow-up:** "Object storage first-byte latency is ~tens of ms. Is that a problem?" → not behind a CDN. Hot objects are served from the edge.
 </details>
 
-**Q2. "Why not just store files on the app servers' disks?"**
-<details><summary>Model answer</summary>
+## 📖 Teaser
 
-- The app servers become **stateful** (you can't scale out or replace them freely, lesson 018), disks fill up, there's no redundancy (a disk failure = data loss), and serving files wastes app CPU and bandwidth.
-- Object storage gives durability, unlimited scale, cheap tiers, and direct CDN integration.
-- **Likely follow-up:** "What about latency for small, frequently read files?" → the CDN plus caching solves reads, and object storage first-byte latency (~tens of ms) is fine behind a CDN.
-</details>
-
-> 📖 *Next, a customer searches for "spicy vegan noodels" and gets nothing back.*
+> 📖 *Videos have a proper home now, and then a customer searches "spicy vegan noodels" and Pantry confidently answers: zero results.*
 
 ---
 
